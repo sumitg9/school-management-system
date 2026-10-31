@@ -511,7 +511,7 @@ return new class extends Migration
         $feeTypes = [
             ['name' => 'Tuition Fee', 'type' => 'tuition', 'amount' => 18000.00, 'due' => '2024-04-30'],
             ['name' => 'Transport Fee', 'type' => 'transport', 'amount' => 6000.00, 'due' => '2024-04-30'],
-            ['name' => 'Computer Lab Fee', 'type' => 'lab', 'amount' => 2500.00, 'due' => '2024-05-15'],
+            ['name' => 'Computer Lab Fee', 'type' => 'other', 'amount' => 2500.00, 'due' => '2024-05-15'],
             ['name' => 'Examination Fee', 'type' => 'exam', 'amount' => 1500.00, 'due' => '2024-06-30'],
         ];
 
