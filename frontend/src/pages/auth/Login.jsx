@@ -42,6 +42,7 @@ const Login = () => {
   };
 
   const handleDemoLogin = async (role) => {
+    const roleKey = role.toLowerCase();
     const credentials = {
       admin: { email: 'admin@school.com', password: 'password' },
       teacher: { email: 'teacher@school.com', password: 'password' },
@@ -49,9 +50,14 @@ const Login = () => {
       parent: { email: 'parent@school.com', password: 'password' },
     };
 
-    if (credentials[role]) {
+    if (credentials[roleKey]) {
+      setFormData(prev => ({
+        ...prev,
+        email: credentials[roleKey].email,
+        password: credentials[roleKey].password,
+      }));
       setLoading(true);
-      const result = await login(credentials[role]);
+      const result = await login(credentials[roleKey]);
       setLoading(false);
 
       if (result.success) {
