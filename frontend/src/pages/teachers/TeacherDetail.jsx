@@ -3,10 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { teacherAPI } from '../../services/api';
 import Badge from '../../components/common/Badge';
+import { useSettings } from '../../context/SettingsContext';
 
 const TeacherDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { formatDate } = useSettings();
   const [teacher, setTeacher] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('profile');

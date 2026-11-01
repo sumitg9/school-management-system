@@ -4,13 +4,16 @@ import { toast } from 'react-toastify';
 import { examAPI, academicYearAPI } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
+import { useSettings } from '../../context/SettingsContext';
 
 const ExamList = () => {
   const navigate = useNavigate();
+  const { formatDate } = useSettings();
   const [exams, setExams] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     page: 1,
     per_page: 20,
@@ -19,8 +22,25 @@ const ExamList = () => {
     type: '',
   });
 
+  // Fetch academic years once on mount
   useEffect(() => {
     fetchAcademicYears();
+  }, []);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters(prev => {
+        if (prev.search === searchTerm) return prev;
+        return { ...prev, search: searchTerm, page: 1 };
+      });
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Fetch exams when filters change
+  useEffect(() => {
     fetchExams();
   }, [filters]);
 
@@ -111,12 +131,12 @@ const ExamList = () => {
     {
       key: 'start_date',
       label: 'Start Date',
-      render: (row) => new Date(row.start_date).toLocaleDateString(),
+      render: (row) => formatDate(row.start_date),
     },
     {
       key: 'end_date',
       label: 'End Date',
-      render: (row) => new Date(row.end_date).toLocaleDateString(),
+      render: (row) => formatDate(row.end_date),
     },
     {
       key: 'total_marks',
@@ -195,8 +215,8 @@ const ExamList = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
             <input
               type="text"
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search exams..."
               className="input-field"
             />
@@ -234,6 +254,7 @@ const ExamList = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">&nbsp;</label>
             <button
               onClick={() => {
+                setSearchTerm('');
                 setFilters({
                   page: 1,
                   per_page: 20,

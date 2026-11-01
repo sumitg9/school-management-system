@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Section;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class SectionController extends Controller
 {
@@ -26,7 +27,14 @@ class SectionController extends Controller
         $perPage = $request->get('per_page', 50);
 
         if ($perPage === 'all') {
-            $sections = $query->get();
+            $classId = $request->get('class_id', 'all');
+            $status = $request->get('status', 'all');
+            $cacheKey = "sections_list_{$classId}_{$status}";
+
+            $sections = Cache::remember($cacheKey, 600, function() use ($query) {
+                return $query->get();
+            });
+
             return response()->json([
                 'success' => true,
                 'data' => $sections,

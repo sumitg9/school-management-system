@@ -4,6 +4,7 @@ import 'react-toastify/dist/ReactToastify.css';
 
 // Context
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { SettingsProvider } from './context/SettingsContext';
 
 // Layout
 import Layout from './components/layout/Layout';
@@ -42,6 +43,7 @@ import AssignmentDetail from './pages/assignments/AssignmentDetail';
 import EnhancedDashboard from './pages/EnhancedDashboard';
 import AdvancedReports from './pages/reports/AdvancedReports';
 import BulkOperations from './pages/tools/BulkOperations';
+import Settings from './pages/settings/Settings';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -112,6 +114,7 @@ function AppRoutes() {
                   <Route path="/assignments/create" element={<AssignmentForm />} />
                   <Route path="/assignments/:id" element={<AssignmentDetail />} />
                   <Route path="/assignments/:id/edit" element={<AssignmentForm />} />
+                  <Route path="/settings" element={<Settings />} />
                 </Routes>
               </Layout>
             </ProtectedRoute>
@@ -127,7 +130,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppRoutes />
+        <SettingsProvider>
+          <AppRoutes />
+        </SettingsProvider>
       </AuthProvider>
     </Router>
   );

@@ -100,46 +100,76 @@ return new class extends Migration
         // 2. Core Demo Users
         $coreUsers = [
             [
-                'name' => 'Super Admin',
+                'name' => 'Dr. Rameshwar Sharma',
                 'email' => 'superadmin@school.com',
                 'role' => 'super-admin',
-                'phone' => '+1234567890',
+                'phone' => '+91 98765 00001',
                 'gender' => 'male',
+                'address' => '42, Shanti Kunj, Sector 14, Dwarka',
+                'city' => 'New Delhi',
+                'state' => 'Delhi',
+                'country' => 'India',
+                'postal_code' => '110078',
             ],
             [
-                'name' => 'Admin User',
+                'name' => 'Rajesh Sharma',
                 'email' => 'admin@school.com',
                 'role' => 'admin',
-                'phone' => '+1234567891',
+                'phone' => '+91 98765 00002',
                 'gender' => 'male',
+                'address' => '42, Shanti Kunj, Sector 14, Dwarka',
+                'city' => 'New Delhi',
+                'state' => 'Delhi',
+                'country' => 'India',
+                'postal_code' => '110078',
             ],
             [
-                'name' => 'John Teacher',
+                'name' => 'Vikram Malhotra',
                 'email' => 'teacher@school.com',
                 'role' => 'teacher',
-                'phone' => '+1234567892',
+                'phone' => '+91 98765 00003',
                 'gender' => 'male',
+                'address' => 'B-12, Teachers Enclave, Mayur Vihar Phase 1',
+                'city' => 'New Delhi',
+                'state' => 'Delhi',
+                'country' => 'India',
+                'postal_code' => '110091',
             ],
             [
-                'name' => 'Jane Student',
+                'name' => 'Aarohi Verma',
                 'email' => 'student@school.com',
                 'role' => 'student',
-                'phone' => '+1234567893',
+                'phone' => '+91 98765 00004',
                 'gender' => 'female',
+                'address' => 'Flat 302, Green Glen Layout, Bellandur',
+                'city' => 'Bengaluru',
+                'state' => 'Karnataka',
+                'country' => 'India',
+                'postal_code' => '560103',
             ],
             [
-                'name' => 'Parent User',
+                'name' => 'Ramesh Verma',
                 'email' => 'parent@school.com',
                 'role' => 'parent',
-                'phone' => '+1234567894',
+                'phone' => '+91 98765 00005',
                 'gender' => 'male',
+                'address' => 'Flat 302, Green Glen Layout, Bellandur',
+                'city' => 'Bengaluru',
+                'state' => 'Karnataka',
+                'country' => 'India',
+                'postal_code' => '560103',
             ],
             [
-                'name' => 'Accountant User',
+                'name' => 'Sunita Patel',
                 'email' => 'accountant@school.com',
                 'role' => 'accountant',
-                'phone' => '+1234567895',
+                'phone' => '+91 98765 00006',
                 'gender' => 'female',
+                'address' => '108, Navrangpura',
+                'city' => 'Ahmedabad',
+                'state' => 'Gujarat',
+                'country' => 'India',
+                'postal_code' => '380009',
             ],
         ];
 
@@ -154,7 +184,11 @@ return new class extends Migration
                     'gender' => $uData['gender'],
                     'status' => 'active',
                     'date_of_birth' => '1990-01-01',
-                    'address' => '123 School Ave, Education City',
+                    'address' => $uData['address'],
+                    'city' => $uData['city'],
+                    'state' => $uData['state'],
+                    'country' => $uData['country'],
+                    'postal_code' => $uData['postal_code'],
                 ]
             );
 
@@ -259,12 +293,12 @@ return new class extends Migration
 
         // 6. Teachers
         $teacherProfiles = [
-            ['first_name' => 'John', 'last_name' => 'Teacher', 'email' => 'teacher@school.com', 'dept' => 'Mathematics', 'gender' => 'male', 'qual' => 'M.Sc., B.Ed', 'exp' => 8, 'desig' => 'Senior Teacher'],
-            ['first_name' => 'Rajesh', 'last_name' => 'Kumar', 'email' => 'rajesh.kumar@school.com', 'dept' => 'Mathematics', 'gender' => 'male', 'qual' => 'M.Sc., B.Ed', 'exp' => 10, 'desig' => 'HOD Mathematics'],
-            ['first_name' => 'Priya', 'last_name' => 'Sharma', 'email' => 'priya.sharma@school.com', 'dept' => 'English', 'gender' => 'female', 'qual' => 'M.A. English', 'exp' => 6, 'desig' => 'English Teacher'],
-            ['first_name' => 'Amit', 'last_name' => 'Patel', 'email' => 'amit.patel@school.com', 'dept' => 'Science', 'gender' => 'male', 'qual' => 'M.Sc. Physics', 'exp' => 7, 'desig' => 'Science Teacher'],
-            ['first_name' => 'Anjali', 'last_name' => 'Gupta', 'email' => 'anjali.gupta@school.com', 'dept' => 'Computer Science', 'gender' => 'female', 'qual' => 'M.C.A.', 'exp' => 5, 'desig' => 'CS Teacher'],
-            ['first_name' => 'Rahul', 'last_name' => 'Mehta', 'email' => 'rahul.mehta@school.com', 'dept' => 'Physical Education', 'gender' => 'male', 'qual' => 'B.P.Ed', 'exp' => 4, 'desig' => 'Sports Coach'],
+            ['first_name' => 'Vikram', 'last_name' => 'Malhotra', 'email' => 'teacher@school.com', 'dept' => 'Mathematics', 'gender' => 'male', 'qual' => 'M.Sc., B.Ed', 'exp' => 8, 'desig' => 'Senior Teacher', 'phone' => '+91 98765 00003', 'address' => 'B-12, Teachers Enclave, Mayur Vihar Phase 1', 'city' => 'New Delhi', 'state' => 'Delhi', 'postal_code' => '110091'],
+            ['first_name' => 'Rajesh', 'last_name' => 'Kumar', 'email' => 'rajesh.kumar@school.com', 'dept' => 'Mathematics', 'gender' => 'male', 'qual' => 'M.Sc., B.Ed', 'exp' => 10, 'desig' => 'HOD Mathematics', 'phone' => '+91 98765 11002', 'address' => 'B-24, Sector 62', 'city' => 'Noida', 'state' => 'Uttar Pradesh', 'postal_code' => '201309'],
+            ['first_name' => 'Priya', 'last_name' => 'Sharma', 'email' => 'priya.sharma@school.com', 'dept' => 'English', 'gender' => 'female', 'qual' => 'M.A. English', 'exp' => 6, 'desig' => 'English Teacher', 'phone' => '+91 98765 11003', 'address' => 'C-88, South Extension Part 2', 'city' => 'New Delhi', 'state' => 'Delhi', 'postal_code' => '110049'],
+            ['first_name' => 'Amit', 'last_name' => 'Patel', 'email' => 'amit.patel@school.com', 'dept' => 'Science', 'gender' => 'male', 'qual' => 'M.Sc. Physics', 'exp' => 7, 'desig' => 'Science Teacher', 'phone' => '+91 98765 11004', 'address' => '402, Navrangpura', 'city' => 'Ahmedabad', 'state' => 'Gujarat', 'postal_code' => '380009'],
+            ['first_name' => 'Anjali', 'last_name' => 'Gupta', 'email' => 'anjali.gupta@school.com', 'dept' => 'Computer Science', 'gender' => 'female', 'qual' => 'M.C.A.', 'exp' => 5, 'desig' => 'CS Teacher', 'phone' => '+91 98765 11005', 'address' => '703, Cyber City View, Gachibowli', 'city' => 'Hyderabad', 'state' => 'Telangana', 'postal_code' => '500032'],
+            ['first_name' => 'Rahul', 'last_name' => 'Mehta', 'email' => 'rahul.mehta@school.com', 'dept' => 'Physical Education', 'gender' => 'male', 'qual' => 'B.P.Ed', 'exp' => 4, 'desig' => 'Sports Coach', 'phone' => '+91 98765 11006', 'address' => '52, Shivaji Park, Dadar West', 'city' => 'Mumbai', 'state' => 'Maharashtra', 'postal_code' => '400028'],
         ];
 
         $teachers = [];
@@ -275,11 +309,15 @@ return new class extends Migration
                 [
                     'name' => "{$tp['first_name']} {$tp['last_name']}",
                     'password' => $defaultPassword,
-                    'phone' => '9876543' . str_pad($tIdx, 3, '0', STR_PAD_LEFT),
+                    'phone' => $tp['phone'],
                     'gender' => $tp['gender'],
                     'status' => 'active',
                     'date_of_birth' => '1985-06-15',
-                    'address' => 'Teacher Colony, Education City',
+                    'address' => $tp['address'],
+                    'city' => $tp['city'],
+                    'state' => $tp['state'],
+                    'country' => 'India',
+                    'postal_code' => $tp['postal_code'],
                 ]
             );
 
@@ -312,24 +350,39 @@ return new class extends Migration
         // 7. Demo Students
         $studentSeeds = [
             [
-                'first_name' => 'Jane', 'last_name' => 'Student', 'email' => 'student@school.com',
+                'first_name' => 'Aarohi', 'last_name' => 'Verma', 'email' => 'student@school.com',
                 'admission_number' => 'STU0001', 'class_num' => 10, 'sec' => 'A', 'roll' => '1', 'gender' => 'female',
+                'phone' => '+91 98765 00004', 'dob' => '2008-05-10', 'blood' => 'B+',
+                'address' => 'Flat 302, Green Glen Layout, Bellandur', 'city' => 'Bengaluru', 'state' => 'Karnataka', 'postal_code' => '560103',
+                'emergency_name' => 'Ramesh Verma', 'emergency_phone' => '+91 98765 00005', 'emergency_relation' => 'Father',
             ],
             [
                 'first_name' => 'Aarav', 'last_name' => 'Kumar', 'email' => 'aarav.kumar@student.com',
                 'admission_number' => 'STU0002', 'class_num' => 10, 'sec' => 'A', 'roll' => '2', 'gender' => 'male',
+                'phone' => '+91 98765 22002', 'dob' => '2008-08-14', 'blood' => 'O+',
+                'address' => '14, Mall Road, Civil Lines', 'city' => 'Jaipur', 'state' => 'Rajasthan', 'postal_code' => '302006',
+                'emergency_name' => 'Sanjay Kumar', 'emergency_phone' => '+91 98765 22102', 'emergency_relation' => 'Father',
             ],
             [
                 'first_name' => 'Diya', 'last_name' => 'Sharma', 'email' => 'diya.sharma@student.com',
                 'admission_number' => 'STU0003', 'class_num' => 10, 'sec' => 'B', 'roll' => '1', 'gender' => 'female',
+                'phone' => '+91 98765 22003', 'dob' => '2008-11-22', 'blood' => 'A+',
+                'address' => '88, Kankurgachi Main Road', 'city' => 'Kolkata', 'state' => 'West Bengal', 'postal_code' => '700054',
+                'emergency_name' => 'Alok Sharma', 'emergency_phone' => '+91 98765 22103', 'emergency_relation' => 'Father',
             ],
             [
                 'first_name' => 'Vivaan', 'last_name' => 'Patel', 'email' => 'vivaan.patel@student.com',
                 'admission_number' => 'STU0004', 'class_num' => 9, 'sec' => 'A', 'roll' => '1', 'gender' => 'male',
+                'phone' => '+91 98765 22004', 'dob' => '2009-03-30', 'blood' => 'AB+',
+                'address' => 'C-12, Alkapuri Society', 'city' => 'Vadodara', 'state' => 'Gujarat', 'postal_code' => '390007',
+                'emergency_name' => 'Bhavesh Patel', 'emergency_phone' => '+91 98765 22104', 'emergency_relation' => 'Father',
             ],
             [
                 'first_name' => 'Ananya', 'last_name' => 'Singh', 'email' => 'ananya.singh@student.com',
                 'admission_number' => 'STU0005', 'class_num' => 8, 'sec' => 'A', 'roll' => '1', 'gender' => 'female',
+                'phone' => '+91 98765 22005', 'dob' => '2010-07-19', 'blood' => 'O+',
+                'address' => '56, Gomti Nagar Extension', 'city' => 'Lucknow', 'state' => 'Uttar Pradesh', 'postal_code' => '226010',
+                'emergency_name' => 'Vikramaditya Singh', 'emergency_phone' => '+91 98765 22105', 'emergency_relation' => 'Father',
             ],
         ];
 
@@ -340,11 +393,15 @@ return new class extends Migration
                 [
                     'name' => "{$sData['first_name']} {$sData['last_name']}",
                     'password' => $defaultPassword,
-                    'phone' => '987000' . rand(1000, 9999),
+                    'phone' => $sData['phone'],
                     'gender' => $sData['gender'],
                     'status' => 'active',
-                    'date_of_birth' => '2008-05-10',
-                    'address' => 'Student Residence, Education City',
+                    'date_of_birth' => $sData['dob'],
+                    'address' => $sData['address'],
+                    'city' => $sData['city'],
+                    'state' => $sData['state'],
+                    'country' => 'India',
+                    'postal_code' => $sData['postal_code'],
                 ]
             );
 
@@ -366,11 +423,13 @@ return new class extends Migration
                     'first_name' => $sData['first_name'],
                     'last_name' => $sData['last_name'],
                     'roll_number' => $sData['roll'],
-                    'blood_group' => 'O+',
+                    'blood_group' => $sData['blood'],
                     'nationality' => 'Indian',
-                    'emergency_contact_name' => 'Parent User',
-                    'emergency_contact_phone' => '+1234567894',
-                    'emergency_contact_relation' => 'Father',
+                    'religion' => 'Hindu',
+                    'mother_tongue' => 'Hindi',
+                    'emergency_contact_name' => $sData['emergency_name'],
+                    'emergency_contact_phone' => $sData['emergency_phone'],
+                    'emergency_contact_relation' => $sData['emergency_relation'],
                     'status' => 'active',
                 ]
             );
@@ -383,21 +442,21 @@ return new class extends Migration
             $parentProfile = ParentModel::firstOrCreate(
                 ['user_id' => $parentUser->id],
                 [
-                    'father_name' => 'Robert Parent',
-                    'father_phone' => '+1234567894',
+                    'father_name' => 'Ramesh Verma',
+                    'father_phone' => '+91 98765 00005',
                     'father_email' => 'parent@school.com',
-                    'father_occupation' => 'Architect',
-                    'father_annual_income' => '950000',
-                    'mother_name' => 'Mary Parent',
-                    'mother_phone' => '+1234567899',
-                    'mother_email' => 'mary.parent@school.com',
-                    'mother_occupation' => 'Physician',
+                    'father_occupation' => 'Senior Civil Engineer',
+                    'father_annual_income' => '1500000',
+                    'mother_name' => 'Meenakshi Verma',
+                    'mother_phone' => '+91 98765 99005',
+                    'mother_email' => 'meenakshi.verma@school.com',
+                    'mother_occupation' => 'Associate Professor',
                     'mother_annual_income' => '1200000',
                     'status' => 'active',
                 ]
             );
 
-            // Link parent with Jane Student (first student)
+            // Link parent with Aarohi Verma (first student)
             if (!empty($students)) {
                 $primaryStudent = $students[0];
                 if (!$parentProfile->students()->where('students.id', $primaryStudent->id)->exists()) {

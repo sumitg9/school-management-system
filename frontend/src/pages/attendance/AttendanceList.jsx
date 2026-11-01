@@ -4,9 +4,11 @@ import { toast } from 'react-toastify';
 import { attendanceAPI, classAPI, sectionAPI } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
+import { useSettings } from '../../context/SettingsContext';
 
 const AttendanceList = () => {
   const navigate = useNavigate();
+  const { formatDate } = useSettings();
   const [attendances, setAttendances] = useState([]);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -23,6 +25,9 @@ const AttendanceList = () => {
 
   useEffect(() => {
     fetchClasses();
+  }, []);
+
+  useEffect(() => {
     fetchAttendances();
   }, [filters]);
 
@@ -109,7 +114,7 @@ const AttendanceList = () => {
       key: 'date',
       label: 'Date',
       sortable: true,
-      render: (row) => new Date(row.date).toLocaleDateString(),
+      render: (row) => formatDate(row.date),
     },
     {
       key: 'student',

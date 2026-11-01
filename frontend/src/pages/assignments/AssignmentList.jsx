@@ -4,15 +4,18 @@ import { toast } from 'react-toastify';
 import { assignmentAPI, classAPI, sectionAPI, subjectAPI } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
+import { useSettings } from '../../context/SettingsContext';
 
 const AssignmentList = () => {
   const navigate = useNavigate();
+  const { formatDate } = useSettings();
   const [assignments, setAssignments] = useState([]);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     page: 1,
     per_page: 20,
@@ -22,9 +25,26 @@ const AssignmentList = () => {
     subject_id: '',
   });
 
+  // Fetch classes and subjects once on mount
   useEffect(() => {
     fetchClasses();
     fetchSubjects();
+  }, []);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters(prev => {
+        if (prev.search === searchTerm) return prev;
+        return { ...prev, search: searchTerm, page: 1 };
+      });
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Fetch assignments when filters change
+  useEffect(() => {
     fetchAssignments();
   }, [filters]);
 
@@ -147,7 +167,7 @@ const AssignmentList = () => {
       label: 'Due Date',
       render: (row) => (
         <div>
-          <div className="text-sm text-gray-900">{new Date(row.due_date).toLocaleDateString()}</div>
+          <div className="text-sm text-gray-900">{formatDate(row.due_date)}</div>
           <Badge variant={getStatusVariant(row.due_date)} size="sm">
             {new Date(row.due_date) < new Date() ? 'Overdue' : 'Active'}
           </Badge>
@@ -231,8 +251,8 @@ const AssignmentList = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
             <input
               type="text"
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search assignments..."
               className="input-field"
             />
@@ -287,6 +307,7 @@ const AssignmentList = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">&nbsp;</label>
             <button
               onClick={() => {
+                setSearchTerm('');
                 setFilters({
                   page: 1,
                   per_page: 20,

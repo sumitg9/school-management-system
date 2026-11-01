@@ -3,10 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { feeAPI } from '../../services/api';
 import Badge from '../../components/common/Badge';
+import { useSettings } from '../../context/SettingsContext';
 
 const FeeDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { formatDate } = useSettings();
   const [fee, setFee] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -165,7 +167,7 @@ const FeeDetail = () => {
             <div className="flex justify-between">
               <span className="text-gray-600">Due Date:</span>
               <span className="font-medium text-gray-900">
-                {fee.due_date ? new Date(fee.due_date).toLocaleDateString() : '-'}
+                {formatDate(fee.due_date)}
               </span>
             </div>
             <div className="flex justify-between">

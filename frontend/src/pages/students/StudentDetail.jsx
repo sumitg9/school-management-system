@@ -3,10 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { studentAPI } from '../../services/api';
 import Badge from '../../components/common/Badge';
+import { useSettings } from '../../context/SettingsContext';
 
 const StudentDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { formatDate, formatDateTime } = useSettings();
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('profile');
@@ -97,20 +99,22 @@ const StudentDetail = () => {
                   <h2 className="text-2xl font-bold text-gray-900">
                     {student.first_name} {student.last_name}
                   </h2>
-                  <p className="text-gray-600 mt-1">{student.email}</p>
+                  <p className="text-gray-600 mt-1">{student.email || student.user?.email || '-'}</p>
                 </div>
                 <Badge variant={student.status === 'active' ? 'success' : 'warning'}>
                   {student.status}
                 </Badge>
               </div>
-              <div className="grid grid-cols-4 gap-4 mt-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                 <div>
                   <p className="text-sm text-gray-500">Admission No.</p>
-                  <p className="font-semibold text-gray-900">{student.admission_number}</p>
+                  <p className="font-semibold text-gray-900">{student.admission_number || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Class</p>
-                  <p className="font-semibold text-gray-900">{student.class?.name} - {student.section?.name}</p>
+                  <p className="text-sm text-gray-500">Class & Section</p>
+                  <p className="font-semibold text-gray-900">
+                    {student.class?.name || '-'} {student.section?.name ? `(${student.section.name})` : ''}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Roll Number</p>
@@ -118,7 +122,7 @@ const StudentDetail = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Academic Year</p>
-                  <p className="font-semibold text-gray-900">{student.academic_year?.name}</p>
+                  <p className="font-semibold text-gray-900">{student.academic_year?.name || student.academicYear?.name || '-'}</p>
                 </div>
               </div>
             </div>
@@ -155,11 +159,13 @@ const StudentDetail = () => {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">Date of Birth:</span>
-                <span className="font-medium">{student.date_of_birth || '-'}</span>
+                <span className="font-medium">
+                  {formatDate(student.date_of_birth || student.user?.date_of_birth)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Gender:</span>
-                <span className="font-medium capitalize">{student.gender || '-'}</span>
+                <span className="font-medium capitalize">{student.gender || student.user?.gender || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Blood Group:</span>
@@ -167,11 +173,25 @@ const StudentDetail = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Phone:</span>
-                <span className="font-medium">{student.phone || '-'}</span>
+                <span className="font-medium">{student.phone || student.user?.phone || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Admission Date:</span>
-                <span className="font-medium">{student.admission_date || '-'}</span>
+                <span className="font-medium">
+                  {formatDate(student.admission_date)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Nationality:</span>
+                <span className="font-medium">{student.nationality || '-'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Religion:</span>
+                <span className="font-medium">{student.religion || '-'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Mother Tongue:</span>
+                <span className="font-medium">{student.mother_tongue || '-'}</span>
               </div>
             </div>
           </div>
@@ -182,24 +202,32 @@ const StudentDetail = () => {
             <div className="space-y-3">
               <div>
                 <span className="text-gray-600 block mb-1">Address:</span>
-                <span className="font-medium">{student.address || '-'}</span>
+                <span className="font-medium">{student.address || student.user?.address || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">City:</span>
-                <span className="font-medium">{student.city || '-'}</span>
+                <span className="font-medium">{student.city || student.user?.city || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">State:</span>
-                <span className="font-medium">{student.state || '-'}</span>
+                <span className="font-medium">{student.state || student.user?.state || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Country:</span>
-                <span className="font-medium">{student.country || '-'}</span>
+                <span className="font-medium">{student.country || student.user?.country || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Postal Code:</span>
-                <span className="font-medium">{student.postal_code || '-'}</span>
+                <span className="font-medium">{student.postal_code || student.user?.postal_code || '-'}</span>
               </div>
+              {(student.emergency_contact_name || student.emergency_contact_phone) && (
+                <div className="pt-2 border-t border-gray-100">
+                  <span className="text-gray-600 block mb-1">Emergency Contact:</span>
+                  <span className="font-medium">
+                    {student.emergency_contact_name || '-'} ({student.emergency_contact_relation || 'Relation'}) — {student.emergency_contact_phone || '-'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -209,15 +237,15 @@ const StudentDetail = () => {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">Name:</span>
-                <span className="font-medium">{student.father_name || '-'}</span>
+                <span className="font-medium">{student.father_name || student.parents?.[0]?.father_name || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Phone:</span>
-                <span className="font-medium">{student.father_phone || '-'}</span>
+                <span className="font-medium">{student.father_phone || student.parents?.[0]?.father_phone || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Occupation:</span>
-                <span className="font-medium">{student.father_occupation || '-'}</span>
+                <span className="font-medium">{student.father_occupation || student.parents?.[0]?.father_occupation || '-'}</span>
               </div>
             </div>
           </div>
@@ -227,23 +255,43 @@ const StudentDetail = () => {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">Name:</span>
-                <span className="font-medium">{student.mother_name || '-'}</span>
+                <span className="font-medium">{student.mother_name || student.parents?.[0]?.mother_name || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Phone:</span>
-                <span className="font-medium">{student.mother_phone || '-'}</span>
+                <span className="font-medium">{student.mother_phone || student.parents?.[0]?.mother_phone || '-'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Occupation:</span>
-                <span className="font-medium">{student.mother_occupation || '-'}</span>
+                <span className="font-medium">{student.mother_occupation || student.parents?.[0]?.mother_occupation || '-'}</span>
               </div>
             </div>
           </div>
 
+          {(student.guardian_name || student.parents?.[0]?.guardian_name) && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Guardian's Information</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Name:</span>
+                  <span className="font-medium">{student.guardian_name || student.parents?.[0]?.guardian_name || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Phone:</span>
+                  <span className="font-medium">{student.guardian_phone || student.parents?.[0]?.guardian_phone || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Relation:</span>
+                  <span className="font-medium">{student.guardian_relation || student.parents?.[0]?.guardian_relation || '-'}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Additional Information */}
           <div className="bg-white rounded-lg shadow p-6 lg:col-span-2">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <span className="text-gray-600 block mb-1">Previous School:</span>
                 <span className="font-medium">{student.previous_school || '-'}</span>
@@ -252,6 +300,18 @@ const StudentDetail = () => {
                 <span className="text-gray-600 block mb-1">Medical Conditions:</span>
                 <span className="font-medium">{student.medical_conditions || '-'}</span>
               </div>
+              {student.allergies && (
+                <div>
+                  <span className="text-gray-600 block mb-1">Allergies:</span>
+                  <span className="font-medium">{student.allergies}</span>
+                </div>
+              )}
+              {student.notes && (
+                <div>
+                  <span className="text-gray-600 block mb-1">Notes:</span>
+                  <span className="font-medium">{student.notes}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -259,22 +319,109 @@ const StudentDetail = () => {
 
       {activeTab === 'academic' && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Academic Records</h3>
-          <p className="text-gray-500">Academic records will be displayed here.</p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Academic & Exam Grades</h3>
+          {student.grades && student.grades.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Exam</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marks</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {student.grades.map((grade) => (
+                    <tr key={grade.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{grade.exam?.name || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{grade.subject?.name || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{grade.marks_obtained} / {grade.total_marks}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-blue-600">{grade.grade || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade.remarks || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-gray-500">No exam grade records available for this student.</p>
+          )}
         </div>
       )}
 
       {activeTab === 'attendance' && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Attendance Records</h3>
-          <p className="text-gray-500">Attendance records will be displayed here.</p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Attendance History</h3>
+          {student.attendances && student.attendances.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {student.attendances.map((att) => (
+                    <tr key={att.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatDate(att.date)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <Badge variant={att.status === 'present' ? 'success' : att.status === 'late' ? 'warning' : 'danger'}>
+                          {att.status}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{att.remarks || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-gray-500">No attendance records found for this student.</p>
+          )}
         </div>
       )}
 
       {activeTab === 'fees' && (
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Fee Records</h3>
-          <p className="text-gray-500">Fee records will be displayed here.</p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Fee Payments</h3>
+          {((student.fee_payments && student.fee_payments.length > 0) || (student.feePayments && student.feePayments.length > 0)) ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Receipt No.</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fee Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {(student.fee_payments || student.feePayments).map((fee) => (
+                    <tr key={fee.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{fee.receipt_number}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{fee.fee_structure?.name || fee.feeStructure?.name || 'Fee'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${fee.amount}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(fee.payment_date)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm capitalize text-gray-600">{fee.payment_method}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <Badge variant={fee.status === 'completed' ? 'success' : 'warning'}>
+                          {fee.status}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-gray-500">No fee payment records found for this student.</p>
+          )}
         </div>
       )}
     </div>

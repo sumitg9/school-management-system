@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\GradeController;
 use App\Http\Controllers\Api\V1\FeeController;
 use App\Http\Controllers\Api\V1\AssignmentController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\SettingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -32,9 +33,10 @@ Route::prefix('v1')->group(function () {
 
     // Public routes
     Route::post('/auth/register', [AuthController::class, 'register']);
-    Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/login', [AuthController::class, 'login'])->name('login');
     Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+    Route::get('/settings', [SettingController::class, 'index']);
 
     // Protected routes
     Route::middleware('auth:sanctum')->group(function () {
@@ -53,6 +55,8 @@ Route::prefix('v1')->group(function () {
         // Students
         Route::get('/students/statistics', [StudentController::class, 'statistics']);
         Route::get('/students/export-pdf', [StudentController::class, 'exportPDF']);
+        Route::get('/students/template', [StudentController::class, 'downloadTemplate']);
+        Route::post('/students/import', [StudentController::class, 'import']);
         Route::apiResource('students', StudentController::class);
 
         // Teachers
@@ -111,6 +115,10 @@ Route::prefix('v1')->group(function () {
         Route::post('/notifications/mark-all-as-read', [NotificationController::class, 'markAllAsRead']);
         Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
         Route::delete('/notifications/delete-all-read', [NotificationController::class, 'deleteAllRead']);
+
+        // Settings
+        Route::put('/settings', [SettingController::class, 'update']);
+        Route::post('/settings', [SettingController::class, 'update']);
     });
 });
 

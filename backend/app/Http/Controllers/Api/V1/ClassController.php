@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\ClassModel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class ClassController extends Controller
 {
@@ -13,15 +14,25 @@ class ClassController extends Controller
      */
     public function index(Request $request)
     {
-        $query = ClassModel::with(['sections']);
+        $perPage = $request->get('per_page', 50);
+
+        if ($perPage === 'all' && !$request->filled('status')) {
+            $classes = Cache::remember('classes_all_list', 600, function() {
+                return ClassModel::with(['sections:id,class_id,name'])->ordered()->get();
+            });
+            return response()->json([
+                'success' => true,
+                'data' => $classes,
+            ]);
+        }
+
+        $query = ClassModel::with(['sections:id,class_id,name']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
         $query->ordered();
-
-        $perPage = $request->get('per_page', 50);
 
         if ($perPage === 'all') {
             $classes = $query->get();
@@ -65,6 +76,8 @@ class ClassController extends Controller
             'status' => 'active',
         ]);
 
+        Cache::forget('classes_all_list');
+
         return response()->json([
             'success' => true,
             'message' => 'Class created successfully',
@@ -107,6 +120,8 @@ class ClassController extends Controller
             'status',
         ]));
 
+        Cache::forget('classes_all_list');
+
         return response()->json([
             'success' => true,
             'message' => 'Class updated successfully',
@@ -121,6 +136,8 @@ class ClassController extends Controller
     {
         $class = ClassModel::findOrFail($id);
         $class->delete();
+
+        Cache::forget('classes_all_list');
 
         return response()->json([
             'success' => true,

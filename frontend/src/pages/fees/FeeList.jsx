@@ -4,14 +4,17 @@ import { toast } from 'react-toastify';
 import { feeAPI, academicYearAPI, classAPI } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
+import { useSettings } from '../../context/SettingsContext';
 
 const FeeList = () => {
   const navigate = useNavigate();
+  const { formatDate } = useSettings();
   const [fees, setFees] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     page: 1,
     per_page: 20,
@@ -21,9 +24,26 @@ const FeeList = () => {
     type: '',
   });
 
+  // Fetch academic years & classes once on mount
   useEffect(() => {
     fetchAcademicYears();
     fetchClasses();
+  }, []);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters(prev => {
+        if (prev.search === searchTerm) return prev;
+        return { ...prev, search: searchTerm, page: 1 };
+      });
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Fetch fees when filters change
+  useEffect(() => {
     fetchFees();
   }, [filters]);
 
@@ -136,7 +156,7 @@ const FeeList = () => {
     {
       key: 'due_date',
       label: 'Due Date',
-      render: (row) => row.due_date ? new Date(row.due_date).toLocaleDateString() : '-',
+      render: (row) => formatDate(row.due_date),
     },
   ];
 
@@ -210,8 +230,8 @@ const FeeList = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
             <input
               type="text"
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search fees..."
               className="input-field"
             />
@@ -265,6 +285,7 @@ const FeeList = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">&nbsp;</label>
             <button
               onClick={() => {
+                setSearchTerm('');
                 setFilters({
                   page: 1,
                   per_page: 20,

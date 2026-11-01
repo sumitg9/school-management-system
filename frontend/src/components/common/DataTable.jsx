@@ -21,7 +21,7 @@ const DataTable = ({
     }
   };
 
-  if (loading) {
+  if (loading && (!data || data.length === 0)) {
     return (
       <div className="bg-white rounded-lg shadow p-8">
         <div className="flex items-center justify-center">
@@ -32,7 +32,7 @@ const DataTable = ({
     );
   }
 
-  if (!data || data.length === 0) {
+  if (!loading && (!data || data.length === 0)) {
     return (
       <div className="bg-white rounded-lg shadow p-8">
         <div className="text-center text-gray-500">
@@ -46,7 +46,15 @@ const DataTable = ({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
+    <div className="bg-white rounded-lg shadow overflow-hidden relative">
+      {loading && (
+        <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10 transition-opacity">
+          <div className="bg-white px-4 py-2 rounded-full shadow-md flex items-center space-x-2 border border-gray-200">
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
+            <span className="text-xs font-semibold text-gray-700">Updating...</span>
+          </div>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">

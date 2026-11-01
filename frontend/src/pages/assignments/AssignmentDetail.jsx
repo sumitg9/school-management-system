@@ -3,10 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { assignmentAPI } from '../../services/api';
 import Badge from '../../components/common/Badge';
+import { useSettings } from '../../context/SettingsContext';
 
 const AssignmentDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { formatDate } = useSettings();
   const [assignment, setAssignment] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -138,7 +140,7 @@ const AssignmentDetail = () => {
             <div>
               <p className="text-sm text-gray-500">Due Date</p>
               <p className="text-xl font-bold text-gray-900">
-                {new Date(assignment.due_date).toLocaleDateString()}
+                {formatDate(assignment.due_date)}
               </p>
             </div>
             <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -198,7 +200,7 @@ const AssignmentDetail = () => {
             <div className="flex justify-between">
               <span className="text-gray-600">Due Date:</span>
               <span className="font-medium text-gray-900">
-                {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString() : '-'}
+                {formatDate(assignment.due_date)}
               </span>
             </div>
             <div className="flex justify-between">

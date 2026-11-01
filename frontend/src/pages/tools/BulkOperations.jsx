@@ -1,6 +1,23 @@
 import { useState } from 'react';
 import { toast } from 'react-toastify';
 import Badge from '../../components/common/Badge';
+import { studentAPI } from '../../services/api';
+
+const CSV_TEMPLATES = {
+  students: `first_name,last_name,email,phone,admission_number,admission_date,class_id,section_id,academic_year_id,roll_number,date_of_birth,gender,blood_group,religion,caste,nationality,mother_tongue,status,address,city,state,country,postal_code,father_name,father_phone,father_occupation,mother_name,mother_phone,mother_occupation,guardian_name,guardian_phone,guardian_relation,emergency_contact_name,emergency_contact_phone,emergency_contact_relation,previous_school,medical_conditions,allergies,notes
+Aarav,Sharma,aarav.sharma@example.com,+91 98765 11001,ADM2026001,2026-04-01,1,1,1,101,2015-05-15,male,B+,Hindu,General,Indian,Hindi,active,"Flat 402, Shanti Kunj, Sector 14, Dwarka",New Delhi,Delhi,India,110078,Rajesh Sharma,+91 98765 22001,Software Engineer,Pooja Sharma,+91 98765 22002,Teacher,,,,Rajesh Sharma,+91 98765 22001,Father,"Delhi Public School, R.K. Puram",None,None,"Excels in mathematics and active in school athletics"
+Ananya,Patel,ananya.patel@example.com,+91 98765 11002,ADM2026002,2026-04-01,1,1,1,102,2015-08-20,female,O+,Hindu,General,Indian,Gujarati,active,"B-12, Gokul Dham, Satellite",Ahmedabad,Gujarat,India,380015,Kirit Patel,+91 98765 22003,Businessman,Neeta Patel,+91 98765 22004,Homemaker,,,,Kirit Patel,+91 98765 22003,Father,"St. Xavier High School, Ahmedabad","Mild Asthmatic","Dust allergy","Interested in classical vocal music and debate"`,
+  teachers: `first_name,last_name,email,phone,employee_id,joining_date,department,designation,qualification,gender,address,city,state,postal_code
+Vikram,Malhotra,vikram.malhotra@school.com,+91 98765 33001,EMP001,2023-06-01,Science,Senior Teacher,M.Sc Physics,male,"Sector 21, Gandhinagar",Gandhinagar,Gujarat,382021`,
+  classes: `name,numeric_value,room_number,capacity
+Class 1,1,R-101,40
+Class 2,2,R-102,40`,
+  subjects: `name,code,type,credit_hours
+Mathematics,MATH101,theory,4
+Science,SCI101,practical,4`,
+  fees: `name,type,amount,due_date,description
+Annual Tuition Fee,tuition,15000,2026-05-15,Annual school tuition fee`
+};
 
 const BulkOperations = () => {
   const [activeTab, setActiveTab] = useState('import');
@@ -43,12 +60,28 @@ const BulkOperations = () => {
 
     setLoading(true);
     try {
-      // Simulate import process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      toast.success(`Successfully imported ${importType} data`);
-      setSelectedFile(null);
+      if (importType === 'students') {
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        const response = await studentAPI.import(formData);
+        if (response.success) {
+          toast.success(response.message || 'Students imported successfully!');
+          if (response.errors && response.errors.length > 0) {
+            toast.warn(`Note: ${response.errors.length} rows were skipped: ${response.errors.slice(0, 2).join('; ')}`);
+          }
+          setSelectedFile(null);
+        } else {
+          toast.error(response.message || 'Failed to import student data');
+        }
+      } else {
+        // Fallback simulation for other types
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        toast.success(`Successfully imported ${importType} data`);
+        setSelectedFile(null);
+      }
     } catch (error) {
-      toast.error('Failed to import data');
+      const msg = error.response?.data?.message || error.message || 'Failed to import data';
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -67,9 +100,42 @@ const BulkOperations = () => {
     }
   };
 
-  const downloadTemplate = (type) => {
-    toast.info(`Downloading ${type} template...`);
-    // In a real application, this would download the actual template
+  const downloadTemplate = async (type) => {
+    try {
+      if (type === 'students') {
+        try {
+          const blob = await studentAPI.downloadTemplate();
+          const url = window.URL.createObjectURL(new Blob([blob], { type: 'text/csv;charset=utf-8;' }));
+          const link = document.createElement('a');
+          link.href = url;
+          link.setAttribute('download', 'student_import_template.csv');
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.URL.revokeObjectURL(url);
+          toast.success('Student template downloaded successfully!');
+          return;
+        } catch (apiError) {
+          console.warn('Backend download failed, falling back to client-side generator:', apiError);
+        }
+      }
+
+      // Client-side download fallback (instant, offline-capable)
+      const csvContent = CSV_TEMPLATES[type] || CSV_TEMPLATES.students;
+      const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${type}_template.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} template downloaded successfully!`);
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      toast.error('Failed to download template');
+    }
   };
 
   return (

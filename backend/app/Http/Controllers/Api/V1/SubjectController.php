@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Subject;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class SubjectController extends Controller
 {
@@ -13,6 +14,18 @@ class SubjectController extends Controller
      */
     public function index(Request $request)
     {
+        $perPage = $request->get('per_page', 50);
+
+        if (in_array($perPage, ['all', '100', 100]) && !$request->filled('status') && !$request->filled('type')) {
+            $subjects = Cache::remember('subjects_all_list', 600, function() {
+                return Subject::orderBy('name')->get();
+            });
+            return response()->json([
+                'success' => true,
+                'data' => $subjects,
+            ]);
+        }
+
         $query = Subject::query();
 
         if ($request->filled('status')) {
@@ -23,17 +36,15 @@ class SubjectController extends Controller
             $query->where('type', $request->type);
         }
 
-        $perPage = $request->get('per_page', 50);
-
         if ($perPage === 'all') {
-            $subjects = $query->get();
+            $subjects = $query->orderBy('name')->get();
             return response()->json([
                 'success' => true,
                 'data' => $subjects,
             ]);
         }
 
-        $subjects = $query->paginate($perPage);
+        $subjects = $query->orderBy('name')->paginate($perPage);
 
         return response()->json([
             'success' => true,
@@ -70,6 +81,8 @@ class SubjectController extends Controller
             'description' => $request->description,
             'status' => 'active',
         ]);
+
+        Cache::forget('subjects_all_list');
 
         return response()->json([
             'success' => true,
@@ -115,6 +128,8 @@ class SubjectController extends Controller
             'status',
         ]));
 
+        Cache::forget('subjects_all_list');
+
         return response()->json([
             'success' => true,
             'message' => 'Subject updated successfully',
@@ -129,6 +144,8 @@ class SubjectController extends Controller
     {
         $subject = Subject::findOrFail($id);
         $subject->delete();
+
+        Cache::forget('subjects_all_list');
 
         return response()->json([
             'success' => true,

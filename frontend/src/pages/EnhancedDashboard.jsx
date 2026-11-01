@@ -3,9 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { studentAPI, teacherAPI, classAPI, attendanceAPI, examAPI, feeAPI, assignmentAPI } from '../services/api';
 import Badge from '../components/common/Badge';
+import { useSettings } from '../context/SettingsContext';
 
 const EnhancedDashboard = () => {
   const navigate = useNavigate();
+  const { formatDateTime } = useSettings();
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     students: { total: 0, active: 0, inactive: 0 },
@@ -21,6 +24,8 @@ const EnhancedDashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const fetchDashboardData = async () => {
@@ -119,9 +124,15 @@ const EnhancedDashboard = () => {
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-1">Welcome back! Here's what's happening today.</p>
+      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600 mt-1">Welcome back! Here's what's happening today.</p>
+        </div>
+        <div className="mt-3 md:mt-0 flex items-center gap-2 bg-white border border-gray-200 text-gray-800 shadow-sm px-4 py-2 rounded-xl text-sm font-semibold">
+          <span className="text-blue-600">🕒</span>
+          <span className="font-mono text-gray-900">{formatDateTime(currentTime)}</span>
+        </div>
       </div>
 
       {/* Quick Stats */}

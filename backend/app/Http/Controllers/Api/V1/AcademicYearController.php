@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AcademicYear;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class AcademicYearController extends Controller
 {
@@ -23,6 +24,16 @@ class AcademicYearController extends Controller
         $query->orderBy('start_date', 'desc');
 
         $perPage = $request->get('per_page', 20);
+
+        if ($perPage === 'all' && !$request->filled('status')) {
+            $academicYears = Cache::remember('academic_years_all', 600, function() {
+                return AcademicYear::orderBy('start_date', 'desc')->get();
+            });
+            return response()->json([
+                'success' => true,
+                'data' => $academicYears,
+            ]);
+        }
 
         if ($perPage === 'all') {
             $academicYears = $query->get();
@@ -181,7 +192,9 @@ class AcademicYearController extends Controller
      */
     public function getCurrent()
     {
-        $academicYear = AcademicYear::where('is_current', true)->first();
+        $academicYear = Cache::remember('academic_year_current', 600, function() {
+            return AcademicYear::where('is_current', true)->first();
+        });
 
         if (!$academicYear) {
             return response()->json([
@@ -207,6 +220,9 @@ class AcademicYearController extends Controller
 
             $academicYear = AcademicYear::findOrFail($id);
             $academicYear->update(['is_current' => true]);
+
+            Cache::forget('academic_year_current');
+            Cache::forget('academic_years_all');
 
             DB::commit();
 

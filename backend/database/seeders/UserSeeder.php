@@ -15,60 +15,90 @@ class UserSeeder extends Seeder
     {
         // Create Super Admin
         $superAdmin = User::create([
-            'name' => 'Super Admin',
+            'name' => 'Dr. Rameshwar Sharma',
             'email' => 'superadmin@school.com',
             'password' => Hash::make('password'),
-            'phone' => '+1234567890',
+            'phone' => '+91 98765 00001',
+            'address' => '42, Shanti Kunj, Sector 14, Dwarka',
+            'city' => 'New Delhi',
+            'state' => 'Delhi',
+            'country' => 'India',
+            'postal_code' => '110078',
             'status' => 'active',
         ]);
         $superAdmin->assignRole('super-admin');
 
         // Create Admin
         $admin = User::create([
-            'name' => 'Admin User',
+            'name' => 'Rajesh Sharma',
             'email' => 'admin@school.com',
             'password' => Hash::make('password'),
-            'phone' => '+1234567891',
+            'phone' => '+91 98765 00002',
+            'address' => '42, Shanti Kunj, Sector 14, Dwarka',
+            'city' => 'New Delhi',
+            'state' => 'Delhi',
+            'country' => 'India',
+            'postal_code' => '110078',
             'status' => 'active',
         ]);
         $admin->assignRole('admin');
 
         // Create Teacher
         $teacher = User::create([
-            'name' => 'John Teacher',
+            'name' => 'Vikram Malhotra',
             'email' => 'teacher@school.com',
             'password' => Hash::make('password'),
-            'phone' => '+1234567892',
+            'phone' => '+91 98765 00003',
+            'address' => 'B-12, Teachers Enclave, Mayur Vihar Phase 1',
+            'city' => 'New Delhi',
+            'state' => 'Delhi',
+            'country' => 'India',
+            'postal_code' => '110091',
             'status' => 'active',
         ]);
         $teacher->assignRole('teacher');
 
         // Create Student
         $student = User::create([
-            'name' => 'Jane Student',
+            'name' => 'Aarohi Verma',
             'email' => 'student@school.com',
             'password' => Hash::make('password'),
-            'phone' => '+1234567893',
+            'phone' => '+91 98765 00004',
+            'address' => 'Flat 302, Green Glen Layout, Bellandur',
+            'city' => 'Bengaluru',
+            'state' => 'Karnataka',
+            'country' => 'India',
+            'postal_code' => '560103',
             'status' => 'active',
         ]);
         $student->assignRole('student');
 
         // Create Parent
         $parent = User::create([
-            'name' => 'Parent User',
+            'name' => 'Ramesh Verma',
             'email' => 'parent@school.com',
             'password' => Hash::make('password'),
-            'phone' => '+1234567894',
+            'phone' => '+91 98765 00005',
+            'address' => 'Flat 302, Green Glen Layout, Bellandur',
+            'city' => 'Bengaluru',
+            'state' => 'Karnataka',
+            'country' => 'India',
+            'postal_code' => '560103',
             'status' => 'active',
         ]);
         $parent->assignRole('parent');
 
         // Create Accountant
         $accountant = User::create([
-            'name' => 'Accountant User',
+            'name' => 'Sunita Patel',
             'email' => 'accountant@school.com',
             'password' => Hash::make('password'),
-            'phone' => '+1234567895',
+            'phone' => '+91 98765 00006',
+            'address' => '108, Navrangpura',
+            'city' => 'Ahmedabad',
+            'state' => 'Gujarat',
+            'country' => 'India',
+            'postal_code' => '380009',
             'status' => 'active',
         ]);
         $accountant->assignRole('accountant');

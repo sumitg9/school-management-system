@@ -69,6 +69,10 @@ export const studentAPI = {
   update: (id, data) => api.put(`/students/${id}`, data),
   delete: (id) => api.delete(`/students/${id}`),
   getStatistics: () => api.get('/students/statistics'),
+  downloadTemplate: () => api.get('/students/template', { responseType: 'blob' }),
+  import: (formData) => api.post('/students/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 };
 
 // Teacher API
@@ -159,6 +163,12 @@ export const assignmentAPI = {
   gradeSubmission: (submissionId, data) => api.post(`/assignment-submissions/${submissionId}/grade`, data),
   getSubmissions: (id) => api.get(`/assignments/${id}/submissions`),
   getStudentAssignments: (studentId) => api.get(`/assignments/student/${studentId}`),
+};
+
+// Settings API
+export const settingsAPI = {
+  getAll: () => api.get('/settings'),
+  update: (data) => api.put('/settings', data),
 };
 
 export default api;

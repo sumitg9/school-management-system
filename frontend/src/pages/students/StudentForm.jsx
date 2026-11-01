@@ -100,8 +100,42 @@ const StudentForm = () => {
     setLoading(true);
     try {
       const response = await studentAPI.getById(id);
-      if (response.success) {
-        setFormData(response.data);
+      if (response.success && response.data) {
+        const student = response.data;
+        const parent = student.parents?.[0] || {};
+        const user = student.user || {};
+
+        setFormData({
+          academic_year_id: student.academic_year_id ?? '',
+          class_id: student.class_id ?? '',
+          section_id: student.section_id ?? '',
+          admission_number: student.admission_number ?? '',
+          admission_date: student.admission_date ? String(student.admission_date).substring(0, 10) : '',
+          first_name: student.first_name ?? '',
+          last_name: student.last_name ?? '',
+          date_of_birth: (student.date_of_birth || user.date_of_birth) ? String(student.date_of_birth || user.date_of_birth).substring(0, 10) : '',
+          gender: student.gender || user.gender || '',
+          blood_group: student.blood_group ?? '',
+          email: student.email || user.email || '',
+          phone: student.phone || user.phone || '',
+          address: student.address || user.address || '',
+          city: student.city || user.city || '',
+          state: student.state || user.state || '',
+          country: student.country || user.country || '',
+          postal_code: student.postal_code || user.postal_code || '',
+          father_name: student.father_name || parent.father_name || '',
+          father_phone: student.father_phone || parent.father_phone || '',
+          father_occupation: student.father_occupation || parent.father_occupation || '',
+          mother_name: student.mother_name || parent.mother_name || '',
+          mother_phone: student.mother_phone || parent.mother_phone || '',
+          mother_occupation: student.mother_occupation || parent.mother_occupation || '',
+          guardian_name: student.guardian_name || parent.guardian_name || '',
+          guardian_phone: student.guardian_phone || parent.guardian_phone || '',
+          guardian_relation: student.guardian_relation || parent.guardian_relation || '',
+          previous_school: student.previous_school ?? '',
+          medical_conditions: student.medical_conditions ?? '',
+          status: student.status || 'active',
+        });
       }
     } catch (error) {
       toast.error('Failed to fetch student details');

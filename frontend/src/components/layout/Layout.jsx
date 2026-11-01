@@ -23,7 +23,8 @@ const Layout = ({ children }) => {
     { path: '/fees', icon: '💵', label: 'Fees' },
     { path: '/assignments', icon: '📋', label: 'Assignments' },
     { path: '/reports', icon: '📈', label: 'Reports' },
-    { path: '/tools/bulk', icon: '⚙️', label: 'Bulk Operations' },
+    { path: '/tools/bulk', icon: '🔧', label: 'Bulk Operations' },
+    { path: '/settings', icon: '⚙️', label: 'Settings' },
   ];
 
   const isActive = (path) => {
@@ -55,11 +56,10 @@ const Layout = ({ children }) => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center px-4 py-3 rounded-lg transition ${
-                  isActive(item.path)
+                className={`flex items-center px-4 py-3 rounded-lg transition ${isActive(item.path)
                     ? 'bg-blue-700'
                     : 'hover:bg-blue-700'
-                }`}
+                  }`}
               >
                 <span className="text-xl">{item.icon}</span>
                 {sidebarOpen && <span className="ml-3">{item.label}</span>}
@@ -122,9 +122,9 @@ const Layout = ({ children }) => {
                     {user?.roles?.[0]?.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'User'}
                   </p>
                 </div>
-                
+
                 {/* Dropdown Menu */}
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg py-2 hidden group-hover:block">
+                <div className="absolute right-0 top-full w-48 bg-white rounded-lg shadow-lg py-2 hidden group-hover:block">
                   <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                     👤 Profile
                   </Link>
