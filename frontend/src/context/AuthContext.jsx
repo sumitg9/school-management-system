@@ -24,22 +24,25 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     try {
       const response = await authAPI.login(credentials);
-      
+
       if (response.success) {
         const { user, token, roles, permissions } = response.data;
-        
+
         // Store token and user
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify({ ...user, roles, permissions }));
-        
+
         setToken(token);
         setUser({ ...user, roles, permissions });
-        
+
         toast.success(response.message || 'Login successful!');
         return { success: true };
       }
     } catch (error) {
-      toast.error(error.message || 'Login failed. Please check your credentials.');
+      const errorMessage = typeof error === 'string'
+        ? error
+        : (error?.message || 'Login failed. Please check your credentials.');
+      toast.error(errorMessage);
       return { success: false, error };
     }
   };
@@ -47,16 +50,16 @@ export const AuthProvider = ({ children }) => {
   const register = async (data) => {
     try {
       const response = await authAPI.register(data);
-      
+
       if (response.success) {
         const { user, token } = response.data;
-        
+
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));
-        
+
         setToken(token);
         setUser(user);
-        
+
         toast.success(response.message || 'Registration successful!');
         return { success: true };
       }
