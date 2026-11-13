@@ -32,3 +32,4 @@ export const formatCurrency = (amount, options = {}) => {
 };
 
 export default formatCurrency;
+
