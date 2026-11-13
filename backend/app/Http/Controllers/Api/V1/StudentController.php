@@ -29,7 +29,13 @@ class StudentController extends Controller
         }
 
         if ($request->filled('section_id')) {
-            $query->where('section_id', $request->section_id);
+            if (is_numeric($request->section_id)) {
+                $query->where('section_id', $request->section_id);
+            } else {
+                $query->whereHas('section', function ($sq) use ($request) {
+                    $sq->where('name', $request->section_id);
+                });
+            }
         }
 
         if ($request->filled('status')) {
@@ -516,7 +522,13 @@ class StudentController extends Controller
         }
 
         if ($request->filled('section_id')) {
-            $query->where('section_id', $request->section_id);
+            if (is_numeric($request->section_id)) {
+                $query->where('section_id', $request->section_id);
+            } else {
+                $query->whereHas('section', function ($sq) use ($request) {
+                    $sq->where('name', $request->section_id);
+                });
+            }
         }
 
         if ($request->filled('status')) {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { studentAPI, classAPI, sectionAPI } from '../../services/api';
@@ -21,12 +21,13 @@ const StudentList = () => {
     status: '',
   });
   const [classes, setClasses] = useState([]);
-  const [sections, setSections] = useState([]);
+  const [allSections, setAllSections] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Fetch classes once on mount
+  // Fetch classes and all sections once on mount
   useEffect(() => {
     fetchClasses();
+    fetchAllSections();
   }, []);
 
   // Debounce search input changes
@@ -50,23 +51,43 @@ const StudentList = () => {
     try {
       const response = await classAPI.getAll({ per_page: 'all' });
       if (response.success) {
-        setClasses(response.data);
+        setClasses(response.data || []);
       }
     } catch (error) {
       console.error('Failed to fetch classes:', error);
     }
   };
 
-  const fetchSections = async (classId) => {
+  const fetchAllSections = async () => {
     try {
-      const response = await sectionAPI.getAll({ class_id: classId, per_page: 'all' });
+      const response = await sectionAPI.getAll({ per_page: 'all' });
       if (response.success) {
-        setSections(response.data);
+        setAllSections(response.data || []);
       }
     } catch (error) {
-      console.error('Failed to fetch sections:', error);
+      console.error('Failed to fetch all sections:', error);
     }
   };
+
+  // Dynamically compute available sections based on selected class
+  const availableSections = useMemo(() => {
+    if (filters.class_id) {
+      return allSections
+        .filter(s => String(s.class_id) === String(filters.class_id))
+        .map(s => ({ id: String(s.id), name: s.name }));
+    }
+    // When "All Classes" is selected, extract distinct section names (e.g. A, B, C)
+    const seen = new Set();
+    const unique = [];
+    allSections.forEach(s => {
+      const trimmed = s.name?.trim();
+      if (trimmed && !seen.has(trimmed)) {
+        seen.add(trimmed);
+        unique.push({ id: trimmed, name: trimmed });
+      }
+    });
+    return unique.sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSections, filters.class_id]);
 
   const fetchStudents = async () => {
     setLoading(true);
@@ -86,12 +107,22 @@ const StudentList = () => {
 
   const handleFilterChange = (key, value) => {
     if (key === 'class_id') {
-      if (value) {
-        fetchSections(value);
-      } else {
-        setSections([]);
-      }
-      setFilters(prev => ({ ...prev, class_id: value, section_id: '', page: 1 }));
+      setFilters(prev => {
+        let newSectionId = prev.section_id;
+        if (value && newSectionId) {
+          // If a section was already selected, find the matching section in the new class
+          const matching = allSections.find(s => 
+            String(s.class_id) === String(value) && 
+            (String(s.id) === String(newSectionId) || s.name === String(newSectionId))
+          );
+          newSectionId = matching ? String(matching.id) : '';
+        } else if (!value && newSectionId) {
+          // Switching back to all classes, convert numeric section id to section name if available
+          const sec = allSections.find(s => String(s.id) === String(newSectionId));
+          newSectionId = sec ? sec.name : '';
+        }
+        return { ...prev, class_id: value, section_id: newSectionId, page: 1 };
+      });
     } else {
       setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
     }
@@ -328,12 +359,11 @@ Ananya,Patel,ananya.patel@example.com,+91 98765 11002,ADM2026002,2026-04-01,1,1,
               value={filters.section_id}
               onChange={(e) => handleFilterChange('section_id', e.target.value)}
               className="input-field"
-              disabled={!filters.class_id}
             >
               <option value="">All Sections</option>
-              {sections.map((section) => (
+              {availableSections.map((section) => (
                 <option key={section.id} value={section.id}>
-                  {section.name}
+                  Section {section.name}
                 </option>
               ))}
             </select>

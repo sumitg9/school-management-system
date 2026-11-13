@@ -332,7 +332,24 @@ export const studentAPI = {
       .select('*, user:users(*), class:classes(name), section:sections(name), academic_year:academic_years(name)', { count: 'exact' });
 
     if (params?.class_id) query = query.eq('class_id', params.class_id);
-    if (params?.section_id) query = query.eq('section_id', params.section_id);
+    if (params?.section_id) {
+      const isNumeric = !isNaN(params.section_id) && !isNaN(parseFloat(params.section_id));
+      if (isNumeric) {
+        query = query.eq('section_id', parseInt(params.section_id, 10));
+      } else {
+        // Support filtering by section name (e.g. 'A', 'B', 'C') across classes
+        const { data: matchedSections } = await supabase
+          .from('sections')
+          .select('id')
+          .ilike('name', String(params.section_id).trim());
+        const sectionIds = (matchedSections || []).map(s => s.id);
+        if (sectionIds.length > 0) {
+          query = query.in('section_id', sectionIds);
+        } else {
+          query = query.eq('section_id', -1);
+        }
+      }
+    }
     if (params?.status) query = query.eq('status', params.status);
     if (params?.search) {
       query = query.or(`first_name.ilike.%${params.search}%,last_name.ilike.%${params.search}%,admission_number.ilike.%${params.search}%`);
