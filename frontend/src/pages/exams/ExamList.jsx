@@ -5,9 +5,11 @@ import { examAPI, academicYearAPI } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 const ExamList = () => {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const { formatDate } = useSettings();
   const [exams, setExams] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
@@ -80,7 +82,15 @@ const ExamList = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this exam?')) {
+    const isConfirmed = await confirm({
+      title: 'Delete Exam',
+      message: 'Are you sure you want to delete this exam? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'danger',
+    });
+
+    if (isConfirmed) {
       try {
         await examAPI.delete(id);
         toast.success('Exam deleted successfully');

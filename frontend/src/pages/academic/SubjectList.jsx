@@ -4,9 +4,11 @@ import { toast } from 'react-toastify';
 import { subjectAPI } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
+import { useConfirm } from '../../context/ConfirmContext';
 
 const SubjectList = () => {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
@@ -46,7 +48,15 @@ const SubjectList = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this subject?')) {
+    const isConfirmed = await confirm({
+      title: 'Delete Subject',
+      message: 'Are you sure you want to delete this subject? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'danger',
+    });
+
+    if (isConfirmed) {
       try {
         await subjectAPI.delete(id);
         toast.success('Subject deleted successfully');

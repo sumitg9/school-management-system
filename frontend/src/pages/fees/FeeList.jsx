@@ -5,9 +5,11 @@ import { feeAPI, academicYearAPI, classAPI } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 const FeeList = () => {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const { formatDate } = useSettings();
   const [fees, setFees] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
@@ -94,7 +96,15 @@ const FeeList = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this fee structure?')) {
+    const isConfirmed = await confirm({
+      title: 'Delete Fee Structure',
+      message: 'Are you sure you want to delete this fee structure? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'danger',
+    });
+
+    if (isConfirmed) {
       try {
         await feeAPI.delete(id);
         toast.success('Fee structure deleted successfully');

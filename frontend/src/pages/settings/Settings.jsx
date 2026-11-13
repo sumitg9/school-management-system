@@ -9,12 +9,14 @@ import {
   formatTime as baseFormatTime
 } from '../../utils/dateFormatter';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 const SAMPLE_DATE = new Date('2026-10-31T12:15:00');
 
 const Settings = () => {
   const { settings, updateSettings, loading: initialLoading } = useSettings();
   const { user } = useAuth();
+  const confirm = useConfirm();
 
   // Form states
   const [selectedPreset, setSelectedPreset] = useState('DD-MM-YYYY HH:mm:ss');
@@ -93,7 +95,15 @@ const Settings = () => {
   };
 
   const handleResetDefaults = async () => {
-    if (window.confirm('Are you sure you want to reset date and time settings to default (31-10-2026 12:15:00 format)?')) {
+    const isConfirmed = await confirm({
+      title: 'Reset Date & Time Settings',
+      message: 'Are you sure you want to reset date and time settings to default (31-10-2026 12:15:00 format)?',
+      confirmText: 'Reset to Defaults',
+      cancelText: 'Cancel',
+      type: 'warning',
+    });
+
+    if (isConfirmed) {
       setSaving(true);
       await updateSettings({
         date_time_format: 'DD-MM-YYYY HH:mm:ss',

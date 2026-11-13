@@ -5,9 +5,11 @@ import { attendanceAPI, classAPI, sectionAPI } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 const AttendanceList = () => {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const { formatDate } = useSettings();
   const [attendances, setAttendances] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -87,7 +89,15 @@ const AttendanceList = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this attendance record?')) {
+    const isConfirmed = await confirm({
+      title: 'Delete Attendance Record',
+      message: 'Are you sure you want to delete this attendance record? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'danger',
+    });
+
+    if (isConfirmed) {
       try {
         await attendanceAPI.delete(id);
         toast.success('Attendance record deleted successfully');

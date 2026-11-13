@@ -4,9 +4,11 @@ import { toast } from 'react-toastify';
 import { sectionAPI, classAPI } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
+import { useConfirm } from '../../context/ConfirmContext';
 
 const SectionList = () => {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [sections, setSections] = useState([]);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +61,15 @@ const SectionList = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this section?')) {
+    const isConfirmed = await confirm({
+      title: 'Delete Section',
+      message: 'Are you sure you want to delete this section? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'danger',
+    });
+
+    if (isConfirmed) {
       try {
         await sectionAPI.delete(id);
         toast.success('Section deleted successfully');

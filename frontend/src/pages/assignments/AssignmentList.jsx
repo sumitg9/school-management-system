@@ -5,9 +5,11 @@ import { assignmentAPI, classAPI, sectionAPI, subjectAPI } from '../../services/
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
+import { useConfirm } from '../../context/ConfirmContext';
 
 const AssignmentList = () => {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const { formatDate } = useSettings();
   const [assignments, setAssignments] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -115,7 +117,15 @@ const AssignmentList = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this assignment?')) {
+    const isConfirmed = await confirm({
+      title: 'Delete Assignment',
+      message: 'Are you sure you want to delete this assignment? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'danger',
+    });
+
+    if (isConfirmed) {
       try {
         await assignmentAPI.delete(id);
         toast.success('Assignment deleted successfully');

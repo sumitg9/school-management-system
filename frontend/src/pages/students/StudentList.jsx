@@ -4,9 +4,11 @@ import { toast } from 'react-toastify';
 import { studentAPI, classAPI, sectionAPI } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
+import { useConfirm } from '../../context/ConfirmContext';
 
 const StudentList = () => {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
@@ -100,7 +102,15 @@ const StudentList = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this student?')) {
+    const isConfirmed = await confirm({
+      title: 'Delete Student',
+      message: 'Are you sure you want to delete this student? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      type: 'danger',
+    });
+
+    if (isConfirmed) {
       try {
         await studentAPI.delete(id);
         toast.success('Student deleted successfully');

@@ -8,6 +8,21 @@
   body {
     @apply font-sans antialiased;
   }
+
+  dialog:not([open]) {
+    display: none;
+  }
+
+  dialog:modal {
+    overscroll-behavior: contain;
+  }
+
+  dialog::backdrop {
+    overflow: hidden;
+    overscroll-behavior: contain;
+    background-color: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+  }
 }
 
 @layer components {
