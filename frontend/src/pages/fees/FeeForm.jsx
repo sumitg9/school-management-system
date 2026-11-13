@@ -234,7 +234,7 @@ const FeeForm = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Amount <span className="text-red-500">*</span>
+                Amount (₹) <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
@@ -242,7 +242,7 @@ const FeeForm = () => {
                 value={formData.amount}
                 onChange={handleChange}
                 className="input-field"
-                placeholder="0.00"
+                placeholder="₹ 0.00"
                 min="0"
                 step="0.01"
                 required

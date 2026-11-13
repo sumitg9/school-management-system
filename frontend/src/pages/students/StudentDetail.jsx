@@ -8,7 +8,7 @@ import { useSettings } from '../../context/SettingsContext';
 const StudentDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { formatDate, formatDateTime } = useSettings();
+  const { formatDate, formatDateTime, formatCurrency } = useSettings();
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('profile');
@@ -395,7 +395,7 @@ const StudentDetail = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Receipt No.</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fee Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount (₹)</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Date</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -406,7 +406,7 @@ const StudentDetail = () => {
                     <tr key={fee.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{fee.receipt_number}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{fee.fee_structure?.name || fee.feeStructure?.name || 'Fee'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${fee.amount}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(fee.amount)}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(fee.payment_date)}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm capitalize text-gray-600">{fee.payment_method}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">

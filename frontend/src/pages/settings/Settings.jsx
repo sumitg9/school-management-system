@@ -26,6 +26,8 @@ const Settings = () => {
   const [dateFormat, setDateFormat] = useState('DD-MM-YYYY');
   const [timeFormat, setTimeFormat] = useState('HH:mm:ss');
   const [timezone, setTimezone] = useState('Asia/Kolkata');
+  const [currency, setCurrency] = useState('INR');
+  const [currencySymbol, setCurrencySymbol] = useState('₹');
 
   const [saving, setSaving] = useState(false);
   const [liveNow, setLiveNow] = useState(new Date());
@@ -54,6 +56,8 @@ const Settings = () => {
       setDateFormat(settings.date_format || 'DD-MM-YYYY');
       setTimeFormat(settings.time_format || 'HH:mm:ss');
       setTimezone(settings.timezone || 'Asia/Kolkata');
+      setCurrency(settings.currency || 'INR');
+      setCurrencySymbol(settings.currency_symbol || '₹');
     }
   }, [settings]);
 
@@ -88,6 +92,8 @@ const Settings = () => {
       date_format: dateFormat,
       time_format: timeFormat,
       timezone: timezone,
+      currency: currency,
+      currency_symbol: currencySymbol,
     };
 
     await updateSettings(payload);
@@ -96,8 +102,8 @@ const Settings = () => {
 
   const handleResetDefaults = async () => {
     const isConfirmed = await confirm({
-      title: 'Reset Date & Time Settings',
-      message: 'Are you sure you want to reset date and time settings to default (31-10-2026 12:15:00 format)?',
+      title: 'Reset Localization Settings',
+      message: 'Are you sure you want to reset date, time, and currency settings to default (Indian Rupee ₹ and 31-10-2026 format)?',
       confirmText: 'Reset to Defaults',
       cancelText: 'Cancel',
       type: 'warning',
@@ -110,6 +116,8 @@ const Settings = () => {
         date_format: 'DD-MM-YYYY',
         time_format: 'HH:mm:ss',
         timezone: 'Asia/Kolkata',
+        currency: 'INR',
+        currency_symbol: '₹',
       });
       setSelectedPreset('DD-MM-YYYY HH:mm:ss');
       setIsCustom(false);
@@ -117,6 +125,8 @@ const Settings = () => {
       setDateFormat('DD-MM-YYYY');
       setTimeFormat('HH:mm:ss');
       setTimezone('Asia/Kolkata');
+      setCurrency('INR');
+      setCurrencySymbol('₹');
       setSaving(false);
     }
   };
@@ -312,7 +322,7 @@ const Settings = () => {
         </div>
 
         {/* Additional Localization Settings */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Date-only Format */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
             <div>
@@ -375,7 +385,7 @@ const Settings = () => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
             <div>
               <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <span>🌐</span> Application Timezone
+                <span>🌐</span> Timezone
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">
                 Standard timezone for school operations
@@ -398,6 +408,36 @@ const Settings = () => {
             </div>
             <div className="bg-gray-50 p-2.5 rounded-lg text-xs text-gray-700">
               Current Zone: <span className="font-semibold text-blue-600">{timezone}</span>
+            </div>
+          </div>
+
+          {/* Currency Configuration */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <span className="text-emerald-600 font-bold">₹</span> Currency
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                System currency for fees & payroll
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Select Currency</label>
+              <select
+                value={currency}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCurrency(val);
+                  setCurrencySymbol(val === 'INR' ? '₹' : val === 'USD' ? '$' : '₹');
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="INR">INR - Indian Rupee (₹)</option>
+                <option value="USD">USD - US Dollar ($)</option>
+              </select>
+            </div>
+            <div className="bg-gray-50 p-2.5 rounded-lg text-xs font-mono text-gray-700">
+              Preview: <span className="font-bold text-emerald-600">{currencySymbol} 50,000.00</span>
             </div>
           </div>
         </div>

@@ -8,7 +8,7 @@ import { useSettings } from '../../context/SettingsContext';
 const TeacherDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { formatDate } = useSettings();
+  const { formatDate, formatCurrency } = useSettings();
   const [teacher, setTeacher] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('profile');
@@ -311,7 +311,7 @@ const TeacherDetail = () => {
               <div className="flex justify-between">
                 <span className="text-gray-600">Monthly Salary:</span>
                 <span className="font-medium text-gray-900">
-                  {teacher.salary ? `$${parseFloat(teacher.salary).toFixed(2)}` : '-'}
+                  {teacher.salary ? formatCurrency(teacher.salary) : '-'}
                 </span>
               </div>
               <div className="flex justify-between">

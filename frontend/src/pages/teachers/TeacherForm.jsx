@@ -493,7 +493,7 @@ const TeacherForm = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Monthly Salary
+                Monthly Salary (₹)
               </label>
               <input
                 type="number"
@@ -501,6 +501,7 @@ const TeacherForm = () => {
                 value={formData.salary}
                 onChange={handleChange}
                 className="input-field"
+                placeholder="₹ 0.00"
                 min="0"
                 step="0.01"
               />

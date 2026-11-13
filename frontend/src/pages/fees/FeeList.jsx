@@ -10,7 +10,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 const FeeList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const { formatDate } = useSettings();
+  const { formatDate, formatCurrency } = useSettings();
   const [fees, setFees] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -160,8 +160,8 @@ const FeeList = () => {
     },
     {
       key: 'amount',
-      label: 'Amount',
-      render: (row) => `$${parseFloat(row.amount || 0).toFixed(2)}`,
+      label: 'Amount (₹)',
+      render: (row) => formatCurrency(row.amount),
     },
     {
       key: 'due_date',

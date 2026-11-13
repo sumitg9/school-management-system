@@ -5,6 +5,10 @@ import {
   formatDate as baseFormatDate, 
   formatTime as baseFormatTime 
 } from '../utils/dateFormatter';
+import {
+  formatCurrency as baseFormatCurrency,
+  DEFAULT_CURRENCY_SYMBOL
+} from '../utils/currencyFormatter';
 import { toast } from 'react-toastify';
 
 const SettingsContext = createContext(null);
@@ -14,6 +18,8 @@ const DEFAULT_SETTINGS = {
   date_format: 'DD-MM-YYYY',
   time_format: 'HH:mm:ss',
   timezone: 'Asia/Kolkata',
+  currency: 'INR',
+  currency_symbol: '₹',
 };
 
 export const SettingsProvider = ({ children }) => {
@@ -89,6 +95,15 @@ export const SettingsProvider = ({ children }) => {
     [settings.time_format]
   );
 
+  const formatCurrency = useCallback(
+    (amount, options) => {
+      const symbol = settings.currency_symbol || DEFAULT_CURRENCY_SYMBOL;
+      const opts = typeof options === 'object' ? { symbol, ...options } : { symbol };
+      return baseFormatCurrency(amount, opts);
+    },
+    [settings.currency_symbol]
+  );
+
   const value = {
     settings,
     loading,
@@ -97,6 +112,8 @@ export const SettingsProvider = ({ children }) => {
     formatDateTime,
     formatDate,
     formatTime,
+    formatCurrency,
+    currencySymbol: settings.currency_symbol || DEFAULT_CURRENCY_SYMBOL,
   };
 
   return (
@@ -118,6 +135,8 @@ export const useSettings = () => {
       formatDateTime: (date, fmt) => baseFormatDateTime(date, fmt || DEFAULT_SETTINGS.date_time_format),
       formatDate: (date, fmt) => baseFormatDate(date, fmt || DEFAULT_SETTINGS.date_format),
       formatTime: (date, fmt) => baseFormatTime(date, fmt || DEFAULT_SETTINGS.time_format),
+      formatCurrency: (amount, opts) => baseFormatCurrency(amount, opts),
+      currencySymbol: DEFAULT_CURRENCY_SYMBOL,
     };
   }
   return context;

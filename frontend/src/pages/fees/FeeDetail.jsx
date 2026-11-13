@@ -8,7 +8,7 @@ import { useSettings } from '../../context/SettingsContext';
 const FeeDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { formatDate } = useSettings();
+  const { formatDate, formatCurrency } = useSettings();
   const [fee, setFee] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -161,7 +161,7 @@ const FeeDetail = () => {
             <div className="flex justify-between">
               <span className="text-gray-600">Amount:</span>
               <span className="font-medium text-gray-900 text-xl text-green-600">
-                ${parseFloat(fee.amount || 0).toFixed(2)}
+                {formatCurrency(fee.amount)}
               </span>
             </div>
             <div className="flex justify-between">

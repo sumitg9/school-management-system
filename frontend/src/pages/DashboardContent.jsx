@@ -3,13 +3,13 @@ const DashboardContent = () => {
     { label: 'Total Students', value: '1,245', icon: '👨‍🎓', color: 'blue', change: '+12%' },
     { label: 'Total Teachers', value: '87', icon: '👨‍🏫', color: 'green', change: '+3%' },
     { label: 'Attendance Today', value: '94.5%', icon: '📊', color: 'yellow', change: '+2.1%' },
-    { label: 'Fee Collection', value: '$45.2K', icon: '💰', color: 'red', change: '+8%' },
+    { label: 'Fee Collection', value: '₹45.2K', icon: '💰', color: 'red', change: '+8%' },
   ];
 
   const recentActivities = [
     { icon: '✅', text: 'New student admission: Aarohi Verma', time: '5 min ago', color: 'green' },
     { icon: '📝', text: 'Exam results published for Class 10', time: '1 hour ago', color: 'blue' },
-    { icon: '💵', text: 'Fee payment received: $500', time: '2 hours ago', color: 'yellow' },
+    { icon: '💵', text: 'Fee payment received: ₹500', time: '2 hours ago', color: 'yellow' },
     { icon: '📢', text: 'New announcement posted', time: '3 hours ago', color: 'purple' },
   ];
 
