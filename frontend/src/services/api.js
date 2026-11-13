@@ -352,7 +352,17 @@ export const studentAPI = {
     }
     if (params?.status) query = query.eq('status', params.status);
     if (params?.search) {
-      query = query.or(`first_name.ilike.%${params.search}%,last_name.ilike.%${params.search}%,admission_number.ilike.%${params.search}%`);
+      const term = String(params.search).trim();
+      const { data: matchedUsers } = await supabase
+        .from('users')
+        .select('id')
+        .or(`email.ilike.%${term}%,phone.ilike.%${term}%`);
+      const userIds = (matchedUsers || []).map(u => u.id);
+      if (userIds.length > 0) {
+        query = query.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,admission_number.ilike.%${term}%,user_id.in.(${userIds.join(',')})`);
+      } else {
+        query = query.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,admission_number.ilike.%${term}%`);
+      }
     }
 
     query = query.order('id', { ascending: true });
@@ -634,9 +644,41 @@ export const teacherAPI = {
   getAll: async (params) => {
     if (!useSupabase) return api.get('/teachers', { params });
     let query = supabase.from('teachers').select('*, user:users(*)', { count: 'exact' });
-    if (params?.status) query = query.eq('status', params.status);
+
+    // Filter by department
+    if (params?.department) {
+      query = query.ilike('department', String(params.department).trim());
+    }
+
+    // Filter by employment_type (supports permanent and full-time interchangeably)
+    if (params?.employment_type) {
+      const type = String(params.employment_type).trim().toLowerCase();
+      if (type === 'permanent' || type === 'full-time') {
+        query = query.or('employment_type.eq.permanent,employment_type.eq.full-time');
+      } else {
+        query = query.eq('employment_type', type);
+      }
+    }
+
+    // Filter by status
+    if (params?.status) {
+      query = query.eq('status', params.status);
+    }
+
+    // Search by name, employee_id, department, email, phone
     if (params?.search) {
-      query = query.or(`first_name.ilike.%${params.search}%,last_name.ilike.%${params.search}%,employee_id.ilike.%${params.search}%`);
+      const term = String(params.search).trim();
+      const { data: matchedUsers } = await supabase
+        .from('users')
+        .select('id')
+        .or(`email.ilike.%${term}%,phone.ilike.%${term}%`);
+      const userIds = (matchedUsers || []).map(u => u.id);
+
+      if (userIds.length > 0) {
+        query = query.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_id.ilike.%${term}%,department.ilike.%${term}%,user_id.in.(${userIds.join(',')})`);
+      } else {
+        query = query.or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%,employee_id.ilike.%${term}%,department.ilike.%${term}%`);
+      }
     }
 
     query = query.order('id', { ascending: true });

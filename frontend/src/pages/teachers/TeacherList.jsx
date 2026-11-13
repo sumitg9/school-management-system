@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { teacherAPI } from '../../services/api';
@@ -184,10 +184,18 @@ const TeacherList = () => {
     </>
   );
 
-  const departments = [
+  const DEFAULT_DEPARTMENTS = [
     'Mathematics', 'Science', 'English', 'Social Studies', 'Computer Science',
     'Physical Education', 'Arts', 'Music', 'Languages', 'Administration'
   ];
+
+  const departments = useMemo(() => {
+    const set = new Set(DEFAULT_DEPARTMENTS);
+    teachers.forEach(t => {
+      if (t.department?.trim()) set.add(t.department.trim());
+    });
+    return Array.from(set);
+  }, [teachers]);
 
   return (
     <div className="p-6">
@@ -243,9 +251,9 @@ const TeacherList = () => {
               className="input-field"
             >
               <option value="">All Employment Types</option>
-              <option value="permanent">Permanent</option>
+              <option value="permanent">Permanent / Full-Time</option>
               <option value="contract">Contract</option>
-              <option value="part-time">Part-time</option>
+              <option value="part-time">Part-Time</option>
               <option value="temporary">Temporary</option>
             </select>
           </div>
@@ -265,6 +273,7 @@ const TeacherList = () => {
           <div>
             <button
               onClick={() => {
+                setSearchTerm('');
                 setFilters({
                   page: 1,
                   per_page: 20,
@@ -274,7 +283,7 @@ const TeacherList = () => {
                   status: '',
                 });
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition"
             >
               Clear Filters
             </button>

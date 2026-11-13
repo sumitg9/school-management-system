@@ -24,7 +24,12 @@ class TeacherController extends Controller
         }
 
         if ($request->filled('employment_type')) {
-            $query->where('employment_type', $request->employment_type);
+            $type = $request->employment_type;
+            if ($type === 'permanent' || $type === 'full-time') {
+                $query->whereIn('employment_type', ['permanent', 'full-time']);
+            } else {
+                $query->where('employment_type', $type);
+            }
         }
 
         if ($request->filled('status')) {
@@ -36,7 +41,12 @@ class TeacherController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('first_name', 'like', "%{$search}%")
                   ->orWhere('last_name', 'like', "%{$search}%")
-                  ->orWhere('employee_id', 'like', "%{$search}%");
+                  ->orWhere('employee_id', 'like', "%{$search}%")
+                  ->orWhere('department', 'like', "%{$search}%")
+                  ->orWhereHas('user', function ($uq) use ($search) {
+                      $uq->where('email', 'like', "%{$search}%")
+                         ->orWhere('phone', 'like', "%{$search}%");
+                  });
             });
         }
 
