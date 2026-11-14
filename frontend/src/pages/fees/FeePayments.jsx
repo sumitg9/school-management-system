@@ -7,6 +7,7 @@ import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
 import { useAlert } from '../../context/AlertContext';
 import { formatFeeTypeLabel, getFeeTypeBadgeVariant } from '../../utils/feeTypes';
+import FeeTabs from './FeeTabs';
 
 const FeePayments = () => {
   const navigate = useNavigate();
@@ -311,6 +312,9 @@ const FeePayments = () => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {/* Tab Navigation */}
+      <FeeTabs />
+
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-5">
         <div className="flex items-center space-x-4">
@@ -354,11 +358,11 @@ const FeePayments = () => {
           </button>
           <button
             type="button"
-            onClick={handleOpenCollectModal}
-            className="btn-primary flex items-center space-x-2 px-4 py-2 cursor-pointer shadow-md"
+            onClick={() => navigate('/fees/payment')}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl shadow-sm transition flex items-center space-x-2 cursor-pointer"
           >
             <span>💳</span>
-            <span>Collect Payment</span>
+            <span>Collect Fees (Single / Advance)</span>
           </button>
         </div>
       </div>

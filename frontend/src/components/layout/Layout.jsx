@@ -21,6 +21,7 @@ const Layout = ({ children }) => {
     { path: '/attendance', icon: '📊', label: 'Attendance' },
     { path: '/exams', icon: '📝', label: 'Exams' },
     { path: '/fees', icon: '💵', label: 'Fees' },
+    { path: '/fees/payment', icon: '💳', label: 'Fee Payment' },
     { path: '/assignments', icon: '📋', label: 'Assignments' },
     { path: '/reports', icon: '📈', label: 'Reports' },
     { path: '/tools/bulk', icon: '🔧', label: 'Bulk Operations' },
@@ -30,6 +31,14 @@ const Layout = ({ children }) => {
   const isActive = (path) => {
     if (path === '/') {
       return location.pathname === '/';
+    }
+    if (path === '/fees') {
+      return (
+        location.pathname === '/fees' ||
+        (location.pathname.startsWith('/fees/') &&
+          !location.pathname.startsWith('/fees/payment') &&
+          !location.pathname.startsWith('/fees/collect'))
+      );
     }
     return location.pathname.startsWith(path);
   };
@@ -101,7 +110,7 @@ const Layout = ({ children }) => {
               </button>
               <div>
                 <h2 className="text-xl font-semibold text-gray-800">
-                  {menuItems.find(item => isActive(item.path))?.label || 'Dashboard'}
+                  {[...menuItems].sort((a, b) => b.path.length - a.path.length).find(item => isActive(item.path))?.label || 'Dashboard'}
                 </h2>
               </div>
             </div>

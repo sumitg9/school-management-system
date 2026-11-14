@@ -7,6 +7,7 @@ import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { getAllFeeTypes, formatFeeTypeLabel, getFeeTypeBadgeVariant } from '../../utils/feeTypes';
+import FeeTabs from './FeeTabs';
 
 const FeeList = () => {
   const navigate = useNavigate();
@@ -215,22 +216,34 @@ const FeeList = () => {
 
   return (
     <div className="p-6">
+      {/* Tab Navigation */}
+      <FeeTabs />
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Fee Management</h1>
-            <p className="text-gray-600 mt-1">Manage fee structures and payments</p>
+            <h1 className="text-2xl font-bold text-gray-900">Fee Structures</h1>
+            <p className="text-gray-600 mt-1">Configure and manage tuition and school fee structures</p>
           </div>
-          <button
-            onClick={() => navigate('/fees/create')}
-            className="btn-primary flex items-center space-x-2"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span>Add Fee Structure</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/fees/payment')}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm transition flex items-center space-x-2 cursor-pointer"
+            >
+              <span>💳</span>
+              <span>Collect Fees</span>
+            </button>
+            <button
+              onClick={() => navigate('/fees/create')}
+              className="btn-primary flex items-center space-x-2"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Add Fee Structure</span>
+            </button>
+          </div>
         </div>
       </div>
 

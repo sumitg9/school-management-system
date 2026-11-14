@@ -363,6 +363,7 @@ export const studentAPI = {
       .from('students')
       .select('*, user:users(*), class:classes(name), section:sections(name), academic_year:academic_years(name)', { count: 'exact' });
 
+    if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
     if (params?.class_id) query = query.eq('class_id', params.class_id);
     if (params?.section_id) {
       const isNumeric = !isNaN(params.section_id) && !isNaN(parseFloat(params.section_id));
@@ -1306,6 +1307,7 @@ export const sectionAPI = {
   getAll: async (params) => {
     if (!useSupabase) return api.get('/sections', { params });
     let query = supabase.from('sections').select('*, class:classes(name)', { count: 'exact' });
+    if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
     if (params?.class_id) query = query.eq('class_id', params.class_id);
     if (params?.search) {
       query = query.ilike('name', `%${String(params.search).trim()}%`);
@@ -1411,6 +1413,7 @@ export const attendanceAPI = {
     if (!useSupabase) return api.get('/attendance', { params });
     let query = supabase.from('attendances').select('*, student:students(first_name, last_name, admission_number)', { count: 'exact' });
     if (params?.date) query = query.eq('date', params.date);
+    if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
     if (params?.class_id) query = query.eq('class_id', params.class_id);
     if (params?.section_id) query = query.eq('section_id', params.section_id);
     if (params?.status) query = query.eq('status', params.status);
@@ -1558,7 +1561,13 @@ export const feeAPI = {
     if (!useSupabase) return api.get('/fee-structures', { params });
     let query = supabase.from('fee_structures').select('*, class:classes(name), academic_year:academic_years(name)', { count: 'exact' });
     if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
-    if (params?.class_id) query = query.eq('class_id', params.class_id);
+    if (params?.class_id) {
+      if (params.include_all_classes) {
+        query = query.or(`class_id.eq.${params.class_id},class_id.is.null`);
+      } else {
+        query = query.eq('class_id', params.class_id);
+      }
+    }
     if (params?.type) query = query.eq('type', params.type);
     if (params?.search) {
       query = query.ilike('name', `%${String(params.search).trim()}%`);
@@ -1658,6 +1667,79 @@ export const feeAPI = {
     if (error) throw error;
     return { success: true, data: res };
   },
+  collectTotalPayment: async (data) => {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const receiptNum = data.receipt_number || `RCP-${todayStr.replace(/-/g, '')}-${Math.floor(100000 + Math.random() * 900000)}`;
+    const items = data.items || [];
+    const months = data.months || [];
+    const monthsDesc = months.length > 0 ? `Paid for: ${months.join(', ')} (${months.length} Month${months.length > 1 ? 's' : ''})` : '';
+    const generalRemarks = [monthsDesc, data.remarks].filter(Boolean).join('. ');
+
+    if (!useSupabase) {
+      const results = [];
+      for (let idx = 0; idx < items.length; idx++) {
+        const item = items[idx];
+        const rowReceipt = items.length > 1 ? `${receiptNum}-${idx + 1}` : receiptNum;
+        const payload = {
+          student_id: data.student_id,
+          fee_structure_id: item.fee_structure_id,
+          amount: parseFloat(item.subtotal || item.amount || 0),
+          discount: parseFloat(item.discount || 0),
+          fine: parseFloat(item.fine || 0),
+          total_amount: parseFloat(item.total_amount || item.subtotal || 0),
+          payment_date: data.payment_date || todayStr,
+          payment_method: data.payment_method || 'cash',
+          transaction_id: data.transaction_id || null,
+          remarks: generalRemarks,
+          receipt_number: rowReceipt,
+          status: 'completed',
+        };
+        const res = await api.post('/fee-payments', payload);
+        results.push(res.data);
+      }
+      return { success: true, receipt_number: receiptNum, data: results };
+    }
+
+    const rowsToInsert = items.map((item, idx) => ({
+      student_id: data.student_id,
+      fee_structure_id: item.fee_structure_id,
+      amount: parseFloat(item.subtotal || item.amount || 0),
+      discount: parseFloat(item.discount || 0),
+      fine: parseFloat(item.fine || 0),
+      total_amount: parseFloat(item.total_amount || item.subtotal || 0),
+      payment_date: data.payment_date || todayStr,
+      payment_method: data.payment_method || 'cash',
+      transaction_id: data.transaction_id || null,
+      remarks: generalRemarks,
+      receipt_number: items.length > 1 ? `${receiptNum}-${idx + 1}` : receiptNum,
+      status: 'completed',
+    }));
+
+    if (rowsToInsert.length === 0 && data.fee_structure_id) {
+      rowsToInsert.push({
+        student_id: data.student_id,
+        fee_structure_id: data.fee_structure_id,
+        amount: parseFloat(data.amount || 0),
+        discount: parseFloat(data.discount || 0),
+        fine: parseFloat(data.fine || 0),
+        total_amount: parseFloat(data.total_amount || 0),
+        payment_date: data.payment_date || todayStr,
+        payment_method: data.payment_method || 'cash',
+        transaction_id: data.transaction_id || null,
+        remarks: generalRemarks,
+        receipt_number: receiptNum,
+        status: 'completed',
+      });
+    }
+
+    const { data: res, error } = await supabase
+      .from('fee_payments')
+      .insert(rowsToInsert)
+      .select('*, student:students(first_name, last_name, admission_number), fee_structure:fee_structures(name, type)');
+
+    if (error) throw error;
+    return { success: true, receipt_number: receiptNum, data: res };
+  },
   getStatistics: async () => {
     if (!useSupabase) return api.get('/fee-payments/statistics');
     const { data } = await supabase.from('fee_payments').select('amount');
@@ -1679,6 +1761,7 @@ export const assignmentAPI = {
   getAll: async (params) => {
     if (!useSupabase) return api.get('/assignments', { params });
     let query = supabase.from('assignments').select('*, teacher:teachers(first_name, last_name), class:classes(name)', { count: 'exact' });
+    if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
     if (params?.class_id) query = query.eq('class_id', params.class_id);
     if (params?.section_id) query = query.eq('section_id', params.section_id);
     if (params?.subject_id) query = query.eq('subject_id', params.subject_id);

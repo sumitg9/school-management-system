@@ -40,6 +40,7 @@ import FeeList from './pages/fees/FeeList';
 import FeeForm from './pages/fees/FeeForm';
 import FeeDetail from './pages/fees/FeeDetail';
 import FeePayments from './pages/fees/FeePayments';
+import FeePaymentCollect from './pages/fees/FeePaymentCollect';
 import AssignmentList from './pages/assignments/AssignmentList';
 import AssignmentForm from './pages/assignments/AssignmentForm';
 import AssignmentDetail from './pages/assignments/AssignmentDetail';
@@ -110,6 +111,8 @@ function AppRoutes() {
                   <Route path="/exams/:id/edit" element={<ExamForm />} />
                   <Route path="/exams/:id/grades" element={<ExamGrades />} />
                   <Route path="/fees" element={<FeeList />} />
+                  <Route path="/fees/payment" element={<FeePaymentCollect />} />
+                  <Route path="/fees/collect" element={<FeePaymentCollect />} />
                   <Route path="/fees/create" element={<FeeForm />} />
                   <Route path="/fees/:id" element={<FeeDetail />} />
                   <Route path="/fees/:id/edit" element={<FeeForm />} />
