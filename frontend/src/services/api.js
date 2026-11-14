@@ -279,7 +279,17 @@ export const authAPI = {
 export const academicYearAPI = {
   getAll: async (params) => {
     if (!useSupabase) return api.get('/academic-years', { params });
-    const { data, count, error } = await supabase.from('academic_years').select('*', { count: 'exact' });
+    let query = supabase.from('academic_years').select('*', { count: 'exact' }).order('id', { ascending: false });
+
+    const page = parseInt(params?.page || 1, 10);
+    const perPage = params?.per_page === 'all' ? null : parseInt(params?.per_page || 20, 10);
+    if (perPage) {
+      const from = (page - 1) * perPage;
+      const to = from + perPage - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, count, error } = await query;
     if (error) throw error;
     return paginate(data, count, params);
   },
@@ -365,7 +375,7 @@ export const studentAPI = {
       }
     }
 
-    query = query.order('id', { ascending: true });
+    query = query.order('id', { ascending: false });
 
     // Handle pagination range
     const page = parseInt(params?.page || 1, 10);
@@ -408,6 +418,26 @@ export const studentAPI = {
     const parents = (parentRelations || []).map(pr => pr.parents).filter(Boolean);
     const primaryParent = parents[0] || {};
 
+    // Fetch grades, attendances, fee payments (newest first)
+    const { data: grades } = await supabase
+      .from('grades')
+      .select('*, exam:exams(name), subject:subjects(name)')
+      .eq('student_id', id)
+      .order('id', { ascending: false });
+
+    const { data: attendances } = await supabase
+      .from('attendances')
+      .select('*')
+      .eq('student_id', id)
+      .order('date', { ascending: false })
+      .order('id', { ascending: false });
+
+    const { data: feePayments } = await supabase
+      .from('fee_payments')
+      .select('*, fee_structure:fee_structures(name)')
+      .eq('student_id', id)
+      .order('id', { ascending: false });
+
     const fullStudent = {
       ...student,
       email: student.user?.email || '',
@@ -429,6 +459,9 @@ export const studentAPI = {
       guardian_phone: primaryParent.guardian_phone || '',
       guardian_relation: primaryParent.guardian_relation || '',
       parents,
+      grades: grades || [],
+      attendances: attendances || [],
+      fee_payments: feePayments || [],
     };
 
     return { success: true, data: fullStudent };
@@ -689,7 +722,7 @@ export const teacherAPI = {
       }
     }
 
-    query = query.order('id', { ascending: true });
+    query = query.order('id', { ascending: false });
 
     const page = parseInt(params?.page || 1, 10);
     const perPage = params?.per_page === 'all' ? null : parseInt(params?.per_page || 20, 10);
@@ -1032,7 +1065,26 @@ export const teacherAPI = {
 export const classAPI = {
   getAll: async (params) => {
     if (!useSupabase) return api.get('/classes', { params });
-    const { data, count, error } = await supabase.from('classes').select('*, sections(*)', { count: 'exact' });
+    let query = supabase.from('classes').select('*, sections(*)', { count: 'exact' });
+
+    if (params?.search) {
+      query = query.ilike('name', `%${String(params.search).trim()}%`);
+    }
+    if (params?.academic_year_id) {
+      query = query.eq('academic_year_id', params.academic_year_id);
+    }
+
+    query = query.order('id', { ascending: false });
+
+    const page = parseInt(params?.page || 1, 10);
+    const perPage = params?.per_page === 'all' ? null : parseInt(params?.per_page || 20, 10);
+    if (perPage) {
+      const from = (page - 1) * perPage;
+      const to = from + perPage - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, count, error } = await query;
     if (error) throw error;
     return paginate(data, count, params);
   },
@@ -1071,6 +1123,20 @@ export const sectionAPI = {
     if (!useSupabase) return api.get('/sections', { params });
     let query = supabase.from('sections').select('*, class:classes(name)', { count: 'exact' });
     if (params?.class_id) query = query.eq('class_id', params.class_id);
+    if (params?.search) {
+      query = query.ilike('name', `%${String(params.search).trim()}%`);
+    }
+
+    query = query.order('id', { ascending: false });
+
+    const page = parseInt(params?.page || 1, 10);
+    const perPage = params?.per_page === 'all' ? null : parseInt(params?.per_page || 20, 10);
+    if (perPage) {
+      const from = (page - 1) * perPage;
+      const to = from + perPage - 1;
+      query = query.range(from, to);
+    }
+
     const { data, count, error } = await query;
     if (error) throw error;
     return paginate(data, count, params);
@@ -1107,7 +1173,23 @@ export const sectionAPI = {
 export const subjectAPI = {
   getAll: async (params) => {
     if (!useSupabase) return api.get('/subjects', { params });
-    const { data, count, error } = await supabase.from('subjects').select('*', { count: 'exact' });
+    let query = supabase.from('subjects').select('*', { count: 'exact' });
+    if (params?.type) query = query.eq('type', params.type);
+    if (params?.search) {
+      const term = String(params.search).trim();
+      query = query.or(`name.ilike.%${term}%,code.ilike.%${term}%`);
+    }
+    query = query.order('id', { ascending: false });
+
+    const page = parseInt(params?.page || 1, 10);
+    const perPage = params?.per_page === 'all' ? null : parseInt(params?.per_page || 20, 10);
+    if (perPage) {
+      const from = (page - 1) * perPage;
+      const to = from + perPage - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, count, error } = await query;
     if (error) throw error;
     return paginate(data, count, params);
   },
@@ -1147,6 +1229,18 @@ export const attendanceAPI = {
     if (params?.date) query = query.eq('date', params.date);
     if (params?.class_id) query = query.eq('class_id', params.class_id);
     if (params?.section_id) query = query.eq('section_id', params.section_id);
+    if (params?.status) query = query.eq('status', params.status);
+
+    query = query.order('date', { ascending: false }).order('id', { ascending: false });
+
+    const page = parseInt(params?.page || 1, 10);
+    const perPage = params?.per_page === 'all' ? null : parseInt(params?.per_page || 20, 10);
+    if (perPage) {
+      const from = (page - 1) * perPage;
+      const to = from + perPage - 1;
+      query = query.range(from, to);
+    }
+
     const { data, count, error } = await query;
     if (error) throw error;
     return paginate(data, count, params);
@@ -1179,7 +1273,23 @@ export const attendanceAPI = {
 export const examAPI = {
   getAll: async (params) => {
     if (!useSupabase) return api.get('/exams', { params });
-    const { data, count, error } = await supabase.from('exams').select('*, academic_year:academic_years(name)', { count: 'exact' });
+    let query = supabase.from('exams').select('*, academic_year:academic_years(name)', { count: 'exact' });
+    if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
+    if (params?.type) query = query.eq('type', params.type);
+    if (params?.search) {
+      query = query.ilike('name', `%${String(params.search).trim()}%`);
+    }
+    query = query.order('id', { ascending: false });
+
+    const page = parseInt(params?.page || 1, 10);
+    const perPage = params?.per_page === 'all' ? null : parseInt(params?.per_page || 20, 10);
+    if (perPage) {
+      const from = (page - 1) * perPage;
+      const to = from + perPage - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, count, error } = await query;
     if (error) throw error;
     return paginate(data, count, params);
   },
@@ -1217,7 +1327,20 @@ export const examAPI = {
 export const gradeAPI = {
   getAll: async (params) => {
     if (!useSupabase) return api.get('/grades', { params });
-    const { data, count, error } = await supabase.from('grades').select('*, student:students(first_name, last_name), subject:subjects(name)', { count: 'exact' });
+    let query = supabase.from('grades').select('*, student:students(first_name, last_name), subject:subjects(name)', { count: 'exact' });
+    if (params?.exam_id) query = query.eq('exam_id', params.exam_id);
+    if (params?.student_id) query = query.eq('student_id', params.student_id);
+    query = query.order('id', { ascending: false });
+
+    const page = parseInt(params?.page || 1, 10);
+    const perPage = params?.per_page === 'all' ? null : parseInt(params?.per_page || 20, 10);
+    if (perPage) {
+      const from = (page - 1) * perPage;
+      const to = from + perPage - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, count, error } = await query;
     if (error) throw error;
     return paginate(data, count, params);
   },
@@ -1246,16 +1369,71 @@ export const gradeAPI = {
 // Fee API
 // ==========================================
 export const feeAPI = {
+  getAll: async (params) => feeAPI.getStructures(params),
   getStructures: async (params) => {
     if (!useSupabase) return api.get('/fee-structures', { params });
-    const { data, count, error } = await supabase.from('fee_payments').select('*', { count: 'exact' });
+    let query = supabase.from('fee_structures').select('*, class:classes(name), academic_year:academic_years(name)', { count: 'exact' });
+    if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
+    if (params?.class_id) query = query.eq('class_id', params.class_id);
+    if (params?.type) query = query.eq('type', params.type);
+    if (params?.search) {
+      query = query.ilike('name', `%${String(params.search).trim()}%`);
+    }
+    query = query.order('id', { ascending: false });
+
+    const page = parseInt(params?.page || 1, 10);
+    const perPage = params?.per_page === 'all' ? null : parseInt(params?.per_page || 20, 10);
+    if (perPage) {
+      const from = (page - 1) * perPage;
+      const to = from + perPage - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, count, error } = await query;
     if (error) throw error;
     return paginate(data, count, params);
   },
-  createStructure: (data) => api.post('/fee-structures', data),
+  getById: async (id) => {
+    if (!useSupabase) return api.get(`/fee-structures/${id}`);
+    const { data, error } = await supabase.from('fee_structures').select('*, class:classes(name), academic_year:academic_years(name)').eq('id', id).single();
+    if (error) throw error;
+    return { success: true, data };
+  },
+  createStructure: async (data) => {
+    if (!useSupabase) return api.post('/fee-structures', data);
+    const { data: res, error } = await supabase.from('fee_structures').insert(data).select().single();
+    if (error) throw error;
+    return { success: true, data: res };
+  },
+  create: async (data) => feeAPI.createStructure(data),
+  updateStructure: async (id, data) => {
+    if (!useSupabase) return api.put(`/fee-structures/${id}`, data);
+    const { data: res, error } = await supabase.from('fee_structures').update(data).eq('id', id).select().single();
+    if (error) throw error;
+    return { success: true, data: res };
+  },
+  update: async (id, data) => feeAPI.updateStructure(id, data),
+  deleteStructure: async (id) => {
+    if (!useSupabase) return api.delete(`/fee-structures/${id}`);
+    const { error } = await supabase.from('fee_structures').delete().eq('id', id);
+    if (error) throw error;
+    return { success: true };
+  },
+  delete: async (id) => feeAPI.deleteStructure(id),
   getPayments: async (params) => {
     if (!useSupabase) return api.get('/fee-payments', { params });
-    const { data, count, error } = await supabase.from('fee_payments').select('*, student:students(first_name, last_name)', { count: 'exact' });
+    let query = supabase.from('fee_payments').select('*, student:students(first_name, last_name)', { count: 'exact' });
+    query = query.order('id', { ascending: false });
+
+    const page = parseInt(params?.page || 1, 10);
+    const perPage = params?.per_page === 'all' ? null : parseInt(params?.per_page || 20, 10);
+    if (perPage) {
+      const from = (page - 1) * perPage;
+      const to = from + perPage - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, count, error } = await query;
     if (error) throw error;
     return paginate(data, count, params);
   },
@@ -1273,7 +1451,7 @@ export const feeAPI = {
   },
   getStudentFees: async (studentId) => {
     if (!useSupabase) return api.get(`/fee-payments/student/${studentId}`);
-    const { data, error } = await supabase.from('fee_payments').select('*').eq('student_id', studentId);
+    const { data, error } = await supabase.from('fee_payments').select('*').eq('student_id', studentId).order('id', { ascending: false });
     if (error) throw error;
     return { success: true, data };
   },
@@ -1285,7 +1463,24 @@ export const feeAPI = {
 export const assignmentAPI = {
   getAll: async (params) => {
     if (!useSupabase) return api.get('/assignments', { params });
-    const { data, count, error } = await supabase.from('assignments').select('*, teacher:teachers(first_name, last_name), class:classes(name)', { count: 'exact' });
+    let query = supabase.from('assignments').select('*, teacher:teachers(first_name, last_name), class:classes(name)', { count: 'exact' });
+    if (params?.class_id) query = query.eq('class_id', params.class_id);
+    if (params?.section_id) query = query.eq('section_id', params.section_id);
+    if (params?.subject_id) query = query.eq('subject_id', params.subject_id);
+    if (params?.search) {
+      query = query.ilike('title', `%${String(params.search).trim()}%`);
+    }
+    query = query.order('id', { ascending: false });
+
+    const page = parseInt(params?.page || 1, 10);
+    const perPage = params?.per_page === 'all' ? null : parseInt(params?.per_page || 20, 10);
+    if (perPage) {
+      const from = (page - 1) * perPage;
+      const to = from + perPage - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, count, error } = await query;
     if (error) throw error;
     return paginate(data, count, params);
   },
@@ -1325,7 +1520,17 @@ export const assignmentAPI = {
 export const notificationAPI = {
   getAll: async (params) => {
     if (!useSupabase) return api.get('/notifications', { params });
-    const { data, count, error } = await supabase.from('notifications').select('*', { count: 'exact' });
+    let query = supabase.from('notifications').select('*', { count: 'exact' }).order('id', { ascending: false });
+
+    const page = parseInt(params?.page || 1, 10);
+    const perPage = params?.per_page === 'all' ? null : parseInt(params?.per_page || 20, 10);
+    if (perPage) {
+      const from = (page - 1) * perPage;
+      const to = from + perPage - 1;
+      query = query.range(from, to);
+    }
+
+    const { data, count, error } = await query;
     if (error) throw error;
     return paginate(data, count, params);
   },
