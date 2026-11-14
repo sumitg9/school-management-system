@@ -69,7 +69,8 @@ const TeacherDetail = () => {
 
   const getEmploymentVariant = (type) => {
     switch (type) {
-      case 'permanent': return 'primary';
+      case 'permanent':
+      case 'full-time': return 'primary';
       case 'contract': return 'info';
       case 'part-time': return 'warning';
       case 'temporary': return 'default';
@@ -149,7 +150,7 @@ const TeacherDetail = () => {
               <div>
                 <p className="text-sm text-gray-500">Joining Date</p>
                 <p className="font-semibold text-gray-900">
-                  {teacher.joining_date ? new Date(teacher.joining_date).toLocaleDateString() : '-'}
+                  {teacher.joining_date ? formatDate(teacher.joining_date) : '-'}
                 </p>
               </div>
             </div>
@@ -197,7 +198,7 @@ const TeacherDetail = () => {
               <div className="flex justify-between">
                 <span className="text-gray-600">Date of Birth:</span>
                 <span className="font-medium text-gray-900">
-                  {teacher.date_of_birth ? new Date(teacher.date_of_birth).toLocaleDateString() : '-'}
+                  {teacher.date_of_birth ? formatDate(teacher.date_of_birth) : '-'}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -290,7 +291,7 @@ const TeacherDetail = () => {
               <div className="flex justify-between">
                 <span className="text-gray-600">Joining Date:</span>
                 <span className="font-medium text-gray-900">
-                  {teacher.joining_date ? new Date(teacher.joining_date).toLocaleDateString() : '-'}
+                  {teacher.joining_date ? formatDate(teacher.joining_date) : '-'}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -324,7 +325,7 @@ const TeacherDetail = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">IFSC Code:</span>
-                <span className="font-medium text-gray-900">{teacher.bank_ifsc_code || '-'}</span>
+                <span className="font-medium text-gray-900">{teacher.bank_ifsc_code || teacher.bank_ifsc || '-'}</span>
               </div>
             </div>
           </div>

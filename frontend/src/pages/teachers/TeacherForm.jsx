@@ -29,7 +29,7 @@ const TeacherForm = () => {
     designation: '',
     specialization: '',
     joining_date: '',
-    employment_type: 'permanent',
+    employment_type: 'full-time',
     salary: '',
     bank_name: '',
     bank_account_number: '',
@@ -63,8 +63,40 @@ const TeacherForm = () => {
     setLoading(true);
     try {
       const response = await teacherAPI.getById(id);
-      if (response.success) {
-        setFormData(response.data);
+      if (response.success && response.data) {
+        const t = response.data;
+        setFormData({
+          employee_id: t.employee_id || '',
+          first_name: t.first_name || '',
+          last_name: t.last_name || '',
+          date_of_birth: t.date_of_birth ? String(t.date_of_birth).substring(0, 10) : '',
+          gender: t.gender || '',
+          blood_group: t.blood_group || '',
+          email: t.email || '',
+          phone: t.phone || '',
+          address: t.address || '',
+          city: t.city || '',
+          state: t.state || '',
+          country: t.country || '',
+          postal_code: t.postal_code || '',
+          qualification: t.qualification || '',
+          experience_years: t.experience_years !== null && t.experience_years !== undefined ? String(t.experience_years) : '',
+          department: t.department || '',
+          designation: t.designation || '',
+          specialization: t.specialization || '',
+          joining_date: t.joining_date ? String(t.joining_date).substring(0, 10) : '',
+          employment_type: t.employment_type === 'permanent' ? 'full-time' : (t.employment_type || 'full-time'),
+          salary: t.salary !== null && t.salary !== undefined ? String(t.salary) : '',
+          bank_name: t.bank_name || '',
+          bank_account_number: t.bank_account_number || '',
+          bank_ifsc_code: t.bank_ifsc_code || t.bank_ifsc || '',
+          emergency_contact_name: t.emergency_contact_name || '',
+          emergency_contact_phone: t.emergency_contact_phone || '',
+          emergency_contact_relation: t.emergency_contact_relation || '',
+          previous_school: t.previous_school || '',
+          certifications: t.certifications || '',
+          status: t.status || 'active',
+        });
       }
     } catch (error) {
       toast.error('Failed to fetch teacher details');
@@ -207,15 +239,14 @@ const TeacherForm = () => {
               </label>
               <select
                 name="employment_type"
-                value={formData.employment_type}
+                value={formData.employment_type === 'permanent' ? 'full-time' : formData.employment_type}
                 onChange={handleChange}
                 className="input-field"
                 required
               >
-                <option value="permanent">Permanent</option>
+                <option value="full-time">Full-Time (Permanent)</option>
                 <option value="contract">Contract</option>
-                <option value="part-time">Part-time</option>
-                <option value="temporary">Temporary</option>
+                <option value="part-time">Part-Time</option>
               </select>
             </div>
             <div>

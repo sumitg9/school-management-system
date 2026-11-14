@@ -449,6 +449,7 @@ export const studentAPI = {
         .insert({
           name: fullName,
           email: formData.email,
+          password: bcrypt.hashSync(formData.password || 'password123', 10),
           phone: formData.phone || null,
           date_of_birth: formData.date_of_birth || null,
           gender: formData.gender || null,
@@ -464,6 +465,13 @@ export const studentAPI = {
 
       if (!userErr && newUser) {
         userId = newUser.id;
+        try {
+          await supabase.from('model_has_roles').upsert({
+            role_id: 4,
+            model_type: 'App\\Models\\User',
+            model_id: userId,
+          }, { onConflict: 'role_id,model_id,model_type' });
+        } catch (_) {}
       }
     }
 
@@ -717,13 +725,16 @@ export const teacherAPI = {
       ...teacher,
       email: teacher.user?.email || '',
       phone: teacher.user?.phone || '',
-      date_of_birth: teacher.user?.date_of_birth || '',
+      date_of_birth: teacher.user?.date_of_birth ? String(teacher.user.date_of_birth).substring(0, 10) : '',
       gender: teacher.user?.gender || '',
       address: teacher.user?.address || '',
       city: teacher.user?.city || '',
       state: teacher.user?.state || '',
       country: teacher.user?.country || '',
       postal_code: teacher.user?.postal_code || '',
+      joining_date: teacher.joining_date ? String(teacher.joining_date).substring(0, 10) : '',
+      bank_ifsc: teacher.bank_ifsc || '',
+      bank_ifsc_code: teacher.bank_ifsc || teacher.bank_ifsc_code || '',
     };
 
     return { success: true, data: fullTeacher };
@@ -733,18 +744,88 @@ export const teacherAPI = {
     if (!useSupabase) return api.post('/teachers', formData);
 
     let userId = null;
-    const firstName = formData.first_name || '';
-    const lastName = formData.last_name || '';
+    const firstName = (formData.first_name || '').trim();
+    const lastName = (formData.last_name || '').trim();
     const fullName = (firstName + ' ' + lastName).trim() || 'Teacher';
 
     if (formData.email) {
+      const email = formData.email.trim().toLowerCase();
+      // Check if user already exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (existingUser) {
+        userId = existingUser.id;
+        await supabase
+          .from('users')
+          .update({
+            name: fullName,
+            phone: formData.phone || null,
+            date_of_birth: formData.date_of_birth ? String(formData.date_of_birth).substring(0, 10) : null,
+            gender: formData.gender || null,
+            address: formData.address || null,
+            city: formData.city || null,
+            state: formData.state || null,
+            country: formData.country || null,
+            postal_code: formData.postal_code || null,
+            status: formData.status || 'active',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', userId);
+      } else {
+        const hashedPassword = bcrypt.hashSync(formData.password || 'password123', 10);
+        const { data: newUser, error: userErr } = await supabase
+          .from('users')
+          .insert({
+            name: fullName,
+            email: email,
+            password: hashedPassword,
+            phone: formData.phone || null,
+            date_of_birth: formData.date_of_birth ? String(formData.date_of_birth).substring(0, 10) : null,
+            gender: formData.gender || null,
+            address: formData.address || null,
+            city: formData.city || null,
+            state: formData.state || null,
+            country: formData.country || null,
+            postal_code: formData.postal_code || null,
+            status: formData.status || 'active',
+          })
+          .select()
+          .single();
+
+        if (userErr) throw userErr;
+        if (newUser) {
+          userId = newUser.id;
+        }
+      }
+
+      if (userId) {
+        try {
+          await supabase.from('model_has_roles').upsert({
+            role_id: 3,
+            model_type: 'App\\Models\\User',
+            model_id: userId,
+          }, { onConflict: 'role_id,model_id,model_type' });
+        } catch (_) {}
+      }
+    }
+
+    if (!userId) {
+      // Since teachers table has a NOT NULL constraint on user_id, a user record MUST exist.
+      const empId = formData.employee_id || `EMP${Date.now()}`;
+      const placeholderEmail = `teacher_${empId.toLowerCase().replace(/[^a-z0-9]/g, '')}_${Date.now()}@school.local`;
+      const hashedPassword = bcrypt.hashSync('password123', 10);
       const { data: newUser, error: userErr } = await supabase
         .from('users')
         .insert({
           name: fullName,
-          email: formData.email,
+          email: placeholderEmail,
+          password: hashedPassword,
           phone: formData.phone || null,
-          date_of_birth: formData.date_of_birth || null,
+          date_of_birth: formData.date_of_birth ? String(formData.date_of_birth).substring(0, 10) : null,
           gender: formData.gender || null,
           address: formData.address || null,
           city: formData.city || null,
@@ -756,8 +837,16 @@ export const teacherAPI = {
         .select()
         .single();
 
-      if (!userErr && newUser) {
+      if (userErr) throw userErr;
+      if (newUser) {
         userId = newUser.id;
+        try {
+          await supabase.from('model_has_roles').upsert({
+            role_id: 3,
+            model_type: 'App\\Models\\User',
+            model_id: userId,
+          }, { onConflict: 'role_id,model_id,model_type' });
+        } catch (_) {}
       }
     }
 
@@ -774,6 +863,24 @@ export const teacherAPI = {
       if (formData[col] !== undefined) {
         teacherPayload[col] = formData[col] === '' ? null : formData[col];
       }
+    }
+
+    // Explicit mappings and type conversions
+    if (formData.bank_ifsc_code !== undefined || formData.bank_ifsc !== undefined) {
+      teacherPayload.bank_ifsc = (formData.bank_ifsc_code || formData.bank_ifsc || '').trim() || null;
+    }
+    if (formData.experience_years !== undefined) {
+      teacherPayload.experience_years = (formData.experience_years === '' || formData.experience_years === null) ? null : parseInt(formData.experience_years, 10);
+    }
+    if (formData.salary !== undefined) {
+      teacherPayload.salary = (formData.salary === '' || formData.salary === null) ? null : parseFloat(formData.salary);
+    }
+    if (formData.joining_date) {
+      teacherPayload.joining_date = String(formData.joining_date).substring(0, 10);
+    }
+    if (formData.employment_type) {
+      const empType = String(formData.employment_type).trim().toLowerCase();
+      teacherPayload.employment_type = (empType === 'permanent') ? 'full-time' : empType;
     }
 
     const { data: newTeacher, error: teacherErr } = await supabase
@@ -812,6 +919,24 @@ export const teacherAPI = {
       }
     }
 
+    // Explicit mappings and type conversions
+    if (formData.bank_ifsc_code !== undefined || formData.bank_ifsc !== undefined) {
+      teacherPayload.bank_ifsc = (formData.bank_ifsc_code || formData.bank_ifsc || '').trim() || null;
+    }
+    if (formData.experience_years !== undefined) {
+      teacherPayload.experience_years = (formData.experience_years === '' || formData.experience_years === null) ? null : parseInt(formData.experience_years, 10);
+    }
+    if (formData.salary !== undefined) {
+      teacherPayload.salary = (formData.salary === '' || formData.salary === null) ? null : parseFloat(formData.salary);
+    }
+    if (formData.joining_date !== undefined) {
+      teacherPayload.joining_date = formData.joining_date ? String(formData.joining_date).substring(0, 10) : null;
+    }
+    if (formData.employment_type !== undefined) {
+      const empType = String(formData.employment_type || '').trim().toLowerCase();
+      teacherPayload.employment_type = (empType === 'permanent') ? 'full-time' : (empType || null);
+    }
+
     const { data: updatedTeacher, error: teacherErr } = await supabase
       .from('teachers')
       .update(teacherPayload)
@@ -821,19 +946,67 @@ export const teacherAPI = {
 
     if (teacherErr) throw teacherErr;
 
-    if (teacher.user_id) {
-      const userCols = ['email', 'phone', 'date_of_birth', 'gender', 'address', 'city', 'state', 'country', 'postal_code'];
+    // Handle user record
+    let linkedUserId = teacher.user_id;
+
+    if (linkedUserId) {
+      const userCols = ['phone', 'gender', 'address', 'city', 'state', 'country', 'postal_code', 'status'];
       const userPayload = { updated_at: new Date().toISOString() };
       for (const col of userCols) {
         if (formData[col] !== undefined) {
           userPayload[col] = formData[col] === '' ? null : formData[col];
         }
       }
+      if (formData.email) {
+        userPayload.email = formData.email.trim().toLowerCase();
+      }
+      if (formData.date_of_birth !== undefined) {
+        userPayload.date_of_birth = formData.date_of_birth ? String(formData.date_of_birth).substring(0, 10) : null;
+      }
       const firstName = formData.first_name || teacher.first_name || '';
       const lastName = formData.last_name || teacher.last_name || '';
       userPayload.name = (firstName + ' ' + lastName).trim();
 
-      await supabase.from('users').update(userPayload).eq('id', teacher.user_id);
+      const { error: userErr } = await supabase.from('users').update(userPayload).eq('id', linkedUserId);
+      if (userErr) console.warn('User update error:', userErr);
+    } else if (formData.email) {
+      // Heal teacher missing user_id
+      const email = formData.email.trim().toLowerCase();
+      const firstName = formData.first_name || teacher.first_name || '';
+      const lastName = formData.last_name || teacher.last_name || '';
+      const fullName = (firstName + ' ' + lastName).trim() || 'Teacher';
+
+      const { data: existingUser } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
+      if (existingUser) {
+        linkedUserId = existingUser.id;
+      } else {
+        const { data: newUser } = await supabase.from('users').insert({
+          name: fullName,
+          email: email,
+          password: bcrypt.hashSync('password123', 10),
+          phone: formData.phone || null,
+          date_of_birth: formData.date_of_birth ? String(formData.date_of_birth).substring(0, 10) : null,
+          gender: formData.gender || null,
+          address: formData.address || null,
+          city: formData.city || null,
+          state: formData.state || null,
+          country: formData.country || null,
+          postal_code: formData.postal_code || null,
+          status: formData.status || 'active',
+        }).select().maybeSingle();
+        if (newUser) linkedUserId = newUser.id;
+      }
+
+      if (linkedUserId) {
+        await supabase.from('teachers').update({ user_id: linkedUserId }).eq('id', id);
+        try {
+          await supabase.from('model_has_roles').upsert({
+            role_id: 3,
+            model_type: 'App\\Models\\User',
+            model_id: linkedUserId,
+          }, { onConflict: 'role_id,model_id,model_type' });
+        } catch (_) {}
+      }
     }
 
     return { success: true, message: 'Teacher updated successfully', data: updatedTeacher };
