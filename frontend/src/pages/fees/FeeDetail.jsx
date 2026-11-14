@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { feeAPI } from '../../services/api';
 import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
+import { formatFeeTypeLabel, getFeeTypeBadgeVariant } from '../../utils/feeTypes';
 
 const FeeDetail = () => {
   const navigate = useNavigate();
@@ -114,8 +115,8 @@ const FeeDetail = () => {
                 <h2 className="text-2xl font-bold text-gray-900">{fee.name}</h2>
                 <p className="text-gray-600 mt-1">{fee.academic_year?.name || '-'}</p>
               </div>
-              <Badge variant={getTypeVariant(fee.type)}>
-                {fee.type}
+              <Badge variant={getFeeTypeBadgeVariant(fee.type)}>
+                {formatFeeTypeLabel(fee.type)}
               </Badge>
             </div>
             <p className="text-gray-600 mt-3">{fee.description || 'No description available'}</p>
@@ -143,8 +144,8 @@ const FeeDetail = () => {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Type:</span>
-              <Badge variant={getTypeVariant(fee.type)}>
-                {fee.type}
+              <Badge variant={getFeeTypeBadgeVariant(fee.type)}>
+                {formatFeeTypeLabel(fee.type)}
               </Badge>
             </div>
             <div className="flex flex-col">

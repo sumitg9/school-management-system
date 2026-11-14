@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { feeAPI, academicYearAPI, classAPI } from '../../services/api';
 import { useAlert } from '../../context/AlertContext';
+import { getAllFeeTypes, saveCustomFeeType, formatFeeTypeLabel } from '../../utils/feeTypes';
 
 const FeeForm = () => {
   const navigate = useNavigate();
@@ -12,6 +13,9 @@ const FeeForm = () => {
   const [loading, setLoading] = useState(false);
   const [academicYears, setAcademicYears] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [feeTypes, setFeeTypes] = useState(() => getAllFeeTypes());
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customTypeInput, setCustomTypeInput] = useState('');
   const [formData, setFormData] = useState({
     academic_year_id: '',
     class_id: '',
@@ -25,10 +29,23 @@ const FeeForm = () => {
   useEffect(() => {
     fetchAcademicYears();
     fetchClasses();
+    loadExistingFeeTypes();
     if (isEditMode) {
       fetchFee();
     }
   }, [id]);
+
+  const loadExistingFeeTypes = async () => {
+    try {
+      const response = await feeAPI.getAll({ per_page: 100 });
+      if (response && response.data) {
+        const typesInDb = response.data.map(f => f.type).filter(Boolean);
+        setFeeTypes(getAllFeeTypes(typesInDb));
+      }
+    } catch (err) {
+      console.warn('Could not load existing fee types:', err);
+    }
+  };
 
   const fetchAcademicYears = async () => {
     try {
@@ -63,12 +80,14 @@ const FeeForm = () => {
     try {
       const response = await feeAPI.getById(id);
       if (response.success) {
+        const feeType = response.data.type || 'tuition';
+        setFeeTypes(prev => getAllFeeTypes([...prev.map(t => t.id), feeType]));
         setFormData({
           academic_year_id: response.data.academic_year_id || '',
           class_id: response.data.class_id || '',
           name: response.data.name || '',
           description: response.data.description || '',
-          type: response.data.type || 'tuition',
+          type: feeType,
           amount: response.data.amount || '',
           due_date: response.data.due_date || '',
         });
@@ -86,16 +105,50 @@ const FeeForm = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleApplyCustomType = () => {
+    const trimmed = customTypeInput.trim();
+    if (!trimmed) return;
+    const created = saveCustomFeeType(trimmed);
+    if (created) {
+      setFeeTypes(getAllFeeTypes([created.id]));
+      setFormData(prev => ({ ...prev, type: created.id }));
+      setShowCustomInput(false);
+      setCustomTypeInput('');
+      toast.success(`Custom fee type "${created.label}" added and selected!`);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    let finalType = formData.type;
+    if (showCustomInput && customTypeInput.trim()) {
+      const created = saveCustomFeeType(customTypeInput.trim());
+      if (created) {
+        finalType = created.id;
+        setFeeTypes(getAllFeeTypes([created.id]));
+        setFormData(prev => ({ ...prev, type: created.id }));
+      }
+    }
+
+    if (!finalType) {
+      showValidationError('Please specify or select a Fee Type.', 'Validation Error');
+      return;
+    }
+
     setLoading(true);
+
+    const payload = {
+      ...formData,
+      type: finalType,
+    };
 
     try {
       if (isEditMode) {
-        await feeAPI.update(id, formData);
+        await feeAPI.update(id, payload);
         toast.success('Fee structure updated successfully');
       } else {
-        await feeAPI.create(formData);
+        await feeAPI.create(payload);
         toast.success('Fee structure created successfully');
       }
       navigate('/fees');
@@ -197,22 +250,108 @@ const FeeForm = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Fee Type <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="type"
-                value={formData.type}
-                onChange={handleChange}
-                className="input-field"
-                required
-              >
-                <option value="tuition">Tuition</option>
-                <option value="transport">Transport</option>
-                <option value="library">Library</option>
-                <option value="sports">Sports</option>
-                <option value="exam">Exam</option>
-              </select>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Fee Type <span className="text-red-500">*</span>
+                </label>
+                {!showCustomInput && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCustomInput(true);
+                      setCustomTypeInput('');
+                    }}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>+ Custom Type</span>
+                  </button>
+                )}
+              </div>
+
+              {!showCustomInput ? (
+                <div className="space-y-1">
+                  <select
+                    name="type"
+                    value={formData.type}
+                    onChange={(e) => {
+                      if (e.target.value === '__add_custom__') {
+                        setShowCustomInput(true);
+                        setCustomTypeInput('');
+                      } else {
+                        handleChange(e);
+                      }
+                    }}
+                    className="input-field"
+                    required
+                  >
+                    <option value="">Select Fee Type</option>
+                    <optgroup label="Standard Fee Types">
+                      {feeTypes.filter(t => !t.isCustom).map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                    {feeTypes.some(t => t.isCustom) && (
+                      <optgroup label="Custom Fee Types">
+                        {feeTypes.filter(t => t.isCustom).map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.label} (Custom)
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <option value="__add_custom__" className="text-blue-600 font-bold">
+                      ➕ + Add Custom Fee Type...
+                    </option>
+                  </select>
+                  <p className="text-xs text-gray-500">
+                    Select a type or choose "+ Add Custom Fee Type" if not in the list.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 bg-blue-50/70 p-3 rounded-xl border border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-blue-900 flex items-center gap-1">
+                      <span>🏷️</span> Add Custom Fee Type
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomInput(false)}
+                      className="text-xs font-medium text-gray-500 hover:text-gray-800 cursor-pointer"
+                    >
+                      Cancel (Back to dropdown)
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customTypeInput}
+                      onChange={(e) => setCustomTypeInput(e.target.value)}
+                      placeholder="e.g. Computer Lab, Robotics, Field Trip"
+                      className="input-field flex-1 text-sm bg-white"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleApplyCustomType();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCustomType}
+                      disabled={!customTypeInput.trim()}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition disabled:opacity-50 cursor-pointer shrink-0"
+                    >
+                      Add & Select
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    This custom type will be saved to your fee types list and selected for this fee structure.
+                  </p>
+                </div>
+              )}
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">

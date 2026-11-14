@@ -13,6 +13,13 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { classAPI } from '../../services/api';
+import { 
+  getSavedCustomFeeTypes, 
+  saveCustomFeeType, 
+  removeCustomFeeType, 
+  STANDARD_FEE_TYPES 
+} from '../../utils/feeTypes';
+import { toast } from 'react-toastify';
 
 const SAMPLE_DATE = new Date('2026-10-31T12:15:00');
 
@@ -47,6 +54,10 @@ const Settings = () => {
   const [newClassName, setNewClassName] = useState('');
   const [newClassYears, setNewClassYears] = useState(3);
   const [newClassMonths, setNewClassMonths] = useState(0);
+
+  // Custom Fee Types
+  const [customFeeTypes, setCustomFeeTypes] = useState(() => getSavedCustomFeeTypes());
+  const [newFeeTypeName, setNewFeeTypeName] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [liveNow, setLiveNow] = useState(new Date());
@@ -160,6 +171,21 @@ const Settings = () => {
     setNewClassName('');
     setNewClassYears(3);
     setNewClassMonths(0);
+  };
+
+  const handleAddFeeTypeFromSettings = () => {
+    if (!newFeeTypeName.trim()) return;
+    const created = saveCustomFeeType(newFeeTypeName.trim());
+    if (created) {
+      setCustomFeeTypes(getSavedCustomFeeTypes());
+      setNewFeeTypeName('');
+      toast.success(`Custom fee type "${created.label}" added!`);
+    }
+  };
+
+  const handleRemoveFeeTypeFromSettings = (id) => {
+    const updated = removeCustomFeeType(id);
+    setCustomFeeTypes(updated);
   };
 
   const handleLoadStandardCriteria = () => {
@@ -911,6 +937,84 @@ const Settings = () => {
                 <div className="bg-gray-50 p-2.5 rounded-lg text-xs font-mono text-gray-700">
                   Preview: <span className="font-bold text-emerald-600">{currencySymbol} 50,000.00</span>
                 </div>
+              </div>
+            </div>
+
+            {/* Custom Fee Types Card */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 gap-2">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                    <span>🏷️</span> Fee Types Management
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Add custom fee categories if not available in the default dropdown.
+                  </p>
+                </div>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800">
+                  {customFeeTypes.length} Custom Added
+                </span>
+              </div>
+
+              {/* Standard Fee Types summary */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-2">Built-in Standard Types:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {STANDARD_FEE_TYPES.map(t => (
+                    <span key={t.id} className="px-2.5 py-1 text-xs rounded-lg bg-gray-100 text-gray-700 font-medium border border-gray-200">
+                      {t.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Fee Types list */}
+              <div>
+                <p className="text-xs font-semibold text-gray-700 mb-2">Active Custom Fee Types:</p>
+                {customFeeTypes.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic">No custom fee types added yet. You can add them here or directly in the Fee Structure form.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {customFeeTypes.map(t => (
+                      <span key={t.id} className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-800 border border-blue-200">
+                        <span>{t.label}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFeeTypeFromSettings(t.id)}
+                          className="text-blue-500 hover:text-red-600 font-bold ml-1 cursor-pointer"
+                          title={`Remove ${t.label}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Add Custom Fee Type Input */}
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="text"
+                  value={newFeeTypeName}
+                  onChange={(e) => setNewFeeTypeName(e.target.value)}
+                  placeholder="e.g. Computer Lab Fee, Robotics Club, Annual Magazine"
+                  className="input-field text-sm flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddFeeTypeFromSettings();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddFeeTypeFromSettings}
+                  disabled={!newFeeTypeName.trim()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition disabled:opacity-50 shrink-0 cursor-pointer"
+                >
+                  + Add Fee Type
+                </button>
               </div>
             </div>
           </div>

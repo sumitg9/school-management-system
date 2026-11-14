@@ -6,6 +6,8 @@ const Badge = ({ children, variant = 'default', size = 'md' }) => {
     warning: 'bg-yellow-100 text-yellow-800',
     danger: 'bg-red-100 text-red-800',
     info: 'bg-cyan-100 text-cyan-800',
+    purple: 'bg-purple-100 text-purple-800',
+    secondary: 'bg-indigo-100 text-indigo-800',
   };
 
   const sizes = {

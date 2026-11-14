@@ -6,6 +6,7 @@ import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { getAllFeeTypes, formatFeeTypeLabel, getFeeTypeBadgeVariant } from '../../utils/feeTypes';
 
 const FeeList = () => {
   const navigate = useNavigate();
@@ -153,8 +154,8 @@ const FeeList = () => {
       key: 'type',
       label: 'Type',
       render: (row) => (
-        <Badge variant={getTypeVariant(row.type)}>
-          {row.type}
+        <Badge variant={getFeeTypeBadgeVariant(row.type)}>
+          {formatFeeTypeLabel(row.type)}
         </Badge>
       ),
     },
@@ -284,11 +285,11 @@ const FeeList = () => {
               className="input-field"
             >
               <option value="">All Types</option>
-              <option value="tuition">Tuition</option>
-              <option value="transport">Transport</option>
-              <option value="library">Library</option>
-              <option value="sports">Sports</option>
-              <option value="exam">Exam</option>
+              {getAllFeeTypes(fees.map(f => f.type)).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label} {t.isCustom ? '(Custom)' : ''}
+                </option>
+              ))}
             </select>
           </div>
           <div>

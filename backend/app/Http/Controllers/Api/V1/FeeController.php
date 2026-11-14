@@ -67,7 +67,7 @@ class FeeController extends Controller
             'academic_year_id' => 'required|exists:academic_years,id',
             'class_id' => 'required|exists:classes,id',
             'name' => 'required|string|max:100',
-            'type' => 'required|in:tuition,transport,library,sports,exam,other',
+            'type' => 'required|string|max:100',
             'amount' => 'required|numeric|min:0',
             'frequency' => 'required|in:one-time,monthly,quarterly,half-yearly,yearly',
             'due_date' => 'nullable|date',
