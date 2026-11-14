@@ -1606,7 +1606,19 @@ export const feeAPI = {
   delete: async (id) => feeAPI.deleteStructure(id),
   getPayments: async (params) => {
     if (!useSupabase) return api.get('/fee-payments', { params });
-    let query = supabase.from('fee_payments').select('*, student:students(first_name, last_name)', { count: 'exact' });
+    let query = supabase.from('fee_payments').select('*, student:students(first_name, last_name, admission_number, roll_number), fee_structure:fee_structures(name, amount, type)', { count: 'exact' });
+    if (params?.fee_structure_id) {
+      query = query.eq('fee_structure_id', params.fee_structure_id);
+    }
+    if (params?.student_id) {
+      query = query.eq('student_id', params.student_id);
+    }
+    if (params?.payment_method) {
+      query = query.eq('payment_method', params.payment_method);
+    }
+    if (params?.status) {
+      query = query.eq('status', params.status);
+    }
     query = query.order('id', { ascending: false });
 
     const page = parseInt(params?.page || 1, 10);
@@ -1623,7 +1635,26 @@ export const feeAPI = {
   },
   collectPayment: async (data) => {
     if (!useSupabase) return api.post('/fee-payments', data);
-    const { data: res, error } = await supabase.from('fee_payments').insert(data).select().single();
+    const amount = parseFloat(data.amount || 0);
+    const discount = parseFloat(data.discount || 0);
+    const fine = parseFloat(data.fine || 0);
+    const totalAmount = data.total_amount !== undefined ? parseFloat(data.total_amount) : (amount - discount + fine);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const receiptNum = data.receipt_number || `RCP-${todayStr.replace(/-/g, '')}-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const payload = {
+      ...data,
+      amount,
+      discount,
+      fine,
+      total_amount: totalAmount,
+      receipt_number: receiptNum,
+      payment_date: data.payment_date || todayStr,
+      payment_method: data.payment_method || 'cash',
+      status: data.status || 'completed',
+    };
+
+    const { data: res, error } = await supabase.from('fee_payments').insert(payload).select('*, student:students(first_name, last_name)').single();
     if (error) throw error;
     return { success: true, data: res };
   },
