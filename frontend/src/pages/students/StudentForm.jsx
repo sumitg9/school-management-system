@@ -3,13 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { studentAPI, classAPI, sectionAPI, academicYearAPI } from '../../services/api';
 import { useAlert } from '../../context/AlertContext';
-import { getMaxDateOfBirth, validateDateOfBirth } from '../../utils/dateFormatter';
+import { useSettings } from '../../context/SettingsContext';
+import { getStudentAgeCriteria, getMaxStudentDateOfBirth, validateStudentDateOfBirth } from '../../utils/dateFormatter';
 
 const StudentForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = !!id;
   const { showValidationError } = useAlert();
+  const { settings } = useSettings();
 
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState([]);
@@ -153,12 +155,16 @@ const StudentForm = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const selectedClass = classes.find(c => String(c.id) === String(formData.class_id));
+  const studentCriteria = getStudentAgeCriteria(selectedClass, settings);
+  const maxStudentDOB = getMaxStudentDateOfBirth(selectedClass, settings);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const dobError = validateDateOfBirth(formData.date_of_birth);
+    const dobError = validateStudentDateOfBirth(formData.date_of_birth, selectedClass, settings);
     if (dobError) {
-      showValidationError(dobError, 'Form Validation Error');
+      showValidationError(dobError, 'Student Age Criteria');
       return;
     }
 
@@ -361,11 +367,23 @@ const StudentForm = () => {
                 name="date_of_birth"
                 value={formData.date_of_birth}
                 onChange={handleChange}
-                max={getMaxDateOfBirth()}
+                max={maxStudentDOB}
+                data-entity-type="student"
+                data-min-years={studentCriteria.minYears}
+                data-min-months={studentCriteria.minMonths}
+                data-class-label={selectedClass?.name || ''}
                 className="input-field"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">Must be at least 20 years back</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {selectedClass
+                  ? `Must be at least ${studentCriteria.minYears} year${studentCriteria.minYears !== 1 ? 's' : ''}${
+                      studentCriteria.minMonths > 0
+                        ? ` and ${studentCriteria.minMonths} month${studentCriteria.minMonths !== 1 ? 's' : ''}`
+                        : ''
+                    } old for ${selectedClass.name} (born on or before ${maxStudentDOB})`
+                  : `Must be at least ${studentCriteria.minYears} years and ${studentCriteria.minMonths} months old (born on or before ${maxStudentDOB})`}
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

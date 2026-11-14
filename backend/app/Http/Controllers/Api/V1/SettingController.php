@@ -33,28 +33,33 @@ class SettingController extends Controller
             'date_format' => 'nullable|string|max:100',
             'time_format' => 'nullable|string|max:100',
             'timezone' => 'nullable|string|max:100',
+            'currency' => 'nullable|string|max:20',
+            'currency_symbol' => 'nullable|string|max:10',
+            'student_min_age_years' => 'nullable|numeric|min:0',
+            'student_min_age_months' => 'nullable|numeric|min:0|max:11',
+            'teacher_min_age_years' => 'nullable|numeric|min:15',
+            'staff_min_age_years' => 'nullable|numeric|min:15',
+            'class_age_criteria' => 'nullable',
             'settings' => 'nullable|array',
         ]);
 
+        $payload = $request->except(['_token', '_method']);
+
         // If 'settings' array passed:
-        if ($request->has('settings') && is_array($request->settings)) {
-            foreach ($request->settings as $key => $value) {
-                Setting::set($key, (string)$value, 'localization');
+        if (isset($payload['settings']) && is_array($payload['settings'])) {
+            foreach ($payload['settings'] as $key => $value) {
+                $valStr = is_array($value) ? json_encode($value) : (string)$value;
+                Setting::set($key, $valStr, 'general');
             }
+            unset($payload['settings']);
         }
 
-        // Direct keys
-        $directKeys = [
-            'date_time_format',
-            'date_format',
-            'time_format',
-            'timezone',
-        ];
-
-        foreach ($directKeys as $key) {
-            if ($request->has($key)) {
-                Setting::set($key, $request->input($key), 'localization');
-            }
+        foreach ($payload as $key => $value) {
+            $group = in_array($key, ['date_time_format', 'date_format', 'time_format', 'timezone', 'currency', 'currency_symbol'])
+                ? 'localization'
+                : 'age_criteria';
+            $valStr = (is_array($value) || is_object($value)) ? json_encode($value) : (string)$value;
+            Setting::set($key, $valStr, $group);
         }
 
         $allSettings = Setting::all();

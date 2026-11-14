@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { supabase } from './supabase';
 import bcrypt from 'bcryptjs';
-import { validateDateOfBirth } from '../utils/dateFormatter';
+import { validateStudentDateOfBirth, validateTeacherDateOfBirth, validateDateOfBirth } from '../utils/dateFormatter';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const useSupabase = import.meta.env.VITE_USE_SUPABASE !== 'false';
@@ -493,7 +493,7 @@ export const studentAPI = {
     if (!useSupabase) return api.post('/students', formData);
 
     if (formData.date_of_birth) {
-      const dobError = validateDateOfBirth(formData.date_of_birth);
+      const dobError = validateStudentDateOfBirth(formData.date_of_birth, formData.class_id || formData.class_name);
       if (dobError) throw new Error(dobError);
     }
 
@@ -600,7 +600,7 @@ export const studentAPI = {
     if (!useSupabase) return api.put(`/students/${id}`, formData);
 
     if (formData.date_of_birth) {
-      const dobError = validateDateOfBirth(formData.date_of_birth);
+      const dobError = validateStudentDateOfBirth(formData.date_of_birth, formData.class_id || formData.class_name);
       if (dobError) throw new Error(dobError);
     }
 
@@ -824,7 +824,7 @@ export const teacherAPI = {
     if (!empId) throw new Error('Employee ID is required.');
 
     if (formData.date_of_birth) {
-      const dobError = validateDateOfBirth(formData.date_of_birth);
+      const dobError = validateTeacherDateOfBirth(formData.date_of_birth);
       if (dobError) throw new Error(dobError);
     }
 
@@ -1039,7 +1039,7 @@ export const teacherAPI = {
     if (!useSupabase) return api.put(`/teachers/${id}`, formData);
 
     if (formData.date_of_birth) {
-      const dobError = validateDateOfBirth(formData.date_of_birth);
+      const dobError = validateTeacherDateOfBirth(formData.date_of_birth);
       if (dobError) throw new Error(dobError);
     }
 
@@ -1736,14 +1736,23 @@ export const settingsAPI = {
     if (error) throw error;
     const settingsMap = {};
     (data || []).forEach(item => {
-      settingsMap[item.key] = item.value;
+      let val = item.value;
+      if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+        try {
+          val = JSON.parse(val);
+        } catch {
+          // keep as string
+        }
+      }
+      settingsMap[item.key] = val;
     });
     return { success: true, data: settingsMap };
   },
   update: async (data) => {
     if (!useSupabase) return api.put('/settings', data);
     for (const [key, value] of Object.entries(data)) {
-      const { error } = await supabase.from('settings').upsert({ key, value }, { onConflict: 'key' });
+      const valStr = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '');
+      const { error } = await supabase.from('settings').upsert({ key, value: valStr }, { onConflict: 'key' });
       if (error) throw error;
     }
     return { success: true, data };

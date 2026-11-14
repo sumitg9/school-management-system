@@ -3,13 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { teacherAPI } from '../../services/api';
 import { useAlert } from '../../context/AlertContext';
-import { getMaxDateOfBirth, validateDateOfBirth } from '../../utils/dateFormatter';
+import { useSettings } from '../../context/SettingsContext';
+import { getMaxTeacherDateOfBirth, validateTeacherDateOfBirth } from '../../utils/dateFormatter';
 
 const TeacherForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = !!id;
   const { showValidationError } = useAlert();
+  const { settings } = useSettings();
 
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -114,12 +116,15 @@ const TeacherForm = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const teacherMinYears = settings?.teacher_min_age_years ?? 20;
+  const maxTeacherDOB = getMaxTeacherDateOfBirth(settings);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const dobError = validateDateOfBirth(formData.date_of_birth);
+    const dobError = validateTeacherDateOfBirth(formData.date_of_birth, settings);
     if (dobError) {
-      showValidationError(dobError, 'Form Validation Error');
+      showValidationError(dobError, 'Teacher Age Requirement');
       return;
     }
 
@@ -318,11 +323,15 @@ const TeacherForm = () => {
                 name="date_of_birth"
                 value={formData.date_of_birth}
                 onChange={handleChange}
-                max={getMaxDateOfBirth()}
+                max={maxTeacherDOB}
+                data-entity-type="teacher"
+                data-min-years={teacherMinYears}
                 className="input-field"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">Must be at least 20 years back</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Must be at least {teacherMinYears} years back (born on or before {maxTeacherDOB})
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

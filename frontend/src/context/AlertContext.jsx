@@ -118,7 +118,35 @@ const getFriendlyValidationMessage = (el) => {
   }
   if (validity.rangeOverflow) {
     if (el.name === 'date_of_birth' || el.id === 'date_of_birth' || labelText.toLowerCase().includes('birth')) {
-      return 'Date of birth should not be present and future date. It must be at least 20 years back.';
+      const entity = el.dataset?.entityType;
+      const minYears = el.dataset?.minYears;
+      const minMonths = el.dataset?.minMonths;
+      const classLabel = el.dataset?.classLabel;
+
+      if (entity === 'student') {
+        const y = minYears || '2';
+        const m = minMonths || '6';
+        if (classLabel) {
+          return `For ${classLabel}, student's date of birth should not be in the present or future, and must be at least ${y} year${y !== '1' ? 's' : ''}${parseInt(m, 10) > 0 ? ` and ${m} month${m !== '1' ? 's' : ''}` : ''} old.`;
+        }
+        return `Student's date of birth should not be in the present or future, and must be at least ${y} years and ${m} months old.`;
+      }
+
+      if (entity === 'teacher') {
+        const y = minYears || '20';
+        return `Teacher's date of birth should not be present and future date. It must be at least ${y} years back.`;
+      }
+
+      if (entity === 'staff') {
+        const y = minYears || '18';
+        return `Staff date of birth should not be present and future date. It must be at least ${y} years back.`;
+      }
+
+      if (el.dataset?.errorMessage) {
+        return el.dataset.errorMessage;
+      }
+
+      return 'Date of birth should not be present and future date, and must meet the minimum age requirement.';
     }
     return `${labelText} cannot exceed ${el.max}.`;
   }
