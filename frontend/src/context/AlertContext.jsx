@@ -117,6 +117,9 @@ const getFriendlyValidationMessage = (el) => {
     return `${labelText} must be at least ${el.min}.`;
   }
   if (validity.rangeOverflow) {
+    if (el.name === 'date_of_birth' || el.id === 'date_of_birth' || labelText.toLowerCase().includes('birth')) {
+      return 'Date of birth should not be present and future date. It must be at least 20 years back.';
+    }
     return `${labelText} cannot exceed ${el.max}.`;
   }
   if (validity.stepMismatch) {
@@ -306,3 +309,4 @@ export const useAlert = () => {
 };
 
 export default AlertContext;
+

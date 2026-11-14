@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { studentAPI, classAPI, sectionAPI, academicYearAPI } from '../../services/api';
 import { useAlert } from '../../context/AlertContext';
+import { getMaxDateOfBirth, validateDateOfBirth } from '../../utils/dateFormatter';
 
 const StudentForm = () => {
   const navigate = useNavigate();
@@ -154,6 +155,13 @@ const StudentForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const dobError = validateDateOfBirth(formData.date_of_birth);
+    if (dobError) {
+      showValidationError(dobError, 'Form Validation Error');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -353,9 +361,11 @@ const StudentForm = () => {
                 name="date_of_birth"
                 value={formData.date_of_birth}
                 onChange={handleChange}
+                max={getMaxDateOfBirth()}
                 className="input-field"
                 required
               />
+              <p className="text-xs text-gray-500 mt-1">Must be at least 20 years back</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

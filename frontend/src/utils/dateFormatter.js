@@ -146,3 +146,54 @@ export const formatTime = (dateValue, formatPattern = 'HH:mm:ss') => {
   }
 };
 
+/**
+ * Calculates the maximum allowable Date of Birth string (YYYY-MM-DD), exactly 20 years ago today
+ */
+export const getMaxDateOfBirth = () => {
+  const today = new Date();
+  const d = new Date(today.getFullYear() - 20, today.getMonth(), today.getDate());
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Validates that Date of Birth is not in the present or future, and is at least 20 years back.
+ * Returns null if valid, or an error message string if invalid.
+ */
+export const validateDateOfBirth = (dobString) => {
+  if (!dobString) return null;
+
+  const cleanStr = String(dobString).trim().substring(0, 10);
+  const parts = cleanStr.split('-');
+  if (parts.length !== 3) {
+    return 'Please enter a valid Date of Birth (YYYY-MM-DD).';
+  }
+
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+
+  const dob = new Date(year, month, day);
+  if (isNaN(dob.getTime())) {
+    return 'Please enter a valid Date of Birth.';
+  }
+
+  const today = new Date();
+  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  // Check 1: Present or future date
+  if (dob >= todayMidnight) {
+    return 'Date of birth should not be present and future date. It must be at least 20 years back.';
+  }
+
+  // Check 2: At least 20 years back
+  const minAgeDate = new Date(today.getFullYear() - 20, today.getMonth(), today.getDate());
+  if (dob > minAgeDate) {
+    return 'Date of birth must be at least 20 years back.';
+  }
+
+  return null;
+};
+

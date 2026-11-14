@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { supabase } from './supabase';
 import bcrypt from 'bcryptjs';
+import { validateDateOfBirth } from '../utils/dateFormatter';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const useSupabase = import.meta.env.VITE_USE_SUPABASE !== 'false';
@@ -491,6 +492,11 @@ export const studentAPI = {
   create: async (formData) => {
     if (!useSupabase) return api.post('/students', formData);
 
+    if (formData.date_of_birth) {
+      const dobError = validateDateOfBirth(formData.date_of_birth);
+      if (dobError) throw new Error(dobError);
+    }
+
     // 1. Create a user record if email is provided
     let userId = null;
     const firstName = formData.first_name || '';
@@ -592,6 +598,11 @@ export const studentAPI = {
 
   update: async (id, formData) => {
     if (!useSupabase) return api.put(`/students/${id}`, formData);
+
+    if (formData.date_of_birth) {
+      const dobError = validateDateOfBirth(formData.date_of_birth);
+      if (dobError) throw new Error(dobError);
+    }
 
     // 1. Get existing student
     const { data: student, error: fetchErr } = await supabase
@@ -812,6 +823,11 @@ export const teacherAPI = {
     const empId = (formData.employee_id || '').trim();
     if (!empId) throw new Error('Employee ID is required.');
 
+    if (formData.date_of_birth) {
+      const dobError = validateDateOfBirth(formData.date_of_birth);
+      if (dobError) throw new Error(dobError);
+    }
+
     // Pre-check 1: Check if employee_id is already assigned to an existing teacher
     const { data: existingEmp, error: empCheckErr } = await supabase
       .from('teachers')
@@ -1021,6 +1037,11 @@ export const teacherAPI = {
 
   update: async (id, formData) => {
     if (!useSupabase) return api.put(`/teachers/${id}`, formData);
+
+    if (formData.date_of_birth) {
+      const dobError = validateDateOfBirth(formData.date_of_birth);
+      if (dobError) throw new Error(dobError);
+    }
 
     const { data: teacher, error: fetchErr } = await supabase
       .from('teachers')
