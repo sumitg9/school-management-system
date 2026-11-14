@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { authAPI } from '../services/api';
 import { toast } from 'react-toastify';
+import { showGlobalValidationError } from './AlertContext';
 
 const AuthContext = createContext(null);
 
@@ -42,7 +43,7 @@ export const AuthProvider = ({ children }) => {
       const errorMessage = typeof error === 'string'
         ? error
         : (error?.message || 'Login failed. Please check your credentials.');
-      toast.error(errorMessage);
+      showGlobalValidationError(errorMessage, 'Authentication Error');
       return { success: false, error };
     }
   };
@@ -64,7 +65,7 @@ export const AuthProvider = ({ children }) => {
         return { success: true };
       }
     } catch (error) {
-      toast.error(error.message || 'Registration failed.');
+      showGlobalValidationError(error?.message || 'Registration failed.', 'Registration Error');
       return { success: false, error };
     }
   };

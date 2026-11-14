@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { attendanceAPI, classAPI, sectionAPI, studentAPI } from '../../services/api';
 import Badge from '../../components/common/Badge';
+import { useAlert } from '../../context/AlertContext';
 
 const MarkAttendance = () => {
   const navigate = useNavigate();
+  const { showValidationError } = useAlert();
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -142,7 +144,7 @@ const MarkAttendance = () => {
       toast.success('Attendance marked successfully');
       navigate('/attendance');
     } catch (error) {
-      toast.error(error.message || 'Failed to mark attendance');
+      showValidationError(error, 'Failed to mark attendance');
     } finally {
       setLoading(false);
     }

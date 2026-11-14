@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { sectionAPI, classAPI, teacherAPI } from '../../services/api';
+import { useAlert } from '../../context/AlertContext';
 
 const SectionForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = !!id;
+  const { showValidationError } = useAlert();
 
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState([]);
@@ -84,7 +86,7 @@ const SectionForm = () => {
       }
       navigate('/sections');
     } catch (error) {
-      toast.error(error.message || `Failed to ${isEdit ? 'update' : 'create'} section`);
+      showValidationError(error, `Failed to ${isEdit ? 'update' : 'create'} section`);
     } finally {
       setLoading(false);
     }

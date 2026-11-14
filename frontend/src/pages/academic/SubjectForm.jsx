@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { subjectAPI } from '../../services/api';
+import { useAlert } from '../../context/AlertContext';
 
 const SubjectForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = !!id;
+  const { showValidationError } = useAlert();
 
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -61,7 +63,7 @@ const SubjectForm = () => {
       }
       navigate('/subjects');
     } catch (error) {
-      toast.error(error.message || `Failed to ${isEdit ? 'update' : 'create'} subject`);
+      showValidationError(error, `Failed to ${isEdit ? 'update' : 'create'} subject`);
     } finally {
       setLoading(false);
     }

@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { ConfirmProvider } from './context/ConfirmContext';
+import { AlertProvider } from './context/AlertContext';
 
 // Layout
 import Layout from './components/layout/Layout';
@@ -133,7 +134,9 @@ function App() {
       <AuthProvider>
         <SettingsProvider>
           <ConfirmProvider>
-            <AppRoutes />
+            <AlertProvider>
+              <AppRoutes />
+            </AlertProvider>
           </ConfirmProvider>
         </SettingsProvider>
       </AuthProvider>

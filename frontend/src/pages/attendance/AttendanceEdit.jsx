@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { attendanceAPI } from '../../services/api';
+import { useAlert } from '../../context/AlertContext';
 
 const AttendanceEdit = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { showValidationError } = useAlert();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     status: 'present',
@@ -50,7 +52,7 @@ const AttendanceEdit = () => {
       toast.success('Attendance updated successfully');
       navigate('/attendance');
     } catch (error) {
-      toast.error(error.message || 'Failed to update attendance');
+      showValidationError(error, 'Failed to update attendance');
     } finally {
       setLoading(false);
     }

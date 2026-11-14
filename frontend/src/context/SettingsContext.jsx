@@ -10,6 +10,7 @@ import {
   DEFAULT_CURRENCY_SYMBOL
 } from '../utils/currencyFormatter';
 import { toast } from 'react-toastify';
+import { showGlobalValidationError } from './AlertContext';
 
 const SettingsContext = createContext(null);
 
@@ -66,7 +67,7 @@ export const SettingsProvider = ({ children }) => {
       return { success: false };
     } catch (error) {
       const msg = error.response?.data?.message || error.message || 'Failed to update settings';
-      toast.error(msg);
+      showGlobalValidationError(msg, 'Settings Error');
       return { success: false, error };
     }
   };

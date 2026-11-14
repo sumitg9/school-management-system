@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { feeAPI, academicYearAPI, classAPI } from '../../services/api';
+import { useAlert } from '../../context/AlertContext';
 
 const FeeForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
+  const { showValidationError } = useAlert();
   const [loading, setLoading] = useState(false);
   const [academicYears, setAcademicYears] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -98,7 +100,7 @@ const FeeForm = () => {
       }
       navigate('/fees');
     } catch (error) {
-      toast.error(error.message || `Failed to ${isEditMode ? 'update' : 'create'} fee structure`);
+      showValidationError(error, `Failed to ${isEditMode ? 'update' : 'create'} fee structure`);
     } finally {
       setLoading(false);
     }

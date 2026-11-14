@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { assignmentAPI, classAPI, sectionAPI, subjectAPI } from '../../services/api';
+import { useAlert } from '../../context/AlertContext';
 
 const AssignmentForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
+  const { showValidationError } = useAlert();
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -112,7 +114,7 @@ const AssignmentForm = () => {
       }
       navigate('/assignments');
     } catch (error) {
-      toast.error(error.message || `Failed to ${isEditMode ? 'update' : 'create'} assignment`);
+      showValidationError(error, `Failed to ${isEditMode ? 'update' : 'create'} assignment`);
     } finally {
       setLoading(false);
     }

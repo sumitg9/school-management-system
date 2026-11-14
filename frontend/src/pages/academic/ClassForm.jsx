@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { classAPI, academicYearAPI, teacherAPI } from '../../services/api';
+import { useAlert } from '../../context/AlertContext';
 
 const ClassForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = !!id;
+  const { showValidationError } = useAlert();
 
   const [loading, setLoading] = useState(false);
   const [academicYears, setAcademicYears] = useState([]);
@@ -89,7 +91,7 @@ const ClassForm = () => {
       }
       navigate('/classes');
     } catch (error) {
-      toast.error(error.message || `Failed to ${isEdit ? 'update' : 'create'} class`);
+      showValidationError(error, `Failed to ${isEdit ? 'update' : 'create'} class`);
     } finally {
       setLoading(false);
     }

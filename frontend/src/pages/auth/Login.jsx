@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { showValidationError } = useAlert();
   const [formData, setFormData] = useState({
     email: 'admin@school.com',
     password: 'password',
@@ -25,7 +27,7 @@ const Login = () => {
     e.preventDefault();
 
     if (!formData.email || !formData.password) {
-      toast.error('Please enter email and password');
+      showValidationError('Please enter both email and password to sign in.', 'Validation Error');
       return;
     }
 

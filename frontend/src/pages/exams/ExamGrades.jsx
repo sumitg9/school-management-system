@@ -3,10 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { examAPI, gradeAPI, classAPI, sectionAPI, subjectAPI, studentAPI } from '../../services/api';
 import Badge from '../../components/common/Badge';
+import { useAlert } from '../../context/AlertContext';
 
 const ExamGrades = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { showValidationError } = useAlert();
   const [exam, setExam] = useState(null);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -161,7 +163,7 @@ const ExamGrades = () => {
       toast.success('Grades saved successfully');
       navigate(`/exams/${id}`);
     } catch (error) {
-      toast.error(error.message || 'Failed to save grades');
+      showValidationError(error, 'Failed to save grades');
     } finally {
       setLoading(false);
     }

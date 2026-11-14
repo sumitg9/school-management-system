@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { toast } from 'react-toastify';
 import Badge from '../../components/common/Badge';
 import { studentAPI } from '../../services/api';
+import { useAlert } from '../../context/AlertContext';
 
 const CSV_TEMPLATES = {
   students: `first_name,last_name,email,phone,admission_number,admission_date,class_id,section_id,academic_year_id,roll_number,date_of_birth,gender,blood_group,religion,caste,nationality,mother_tongue,status,address,city,state,country,postal_code,father_name,father_phone,father_occupation,mother_name,mother_phone,mother_occupation,guardian_name,guardian_phone,guardian_relation,emergency_contact_name,emergency_contact_phone,emergency_contact_relation,previous_school,medical_conditions,allergies,notes
@@ -20,6 +21,7 @@ Annual Tuition Fee,tuition,15000,2026-05-15,Annual school tuition fee`
 };
 
 const BulkOperations = () => {
+  const { showValidationError } = useAlert();
   const [activeTab, setActiveTab] = useState('import');
   const [selectedFile, setSelectedFile] = useState(null);
   const [importType, setImportType] = useState('students');
@@ -54,7 +56,7 @@ const BulkOperations = () => {
 
   const handleImport = async () => {
     if (!selectedFile) {
-      toast.error('Please select a file to import');
+      showValidationError('Please select a file to import.', 'File Required');
       return;
     }
 
@@ -71,7 +73,7 @@ const BulkOperations = () => {
           }
           setSelectedFile(null);
         } else {
-          toast.error(response.message || 'Failed to import student data');
+          showValidationError(response.message || 'Failed to import student data', 'Import Error');
         }
       } else {
         // Fallback simulation for other types
@@ -81,7 +83,7 @@ const BulkOperations = () => {
       }
     } catch (error) {
       const msg = error.response?.data?.message || error.message || 'Failed to import data';
-      toast.error(msg);
+      showValidationError(msg, 'Import Error');
     } finally {
       setLoading(false);
     }

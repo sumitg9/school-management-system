@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { teacherAPI } from '../../services/api';
+import { useAlert } from '../../context/AlertContext';
 
 const TeacherForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = !!id;
+  const { showValidationError } = useAlert();
 
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -125,8 +127,7 @@ const TeacherForm = () => {
       }
       navigate('/teachers');
     } catch (error) {
-      const errorMsg = error?.message || (typeof error === 'string' ? error : `Failed to ${isEdit ? 'update' : 'create'} teacher`);
-      toast.error(errorMsg);
+      showValidationError(error, `Failed to ${isEdit ? 'update' : 'create'} teacher`);
     } finally {
       setLoading(false);
     }
