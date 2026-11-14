@@ -59,3 +59,4 @@ const FeeTabs = () => {
 };
 
 export default FeeTabs;
+
