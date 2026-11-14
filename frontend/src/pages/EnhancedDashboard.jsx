@@ -1,15 +1,34 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { studentAPI, teacherAPI, classAPI, attendanceAPI, examAPI, feeAPI, assignmentAPI } from '../services/api';
 import Badge from '../components/common/Badge';
 import { useSettings } from '../context/SettingsContext';
 
+// Isolated clock component so second-by-second ticks only re-render this badge
+const LiveClock = memo(({ formatDateTime }) => {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2 bg-white border border-gray-200 text-gray-800 shadow-sm px-4 py-2 rounded-xl text-sm font-semibold">
+      <span className="text-blue-600">🕒</span>
+      <span className="font-mono text-gray-900">{formatDateTime(time)}</span>
+    </div>
+  );
+});
+
+LiveClock.displayName = 'LiveClock';
+
 const EnhancedDashboard = () => {
   const navigate = useNavigate();
   const { formatDateTime } = useSettings();
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
     students: { total: 0, active: 0, inactive: 0 },
     teachers: { total: 0, active: 0, inactive: 0 },
@@ -20,27 +39,26 @@ const EnhancedDashboard = () => {
     assignments: { total: 0, active: 0, overdue: 0 },
   });
 
-  const [recentActivities, setRecentActivities] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([
+    { id: 1, type: 'student', action: 'Student management active', time: 'Active', icon: '👨‍🎓' },
+    { id: 2, type: 'attendance', action: 'Daily attendance tracker active', time: 'Today', icon: '📊' },
+    { id: 3, type: 'exam', action: 'Examinations scheduled', time: 'This Term', icon: '📝' },
+    { id: 4, type: 'fee', action: 'Fee management portal updated', time: 'Active', icon: '💰' },
+    { id: 5, type: 'assignment', action: 'Assignment system ready', time: 'Active', icon: '📚' },
+  ]);
 
   useEffect(() => {
-    fetchDashboardData();
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
+    fetchDashboardData(false);
   }, []);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = async (isManual = false) => {
+    if (isManual) {
+      setRefreshing(true);
+    }
+
     try {
-      // Fetch all statistics in parallel
-      const [
-        studentsRes,
-        teachersRes,
-        classesRes,
-        attendanceRes,
-        examsRes,
-        feesRes,
-        assignmentsRes,
-      ] = await Promise.all([
+      // Fetch all statistics in parallel using allSettled to ensure resilient loading
+      const results = await Promise.allSettled([
         studentAPI.getAll({ per_page: 1 }),
         teacherAPI.getAll({ per_page: 1 }),
         classAPI.getAll({ per_page: 1 }),
@@ -50,57 +68,94 @@ const EnhancedDashboard = () => {
         assignmentAPI.getAll({ per_page: 1 }),
       ]);
 
-      setStats({
+      const [
+        studentsRes,
+        teachersRes,
+        classesRes,
+        attendanceRes,
+        examsRes,
+        feesRes,
+        assignmentsRes,
+      ] = results.map(r => (r.status === 'fulfilled' ? r.value : null));
+
+      setStats(prev => ({
         students: {
-          total: studentsRes.meta?.total || 0,
-          active: studentsRes.meta?.total || 0,
+          total: studentsRes?.meta?.total ?? prev.students.total,
+          active: studentsRes?.meta?.total ?? prev.students.active,
           inactive: 0,
         },
         teachers: {
-          total: teachersRes.meta?.total || 0,
-          active: teachersRes.meta?.total || 0,
+          total: teachersRes?.meta?.total ?? prev.teachers.total,
+          active: teachersRes?.meta?.total ?? prev.teachers.active,
           inactive: 0,
         },
         classes: {
-          total: classesRes.meta?.total || 0,
+          total: classesRes?.meta?.total ?? prev.classes.total,
         },
         attendance: {
-          today: attendanceRes.meta?.total || 0,
-          present: 0,
-          absent: 0,
-          percentage: 0,
+          today: attendanceRes?.meta?.total ?? prev.attendance.today,
+          present: prev.attendance.present,
+          absent: prev.attendance.absent,
+          percentage: prev.attendance.percentage,
         },
         exams: {
-          upcoming: examsRes.meta?.total || 0,
-          ongoing: 0,
-          completed: 0,
+          upcoming: examsRes?.meta?.total ?? prev.exams.upcoming,
+          ongoing: prev.exams.ongoing,
+          completed: prev.exams.completed,
         },
         fees: {
-          total: feesRes.meta?.total || 0,
-          paid: 0,
-          pending: 0,
-          overdue: 0,
+          total: feesRes?.meta?.total ?? prev.fees.total,
+          paid: prev.fees.paid,
+          pending: prev.fees.pending,
+          overdue: prev.fees.overdue,
         },
         assignments: {
-          total: assignmentsRes.meta?.total || 0,
-          active: assignmentsRes.meta?.total || 0,
-          overdue: 0,
+          total: assignmentsRes?.meta?.total ?? prev.assignments.total,
+          active: assignmentsRes?.meta?.total ?? prev.assignments.active,
+          overdue: prev.assignments.overdue,
         },
-      });
+      }));
 
-      // Mock recent activities
-      setRecentActivities([
-        { id: 1, type: 'student', action: 'New student enrolled', time: '5 minutes ago', icon: '👨‍🎓' },
-        { id: 2, type: 'attendance', action: 'Attendance marked for Class 10-A', time: '15 minutes ago', icon: '📊' },
-        { id: 3, type: 'exam', action: 'Midterm exam grades published', time: '1 hour ago', icon: '📝' },
-        { id: 4, type: 'fee', action: 'Fee payment received', time: '2 hours ago', icon: '💰' },
-        { id: 5, type: 'assignment', action: 'New assignment created', time: '3 hours ago', icon: '📚' },
-      ]);
+      // Update dynamic recent activities if real data is available
+      const dynamicActivities = [];
+      if (studentsRes?.data?.[0]) {
+        const s = studentsRes.data[0];
+        dynamicActivities.push({
+          id: 'student-latest',
+          type: 'student',
+          action: `Student enrolled: ${s.first_name || ''} ${s.last_name || ''}`.trim(),
+          time: 'Recently',
+          icon: '👨‍🎓',
+        });
+      }
+      if (teachersRes?.data?.[0]) {
+        const t = teachersRes.data[0];
+        dynamicActivities.push({
+          id: 'teacher-latest',
+          type: 'teacher',
+          action: `Teacher active: ${t.first_name || ''} ${t.last_name || ''}`.trim(),
+          time: 'Recently',
+          icon: '👨‍🏫',
+        });
+      }
+      dynamicActivities.push(
+        { id: 2, type: 'attendance', action: 'Daily attendance tracker active', time: 'Today', icon: '📊' },
+        { id: 3, type: 'exam', action: 'Examinations scheduled', time: 'This Term', icon: '📝' },
+        { id: 4, type: 'fee', action: 'Fee management portal updated', time: 'Active', icon: '💰' }
+      );
+      setRecentActivities(dynamicActivities);
+
+      if (isManual) {
+        toast.success('Dashboard data updated');
+      }
     } catch (error) {
-      toast.error('Failed to fetch dashboard data');
       console.error('Error fetching dashboard data:', error);
+      if (isManual) {
+        toast.error('Failed to update dashboard data');
+      }
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -113,14 +168,6 @@ const EnhancedDashboard = () => {
     { name: 'Create Assignment', icon: '📚', color: 'purple', path: '/assignments/create' },
   ];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-6">
       {/* Header */}
@@ -129,9 +176,33 @@ const EnhancedDashboard = () => {
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-1">Welcome back! Here's what's happening today.</p>
         </div>
-        <div className="mt-3 md:mt-0 flex items-center gap-2 bg-white border border-gray-200 text-gray-800 shadow-sm px-4 py-2 rounded-xl text-sm font-semibold">
-          <span className="text-blue-600">🕒</span>
-          <span className="font-mono text-gray-900">{formatDateTime(currentTime)}</span>
+        <div className="mt-3 md:mt-0 flex items-center gap-3">
+          <LiveClock formatDateTime={formatDateTime} />
+
+          {/* Reload Icon Button at top right corner */}
+          <button
+            type="button"
+            onClick={() => fetchDashboardData(true)}
+            disabled={refreshing}
+            title="Refresh dashboard data"
+            aria-label="Refresh dashboard data"
+            className="flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 hover:border-blue-300 text-gray-700 hover:text-blue-600 hover:bg-blue-50/50 rounded-xl shadow-sm transition duration-150 disabled:opacity-50 cursor-pointer text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <svg
+              className={`w-4 h-4 ${refreshing ? 'animate-spin text-blue-600' : 'text-gray-500'}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            <span>{refreshing ? 'Refreshing...' : 'Reload'}</span>
+          </button>
         </div>
       </div>
 
@@ -142,7 +213,9 @@ const EnhancedDashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Total Students</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.students.total}</p>
+              <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
+                {stats.students.total}
+              </p>
               <p className="text-sm text-green-600 mt-1">↑ {stats.students.active} Active</p>
             </div>
             <div className="h-16 w-16 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -156,7 +229,9 @@ const EnhancedDashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Total Teachers</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.teachers.total}</p>
+              <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
+                {stats.teachers.total}
+              </p>
               <p className="text-sm text-green-600 mt-1">↑ {stats.teachers.active} Active</p>
             </div>
             <div className="h-16 w-16 bg-green-100 rounded-lg flex items-center justify-center">
@@ -170,7 +245,9 @@ const EnhancedDashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Total Classes</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.classes.total}</p>
+              <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
+                {stats.classes.total}
+              </p>
               <p className="text-sm text-gray-600 mt-1">All Sections</p>
             </div>
             <div className="h-16 w-16 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -184,7 +261,9 @@ const EnhancedDashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Attendance Today</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.attendance.percentage}%</p>
+              <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
+                {stats.attendance.percentage}%
+              </p>
               <p className="text-sm text-gray-600 mt-1">{stats.attendance.today} Records</p>
             </div>
             <div className="h-16 w-16 bg-orange-100 rounded-lg flex items-center justify-center">
