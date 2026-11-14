@@ -53,6 +53,27 @@ const paginate = (data, count, params) => {
   };
 };
 
+// Database constraint error helper for user-friendly notifications
+const formatDbError = (err, defaultMsg = 'An unexpected error occurred') => {
+  if (!err) return defaultMsg;
+  const msg = err.message || (typeof err === 'string' ? err : defaultMsg);
+  if (err.code === '23505' || msg.includes('unique constraint') || msg.includes('duplicate key')) {
+    if (msg.includes('employee_id') || msg.includes('teachers_employee_id_unique')) {
+      return 'This Employee ID is already registered. Please choose a unique Employee ID.';
+    }
+    if (msg.includes('email') || msg.includes('users_email_unique')) {
+      return 'This email address is already registered. Please use a different email.';
+    }
+    return 'A record with these details already exists. Please verify unique fields.';
+  }
+  if (err.code === '23502' || msg.includes('violates not-null constraint')) {
+    const match = msg.match(/column "([^"]+)"/);
+    const colName = match ? match[1].replace(/_/g, ' ') : 'required field';
+    return `Please fill in the ${colName}. It cannot be empty.`;
+  }
+  return msg;
+};
+
 // ==========================================
 // Authentication API (Powered by Supabase)
 // ==========================================
@@ -489,9 +510,11 @@ export const studentAPI = {
           address: formData.address || null,
           city: formData.city || null,
           state: formData.state || null,
-          country: formData.country || null,
+          country: (formData.country || '').trim() || 'India',
           postal_code: formData.postal_code || null,
           status: formData.status || 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .select()
         .single();
@@ -612,6 +635,9 @@ export const studentAPI = {
         if (formData[col] !== undefined) {
           userPayload[col] = formData[col] === '' ? null : formData[col];
         }
+      }
+      if (formData.country !== undefined) {
+        userPayload.country = (formData.country || '').trim() || 'India';
       }
       const firstName = formData.first_name || student.first_name || '';
       const lastName = formData.last_name || student.last_name || '';
@@ -776,38 +802,72 @@ export const teacherAPI = {
   create: async (formData) => {
     if (!useSupabase) return api.post('/teachers', formData);
 
-    let userId = null;
     const firstName = (formData.first_name || '').trim();
     const lastName = (formData.last_name || '').trim();
     const fullName = (firstName + ' ' + lastName).trim() || 'Teacher';
 
-    if (formData.email) {
-      const email = formData.email.trim().toLowerCase();
-      // Check if user already exists
+    if (!firstName) throw new Error('First name is required.');
+    if (!lastName) throw new Error('Last name is required.');
+
+    const empId = (formData.employee_id || '').trim();
+    if (!empId) throw new Error('Employee ID is required.');
+
+    // Pre-check 1: Check if employee_id is already assigned to an existing teacher
+    const { data: existingEmp, error: empCheckErr } = await supabase
+      .from('teachers')
+      .select('id, employee_id, first_name, last_name')
+      .ilike('employee_id', empId)
+      .maybeSingle();
+
+    if (empCheckErr) console.warn('Employee ID check warning:', empCheckErr);
+    if (existingEmp) {
+      throw new Error(`Employee ID "${empId}" is already assigned to teacher ${existingEmp.first_name} ${existingEmp.last_name}. Please choose a unique Employee ID.`);
+    }
+
+    const email = (formData.email || '').trim().toLowerCase();
+    let userId = null;
+
+    if (email) {
+      // Pre-check 2: Check if email already belongs to a registered teacher
       const { data: existingUser } = await supabase
         .from('users')
-        .select('id')
+        .select('id, name, email')
         .eq('email', email)
         .maybeSingle();
 
       if (existingUser) {
+        const { data: existingTeacher } = await supabase
+          .from('teachers')
+          .select('id, employee_id, first_name, last_name')
+          .eq('user_id', existingUser.id)
+          .maybeSingle();
+
+        if (existingTeacher) {
+          throw new Error(`A teacher with email "${email}" already exists (${existingTeacher.first_name} ${existingTeacher.last_name}, Employee ID: ${existingTeacher.employee_id}).`);
+        }
+
+        // Re-use orphaned user record and update with current teacher profile
         userId = existingUser.id;
-        await supabase
+        const { error: updateUserErr } = await supabase
           .from('users')
           .update({
             name: fullName,
-            phone: formData.phone || null,
+            phone: (formData.phone || '').trim() || null,
             date_of_birth: formData.date_of_birth ? String(formData.date_of_birth).substring(0, 10) : null,
             gender: formData.gender || null,
             address: formData.address || null,
             city: formData.city || null,
             state: formData.state || null,
-            country: formData.country || null,
+            country: (formData.country || '').trim() || 'India',
             postal_code: formData.postal_code || null,
-            status: formData.status || 'active',
+            status: ['inactive', 'terminated', 'resigned'].includes(formData.status) ? 'inactive' : 'active',
             updated_at: new Date().toISOString(),
           })
           .eq('id', userId);
+
+        if (updateUserErr) {
+          throw new Error(formatDbError(updateUserErr, 'Failed to update user account.'));
+        }
       } else {
         const hashedPassword = bcrypt.hashSync(formData.password || 'password123', 10);
         const { data: newUser, error: userErr } = await supabase
@@ -816,20 +876,24 @@ export const teacherAPI = {
             name: fullName,
             email: email,
             password: hashedPassword,
-            phone: formData.phone || null,
+            phone: (formData.phone || '').trim() || null,
             date_of_birth: formData.date_of_birth ? String(formData.date_of_birth).substring(0, 10) : null,
             gender: formData.gender || null,
             address: formData.address || null,
             city: formData.city || null,
             state: formData.state || null,
-            country: formData.country || null,
+            country: (formData.country || '').trim() || 'India',
             postal_code: formData.postal_code || null,
-            status: formData.status || 'active',
+            status: ['inactive', 'terminated', 'resigned'].includes(formData.status) ? 'inactive' : 'active',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           })
           .select()
           .single();
 
-        if (userErr) throw userErr;
+        if (userErr) {
+          throw new Error(formatDbError(userErr, 'Failed to create user account for teacher.'));
+        }
         if (newUser) {
           userId = newUser.id;
         }
@@ -847,8 +911,7 @@ export const teacherAPI = {
     }
 
     if (!userId) {
-      // Since teachers table has a NOT NULL constraint on user_id, a user record MUST exist.
-      const empId = formData.employee_id || `EMP${Date.now()}`;
+      // In case no email was provided, generate placeholder user since teachers.user_id has NOT NULL constraint
       const placeholderEmail = `teacher_${empId.toLowerCase().replace(/[^a-z0-9]/g, '')}_${Date.now()}@school.local`;
       const hashedPassword = bcrypt.hashSync('password123', 10);
       const { data: newUser, error: userErr } = await supabase
@@ -857,20 +920,24 @@ export const teacherAPI = {
           name: fullName,
           email: placeholderEmail,
           password: hashedPassword,
-          phone: formData.phone || null,
+          phone: (formData.phone || '').trim() || null,
           date_of_birth: formData.date_of_birth ? String(formData.date_of_birth).substring(0, 10) : null,
           gender: formData.gender || null,
           address: formData.address || null,
           city: formData.city || null,
           state: formData.state || null,
-          country: formData.country || null,
+          country: (formData.country || '').trim() || 'India',
           postal_code: formData.postal_code || null,
-          status: formData.status || 'active',
+          status: ['inactive', 'terminated', 'resigned'].includes(formData.status) ? 'inactive' : 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         })
         .select()
         .single();
 
-      if (userErr) throw userErr;
+      if (userErr) {
+        throw new Error(formatDbError(userErr, 'Failed to create user account.'));
+      }
       if (newUser) {
         userId = newUser.id;
         try {
@@ -891,30 +958,53 @@ export const teacherAPI = {
       'employment_type', 'status', 'notes'
     ];
 
-    const teacherPayload = { user_id: userId };
+    const teacherPayload = {
+      user_id: userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
     for (const col of teacherCols) {
       if (formData[col] !== undefined) {
         teacherPayload[col] = formData[col] === '' ? null : formData[col];
       }
     }
 
-    // Explicit mappings and type conversions
-    if (formData.bank_ifsc_code !== undefined || formData.bank_ifsc !== undefined) {
-      teacherPayload.bank_ifsc = (formData.bank_ifsc_code || formData.bank_ifsc || '').trim() || null;
-    }
-    if (formData.experience_years !== undefined) {
-      teacherPayload.experience_years = (formData.experience_years === '' || formData.experience_years === null) ? null : parseInt(formData.experience_years, 10);
-    }
+    teacherPayload.first_name = firstName;
+    teacherPayload.last_name = lastName;
+    teacherPayload.employee_id = empId;
+
+    // bank_ifsc
+    const ifsc = (formData.bank_ifsc_code || formData.bank_ifsc || '').trim().toUpperCase();
+    teacherPayload.bank_ifsc = ifsc ? ifsc.substring(0, 20) : null;
+
+    // experience_years (MUST NOT BE NULL)
+    const rawExp = formData.experience_years;
+    const expNum = (rawExp === '' || rawExp === null || rawExp === undefined || isNaN(Number(rawExp)))
+      ? 0
+      : Math.max(0, parseFloat(rawExp));
+    teacherPayload.experience_years = expNum;
+
+    // salary
     if (formData.salary !== undefined) {
-      teacherPayload.salary = (formData.salary === '' || formData.salary === null) ? null : parseFloat(formData.salary);
+      const sal = String(formData.salary).trim();
+      teacherPayload.salary = (sal === '' || isNaN(Number(sal))) ? null : Math.max(0, parseFloat(sal));
     }
-    if (formData.joining_date) {
-      teacherPayload.joining_date = String(formData.joining_date).substring(0, 10);
-    }
-    if (formData.employment_type) {
-      const empType = String(formData.employment_type).trim().toLowerCase();
-      teacherPayload.employment_type = (empType === 'permanent') ? 'full-time' : empType;
-    }
+
+    // joining_date (MUST NOT BE NULL)
+    teacherPayload.joining_date = formData.joining_date
+      ? String(formData.joining_date).substring(0, 10)
+      : new Date().toISOString().substring(0, 10);
+
+    // employment_type
+    const rawEmpType = String(formData.employment_type || 'full-time').trim().toLowerCase();
+    const validEmpTypes = ['full-time', 'part-time', 'contract'];
+    teacherPayload.employment_type = (rawEmpType === 'permanent' || !validEmpTypes.includes(rawEmpType)) ? 'full-time' : rawEmpType;
+
+    // status
+    const rawStatus = String(formData.status || 'active').trim().toLowerCase();
+    const validStatuses = ['active', 'inactive', 'on-leave', 'resigned', 'terminated'];
+    teacherPayload.status = validStatuses.includes(rawStatus) ? rawStatus : 'active';
 
     const { data: newTeacher, error: teacherErr } = await supabase
       .from('teachers')
@@ -922,7 +1012,10 @@ export const teacherAPI = {
       .select()
       .single();
 
-    if (teacherErr) throw teacherErr;
+    if (teacherErr) {
+      throw new Error(formatDbError(teacherErr, 'Failed to save teacher record.'));
+    }
+
     return { success: true, message: 'Teacher created successfully', data: newTeacher };
   },
 
@@ -931,11 +1024,47 @@ export const teacherAPI = {
 
     const { data: teacher, error: fetchErr } = await supabase
       .from('teachers')
-      .select('id, user_id, first_name, last_name')
+      .select('id, user_id, first_name, last_name, employee_id, joining_date')
       .eq('id', id)
       .single();
 
-    if (fetchErr) throw fetchErr;
+    if (fetchErr || !teacher) throw new Error('Teacher record not found.');
+
+    const empId = formData.employee_id ? String(formData.employee_id).trim() : teacher.employee_id;
+    if (!empId) throw new Error('Employee ID cannot be empty.');
+
+    // Pre-check duplicate employee_id on other teachers
+    const { data: existingEmp } = await supabase
+      .from('teachers')
+      .select('id, employee_id, first_name, last_name')
+      .ilike('employee_id', empId)
+      .neq('id', id)
+      .maybeSingle();
+
+    if (existingEmp) {
+      throw new Error(`Employee ID "${empId}" is already assigned to teacher ${existingEmp.first_name} ${existingEmp.last_name}. Please choose a unique Employee ID.`);
+    }
+
+    const email = formData.email ? String(formData.email).trim().toLowerCase() : null;
+    if (email) {
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (existingUser && teacher.user_id && existingUser.id !== teacher.user_id) {
+        const { data: otherTeacher } = await supabase
+          .from('teachers')
+          .select('id, employee_id, first_name, last_name')
+          .eq('user_id', existingUser.id)
+          .maybeSingle();
+
+        if (otherTeacher) {
+          throw new Error(`A teacher with email "${email}" already exists (${otherTeacher.first_name} ${otherTeacher.last_name}, Employee ID: ${otherTeacher.employee_id}).`);
+        }
+      }
+    }
 
     const teacherCols = [
       'employee_id', 'first_name', 'last_name', 'joining_date', 'qualification',
@@ -952,22 +1081,45 @@ export const teacherAPI = {
       }
     }
 
+    if (formData.first_name !== undefined) {
+      teacherPayload.first_name = String(formData.first_name || '').trim();
+    }
+    if (formData.last_name !== undefined) {
+      teacherPayload.last_name = String(formData.last_name || '').trim();
+    }
+    if (formData.employee_id !== undefined) {
+      teacherPayload.employee_id = empId;
+    }
+
     // Explicit mappings and type conversions
     if (formData.bank_ifsc_code !== undefined || formData.bank_ifsc !== undefined) {
-      teacherPayload.bank_ifsc = (formData.bank_ifsc_code || formData.bank_ifsc || '').trim() || null;
+      const ifsc = (formData.bank_ifsc_code || formData.bank_ifsc || '').trim().toUpperCase();
+      teacherPayload.bank_ifsc = ifsc ? ifsc.substring(0, 20) : null;
     }
     if (formData.experience_years !== undefined) {
-      teacherPayload.experience_years = (formData.experience_years === '' || formData.experience_years === null) ? null : parseInt(formData.experience_years, 10);
+      const rawExp = formData.experience_years;
+      teacherPayload.experience_years = (rawExp === '' || rawExp === null || rawExp === undefined || isNaN(Number(rawExp)))
+        ? 0
+        : Math.max(0, parseFloat(rawExp));
     }
     if (formData.salary !== undefined) {
-      teacherPayload.salary = (formData.salary === '' || formData.salary === null) ? null : parseFloat(formData.salary);
+      const sal = String(formData.salary).trim();
+      teacherPayload.salary = (sal === '' || isNaN(Number(sal))) ? null : Math.max(0, parseFloat(sal));
     }
     if (formData.joining_date !== undefined) {
-      teacherPayload.joining_date = formData.joining_date ? String(formData.joining_date).substring(0, 10) : null;
+      teacherPayload.joining_date = formData.joining_date
+        ? String(formData.joining_date).substring(0, 10)
+        : (teacher.joining_date || new Date().toISOString().substring(0, 10));
     }
     if (formData.employment_type !== undefined) {
-      const empType = String(formData.employment_type || '').trim().toLowerCase();
-      teacherPayload.employment_type = (empType === 'permanent') ? 'full-time' : (empType || null);
+      const rawEmpType = String(formData.employment_type || 'full-time').trim().toLowerCase();
+      const validEmpTypes = ['full-time', 'part-time', 'contract'];
+      teacherPayload.employment_type = (rawEmpType === 'permanent' || !validEmpTypes.includes(rawEmpType)) ? 'full-time' : rawEmpType;
+    }
+    if (formData.status !== undefined) {
+      const rawStatus = String(formData.status || 'active').trim().toLowerCase();
+      const validStatuses = ['active', 'inactive', 'on-leave', 'resigned', 'terminated'];
+      teacherPayload.status = validStatuses.includes(rawStatus) ? rawStatus : 'active';
     }
 
     const { data: updatedTeacher, error: teacherErr } = await supabase
@@ -977,21 +1129,29 @@ export const teacherAPI = {
       .select()
       .single();
 
-    if (teacherErr) throw teacherErr;
+    if (teacherErr) {
+      throw new Error(formatDbError(teacherErr, 'Failed to update teacher record.'));
+    }
 
     // Handle user record
     let linkedUserId = teacher.user_id;
 
     if (linkedUserId) {
-      const userCols = ['phone', 'gender', 'address', 'city', 'state', 'country', 'postal_code', 'status'];
+      const userCols = ['phone', 'gender', 'address', 'city', 'state', 'country', 'postal_code'];
       const userPayload = { updated_at: new Date().toISOString() };
       for (const col of userCols) {
         if (formData[col] !== undefined) {
           userPayload[col] = formData[col] === '' ? null : formData[col];
         }
       }
+      if (formData.country !== undefined) {
+        userPayload.country = (formData.country || '').trim() || 'India';
+      }
       if (formData.email) {
         userPayload.email = formData.email.trim().toLowerCase();
+      }
+      if (formData.status !== undefined) {
+        userPayload.status = ['inactive', 'terminated', 'resigned'].includes(formData.status) ? 'inactive' : 'active';
       }
       if (formData.date_of_birth !== undefined) {
         userPayload.date_of_birth = formData.date_of_birth ? String(formData.date_of_birth).substring(0, 10) : null;
@@ -1004,29 +1164,32 @@ export const teacherAPI = {
       if (userErr) console.warn('User update error:', userErr);
     } else if (formData.email) {
       // Heal teacher missing user_id
-      const email = formData.email.trim().toLowerCase();
+      const healEmail = formData.email.trim().toLowerCase();
       const firstName = formData.first_name || teacher.first_name || '';
       const lastName = formData.last_name || teacher.last_name || '';
       const fullName = (firstName + ' ' + lastName).trim() || 'Teacher';
 
-      const { data: existingUser } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
+      const { data: existingUser } = await supabase.from('users').select('id').eq('email', healEmail).maybeSingle();
       if (existingUser) {
         linkedUserId = existingUser.id;
       } else {
-        const { data: newUser } = await supabase.from('users').insert({
+        const { data: newUser, error: newUserErr } = await supabase.from('users').insert({
           name: fullName,
-          email: email,
+          email: healEmail,
           password: bcrypt.hashSync('password123', 10),
-          phone: formData.phone || null,
+          phone: (formData.phone || '').trim() || null,
           date_of_birth: formData.date_of_birth ? String(formData.date_of_birth).substring(0, 10) : null,
           gender: formData.gender || null,
           address: formData.address || null,
           city: formData.city || null,
           state: formData.state || null,
-          country: formData.country || null,
+          country: (formData.country || '').trim() || 'India',
           postal_code: formData.postal_code || null,
-          status: formData.status || 'active',
+          status: ['inactive', 'terminated', 'resigned'].includes(formData.status) ? 'inactive' : 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         }).select().maybeSingle();
+        if (newUserErr) console.warn('User insert error on heal:', newUserErr);
         if (newUser) linkedUserId = newUser.id;
       }
 

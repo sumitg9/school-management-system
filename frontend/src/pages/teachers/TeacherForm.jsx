@@ -21,14 +21,14 @@ const TeacherForm = () => {
     address: '',
     city: '',
     state: '',
-    country: '',
+    country: 'India',
     postal_code: '',
     qualification: '',
-    experience_years: '',
+    experience_years: '0',
     department: '',
     designation: '',
     specialization: '',
-    joining_date: '',
+    joining_date: new Date().toISOString().substring(0, 10),
     employment_type: 'full-time',
     salary: '',
     bank_name: '',
@@ -77,14 +77,14 @@ const TeacherForm = () => {
           address: t.address || '',
           city: t.city || '',
           state: t.state || '',
-          country: t.country || '',
+          country: t.country || 'India',
           postal_code: t.postal_code || '',
           qualification: t.qualification || '',
-          experience_years: t.experience_years !== null && t.experience_years !== undefined ? String(t.experience_years) : '',
+          experience_years: t.experience_years !== null && t.experience_years !== undefined ? String(t.experience_years) : '0',
           department: t.department || '',
           designation: t.designation || '',
           specialization: t.specialization || '',
-          joining_date: t.joining_date ? String(t.joining_date).substring(0, 10) : '',
+          joining_date: t.joining_date ? String(t.joining_date).substring(0, 10) : new Date().toISOString().substring(0, 10),
           employment_type: t.employment_type === 'permanent' ? 'full-time' : (t.employment_type || 'full-time'),
           salary: t.salary !== null && t.salary !== undefined ? String(t.salary) : '',
           bank_name: t.bank_name || '',
@@ -125,7 +125,8 @@ const TeacherForm = () => {
       }
       navigate('/teachers');
     } catch (error) {
-      toast.error(error.message || `Failed to ${isEdit ? 'update' : 'create'} teacher`);
+      const errorMsg = error?.message || (typeof error === 'string' ? error : `Failed to ${isEdit ? 'update' : 'create'} teacher`);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
