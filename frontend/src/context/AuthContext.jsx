@@ -484,48 +484,34 @@ export const AuthProvider = ({ children }) => {
 
   const getTeacherAssignedSectionIds = (sectionsList = [], classesList = []) => {
     if (!isTeacher()) return null;
-    const tId = teacherProfile?.id ? String(teacherProfile.id) : null;
-    const tEmail = (teacherProfile?.email || user?.email || '').toLowerCase();
+    const tId = teacherProfile?.id ? String(teacherProfile.id) : (user?.teacher_id ? String(user.teacher_id) : (user?.id ? String(user.id) : null));
+    const tEmail = (teacherProfile?.email || user?.email || '').toLowerCase().trim();
 
-    const classMeta = getLocalMetaSafe('sms_class_meta');
     const secMeta = getLocalMetaSafe('sms_section_meta');
-
     const assigned = new Set();
 
-    // Check direct assignments on teacher object
+    // 1. Check direct assignments on teacher object or user object
     const explicitSecIds = teacherProfile?.assigned_section_ids || user?.assigned_section_ids;
     if (Array.isArray(explicitSecIds)) {
       explicitSecIds.forEach(id => assigned.add(String(id)));
     }
 
-    // A section is assigned if:
-    // 1. Teacher is assigned as section teacher
-    // 2. OR teacher is Head Class Teacher of this section's parent class
-    sectionsList.forEach(sec => {
-      const sId = String(sec.id);
-      const meta = secMeta[sId] || {};
-      const secTeacherId = meta.section_teacher_id || sec.section_teacher_id || sec.section_teacher?.id;
+    // 2. Check sections where teacher is explicitly assigned as section teacher
+    if (Array.isArray(sectionsList)) {
+      sectionsList.forEach(sec => {
+        const sId = String(sec.id);
+        const meta = secMeta[sId] || {};
+        const secTeacherId = meta.section_teacher_id || sec.section_teacher_id || sec.section_teacher?.id;
 
-      if (tId && String(secTeacherId) === tId) {
-        assigned.add(sId);
-      } else if (tEmail && sec.section_teacher?.email?.toLowerCase() === tEmail) {
-        assigned.add(sId);
-      } else if (sec.class_id) {
-        // Only grant all sections if explicitly the Head Class Teacher of this class
-        const cMeta = classMeta[String(sec.class_id)] || {};
-        const headClassTeacherId = cMeta.class_teacher_id;
-        const matchingClass = classesList.find(c => String(c.id) === String(sec.class_id));
-        const directClassTeacherId = matchingClass?.class_teacher_id || matchingClass?.class_teacher?.id;
-
-        const isHead = (tId && (String(headClassTeacherId) === tId || String(directClassTeacherId) === tId)) ||
-                       (tEmail && matchingClass?.class_teacher?.email?.toLowerCase() === tEmail);
-        if (isHead) {
+        if (tId && String(secTeacherId) === tId) {
+          assigned.add(sId);
+        } else if (tEmail && sec.section_teacher?.email?.toLowerCase().trim() === tEmail) {
           assigned.add(sId);
         }
-      }
-    });
+      });
+    }
 
-    // Also check secMeta directly
+    // 3. Also check secMeta directly for any section assigned to this teacher
     Object.keys(secMeta).forEach(sId => {
       const s = secMeta[sId];
       if (tId && String(s.section_teacher_id) === tId) {

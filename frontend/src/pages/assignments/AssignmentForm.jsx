@@ -18,6 +18,7 @@ const AssignmentForm = () => {
     filterTeacherClasses,
     filterTeacherSections,
     filterTeacherSubjects,
+    getTeacherAssignedSectionIds,
     isClassAssignedToTeacher,
     isSectionAssignedToTeacher,
     isSubjectAssignedToTeacher,
@@ -58,9 +59,24 @@ const AssignmentForm = () => {
 
   const fetchClasses = async () => {
     try {
-      const response = await classAPI.getAll({ per_page: 100 });
-      if (response.success) {
-        setClasses(isTeacher() ? filterTeacherClasses(response.data || []) : (response.data || []));
+      const [classRes, secRes] = await Promise.all([
+        classAPI.getAll({ per_page: 100 }),
+        isTeacher() ? sectionAPI.getAll({ per_page: 200 }) : Promise.resolve({ success: true, data: [] }),
+      ]);
+      if (classRes.success) {
+        let list = classRes.data || [];
+        if (isTeacher()) {
+          // Only show classes where the teacher is explicitly assigned to at least one section
+          const teacherSecs = filterTeacherSections(secRes.data || [], list);
+          const allowedClassIds = new Set(teacherSecs.map(s => String(s.class_id)));
+          list = list.filter(c => allowedClassIds.has(String(c.id)));
+        }
+        setClasses(list);
+
+        // Auto-select class if the teacher only has one assigned class
+        if (isTeacher() && list.length === 1 && !formData.class_id) {
+          setFormData(prev => ({ ...prev, class_id: String(list[0].id) }));
+        }
       }
     } catch (error) {
       console.error('Error fetching classes:', error);
@@ -71,7 +87,16 @@ const AssignmentForm = () => {
     try {
       const response = await sectionAPI.getAll({ class_id: classId, per_page: 100 });
       if (response.success) {
-        setSections(isTeacher() ? filterTeacherSections(response.data || [], classes) : (response.data || []));
+        const raw = response.data || [];
+        const scoped = isTeacher() ? filterTeacherSections(raw, classes) : raw;
+        setSections(scoped);
+
+        // If only 1 section is assigned to this teacher in this class, auto-select it
+        if (isTeacher() && scoped.length === 1) {
+          setFormData(prev => ({ ...prev, section_id: String(scoped[0].id) }));
+        } else if (isTeacher() && scoped.length === 0) {
+          setFormData(prev => ({ ...prev, section_id: '' }));
+        }
       }
     } catch (error) {
       console.error('Error fetching sections:', error);
@@ -142,6 +167,19 @@ const AssignmentForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (isTeacher()) {
+      const assignedSecIds = getTeacherAssignedSectionIds(sections, classes) || new Set();
+      if (!formData.section_id || !assignedSecIds.has(String(formData.section_id))) {
+        toast.error('You can only create assignments for your assigned section(s).');
+        return;
+      }
+      if (!formData.subject_id || !isSubjectAssignedToTeacher(formData.subject_id, subjects)) {
+        toast.error('You can only create assignments for your assigned subject(s).');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -230,16 +268,25 @@ const AssignmentForm = () => {
                 value={formData.section_id}
                 onChange={handleChange}
                 className="input-field"
-                disabled={!formData.class_id}
+                disabled={!formData.class_id || (isTeacher() && sections.length === 0)}
                 required
               >
-                <option value="">Select Section</option>
+                <option value="">
+                  {isTeacher() && sections.length === 0
+                    ? 'No assigned sections available'
+                    : 'Select Section'}
+                </option>
                 {sections.map((section) => (
                   <option key={section.id} value={section.id}>
                     {section.name}
                   </option>
                 ))}
               </select>
+              {isTeacher() && sections.length === 0 && formData.class_id && (
+                <p className="text-xs text-amber-600 mt-1">
+                  You do not have any assigned sections in this class.
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
