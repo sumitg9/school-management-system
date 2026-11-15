@@ -153,6 +153,16 @@ const FeeForm = () => {
       }
     }
 
+    if (!formData.academic_year_id) {
+      showValidationError('Please select an Academic Year.', 'Validation Error');
+      return;
+    }
+
+    if (!formData.class_id) {
+      showValidationError('Please select a Class.', 'Validation Error');
+      return;
+    }
+
     if (!finalType) {
       showValidationError('Please specify or select a Fee Type.', 'Validation Error');
       return;
@@ -178,7 +188,7 @@ const FeeForm = () => {
       ...formData,
       type: finalType,
       due_date: computedDueDate,
-      class_id: formData.class_id ? parseInt(formData.class_id, 10) : null,
+      class_id: parseInt(formData.class_id, 10),
       academic_year_id: parseInt(formData.academic_year_id, 10),
       amount: parseFloat(formData.amount) || 0,
     };
@@ -258,22 +268,22 @@ const FeeForm = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Class
+                Class <span className="text-red-500">*</span>
               </label>
               <select
                 name="class_id"
                 value={formData.class_id}
                 onChange={handleChange}
                 className="input-field"
+                required
               >
-                <option value="">All Classes</option>
+                <option value="">Select Class</option>
                 {classes.map((cls) => (
                   <option key={cls.id} value={cls.id}>
                     {cls.name}
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500 mt-1">Leave empty to apply to all classes</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
