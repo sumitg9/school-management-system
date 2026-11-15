@@ -429,7 +429,21 @@ const FeePaymentCollect = () => {
     }
 
     if (count === 1) {
-      // Pick first unpaid month
+      // Find current calendar month first if it belongs to session and is unpaid
+      const now = new Date();
+      const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const isCurInSession = academicMonths.some(m => m.key === curKey);
+
+      if (isCurInSession) {
+        if (paidMonthsSet.has(curKey)) {
+          toast.info('Current month is already paid.');
+          return;
+        }
+        setSelectedMonthKeys([curKey]);
+        return;
+      }
+
+      // If current calendar month is outside this academic year, select the first unpaid session month
       setSelectedMonthKeys([unpaidMonths[0].key]);
       return;
     }
@@ -1000,9 +1014,9 @@ const FeePaymentCollect = () => {
                       ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                       : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                   }`}
-                  title={unpaidMonths.length === 0 ? 'All months paid' : 'Select next single unpaid month'}
+                  title={unpaidMonths.length === 0 ? 'All months paid' : 'Select current month (1 month)'}
                 >
-                  Current / Next Month (1 mo)
+                  Current Month (1 mo)
                 </button>
                 <button
                   type="button"
