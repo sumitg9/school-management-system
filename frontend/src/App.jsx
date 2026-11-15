@@ -104,7 +104,7 @@ function AppRoutes() {
                   <Route path="/subjects/:id/edit" element={<PermissionRoute permission="edit-classes"><SubjectForm /></PermissionRoute>} />
                   <Route path="/attendance" element={<PermissionRoute permission="view-attendance"><AttendanceList /></PermissionRoute>} />
                   <Route path="/attendance/mark" element={<PermissionRoute permission="mark-attendance"><MarkAttendance /></PermissionRoute>} />
-                  <Route path="/attendance/report" element={<PermissionRoute permission="view-attendance"><AttendanceReport /></PermissionRoute>} />
+                  <Route path="/attendance/report" element={<PermissionRoute permission="view-reports"><AttendanceReport /></PermissionRoute>} />
                   <Route path="/attendance/:id/edit" element={<PermissionRoute permission="edit-attendance"><AttendanceEdit /></PermissionRoute>} />
                   <Route path="/exams" element={<PermissionRoute permission="view-exams"><ExamList /></PermissionRoute>} />
                   <Route path="/exams/create" element={<PermissionRoute permission="create-exams"><ExamForm /></PermissionRoute>} />

@@ -180,6 +180,24 @@ export const authAPI = {
         status: dbUser.status || 'active',
         avatar: dbUser.avatar,
       };
+
+      // Retrieve linked student profile if applicable
+      try {
+        const { data: studentRecord } = await supabase
+          .from('students')
+          .select('*, class:classes(id, name), section:sections(id, name)')
+          .eq('user_id', dbUser.id)
+          .maybeSingle();
+
+        if (studentRecord) {
+          userData.student = studentRecord;
+          userData.student_id = studentRecord.id;
+          userData.class_id = studentRecord.class_id;
+          userData.section_id = studentRecord.section_id;
+        }
+      } catch (e) {
+        console.warn('Could not load student profile on login:', e);
+      }
     } else {
       userData = {
         id: authUser.id,
@@ -714,6 +732,37 @@ export const studentAPI = {
   import: (formData) => api.post('/students/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
+
+  getProfileByUserId: async (userId) => {
+    if (!useSupabase) return api.get(`/students/user/${userId}`);
+    const { data, error } = await supabase
+      .from('students')
+      .select('*, user:users(*), class:classes(id, name), section:sections(id, name), academic_year:academic_years(id, name)')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    return { success: true, data };
+  },
+
+  getDemoStudent: async () => {
+    if (!useSupabase) return api.get('/students/demo');
+    // First try user_id = 4 (Aarohi Verma, default student)
+    let { data } = await supabase
+      .from('students')
+      .select('*, user:users(*), class:classes(id, name), section:sections(id, name), academic_year:academic_years(id, name)')
+      .eq('user_id', 4)
+      .maybeSingle();
+
+    if (!data) {
+      const res = await supabase
+        .from('students')
+        .select('*, user:users(*), class:classes(id, name), section:sections(id, name), academic_year:academic_years(id, name)')
+        .limit(1)
+        .maybeSingle();
+      data = res?.data;
+    }
+    return { success: true, data };
+  },
 };
 
 // ==========================================
@@ -1411,8 +1460,14 @@ export const subjectAPI = {
 export const attendanceAPI = {
   getAll: async (params) => {
     if (!useSupabase) return api.get('/attendance', { params });
-    let query = supabase.from('attendances').select('*, student:students(first_name, last_name, admission_number)', { count: 'exact' });
+    let query = supabase
+      .from('attendances')
+      .select('*, student:students(id, first_name, last_name, admission_number, roll_number, class_id, section_id), class:classes(id, name), section:sections(id, name)', { count: 'exact' });
+
+    if (params?.student_id) query = query.eq('student_id', params.student_id);
     if (params?.date) query = query.eq('date', params.date);
+    if (params?.start_date) query = query.gte('date', params.start_date);
+    if (params?.end_date) query = query.lte('date', params.end_date);
     if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
     if (params?.class_id) query = query.eq('class_id', params.class_id);
     if (params?.section_id) query = query.eq('section_id', params.section_id);
@@ -1432,6 +1487,16 @@ export const attendanceAPI = {
     if (error) throw error;
     return paginate(data, count, params);
   },
+  getById: async (id) => {
+    if (!useSupabase) return api.get(`/attendance/${id}`);
+    const { data, error } = await supabase
+      .from('attendances')
+      .select('*, student:students(id, first_name, last_name, admission_number, roll_number), class:classes(id, name), section:sections(id, name)')
+      .eq('id', id)
+      .single();
+    if (error) throw error;
+    return { success: true, data };
+  },
   markAttendance: async (data) => {
     if (!useSupabase) return api.post('/attendance/mark', data);
     const records = Array.isArray(data) ? data : [data];
@@ -1446,11 +1511,94 @@ export const attendanceAPI = {
     if (error) throw error;
     return { success: true, data: res };
   },
-  getStatistics: async () => {
-    if (!useSupabase) return api.get('/attendance/statistics');
-    const { count: total } = await supabase.from('attendances').select('count', { count: 'exact', head: true });
-    const { count: present } = await supabase.from('attendances').select('count', { count: 'exact', head: true }).eq('status', 'present');
+  delete: async (id) => {
+    if (!useSupabase) return api.delete(`/attendance/${id}`);
+    const { error } = await supabase.from('attendances').delete().eq('id', id);
+    if (error) throw error;
+    return { success: true };
+  },
+  getStatistics: async (params) => {
+    if (!useSupabase) return api.get('/attendance/statistics', { params });
+    let totalQuery = supabase.from('attendances').select('count', { count: 'exact', head: true });
+    let presentQuery = supabase.from('attendances').select('count', { count: 'exact', head: true }).eq('status', 'present');
+    if (params?.student_id) {
+      totalQuery = totalQuery.eq('student_id', params.student_id);
+      presentQuery = presentQuery.eq('student_id', params.student_id);
+    }
+    const { count: total } = await totalQuery;
+    const { count: present } = await presentQuery;
     return { success: true, data: { total: total || 0, present: present || 0, absent: (total || 0) - (present || 0) } };
+  },
+  getReport: async (params) => {
+    if (!useSupabase) return api.get('/attendance/report', { params });
+    let studentsQuery = supabase
+      .from('students')
+      .select('id, first_name, last_name, admission_number, roll_number')
+      .eq('status', 'active');
+    if (params?.class_id) studentsQuery = studentsQuery.eq('class_id', params.class_id);
+    if (params?.section_id) studentsQuery = studentsQuery.eq('section_id', params.section_id);
+    const { data: students, error: sErr } = await studentsQuery;
+    if (sErr) throw sErr;
+
+    let attQuery = supabase.from('attendances').select('*');
+    if (params?.class_id) attQuery = attQuery.eq('class_id', params.class_id);
+    if (params?.section_id) attQuery = attQuery.eq('section_id', params.section_id);
+    if (params?.start_date) attQuery = attQuery.gte('date', params.start_date);
+    if (params?.end_date) attQuery = attQuery.lte('date', params.end_date);
+    const { data: attendances, error: aErr } = await attQuery;
+    if (aErr) throw aErr;
+
+    const studentStats = (students || []).map(stu => {
+      const records = (attendances || []).filter(a => a.student_id === stu.id);
+      const total = records.length;
+      const present = records.filter(a => a.status === 'present').length;
+      const absent = records.filter(a => a.status === 'absent').length;
+      const late = records.filter(a => a.status === 'late').length;
+      const excused = records.filter(a => ['excused', 'half-day', 'on-leave'].includes(a.status)).length;
+      return {
+        ...stu,
+        total_days: total,
+        present_days: present,
+        absent_days: absent,
+        late_days: late,
+        excused_days: excused,
+        attendance_percentage: total > 0 ? ((present / total) * 100).toFixed(1) : 0,
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        students: studentStats,
+        total_days: [...new Set((attendances || []).map(a => a.date))].length,
+        total_records: attendances?.length || 0,
+      }
+    };
+  },
+  getStudentStats: async (studentId, params = {}) => {
+    if (!useSupabase) return api.get(`/attendance/student/${studentId}/stats`, { params });
+    let query = supabase.from('attendances').select('*').eq('student_id', studentId);
+    if (params?.start_date) query = query.gte('date', params.start_date);
+    if (params?.end_date) query = query.lte('date', params.end_date);
+    const { data, error } = await query;
+    if (error) throw error;
+    const total = data?.length || 0;
+    const present = (data || []).filter(a => a.status === 'present').length;
+    const absent = (data || []).filter(a => a.status === 'absent').length;
+    const late = (data || []).filter(a => a.status === 'late').length;
+    const excused = (data || []).filter(a => ['excused', 'half-day', 'on-leave'].includes(a.status)).length;
+    const percentage = total > 0 ? ((present / total) * 100).toFixed(1) : '0.0';
+    return {
+      success: true,
+      data: {
+        total,
+        present,
+        absent,
+        late,
+        excused,
+        percentage: parseFloat(percentage),
+      }
+    };
   },
 };
 

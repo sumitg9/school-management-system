@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { attendanceAPI, classAPI, sectionAPI } from '../../services/api';
 import Badge from '../../components/common/Badge';
+import { useAuth } from '../../context/AuthContext';
 
 const AttendanceReport = () => {
   const navigate = useNavigate();
+  const { isStudent, filterTeacherClasses } = useAuth();
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -34,7 +36,7 @@ const AttendanceReport = () => {
     try {
       const response = await classAPI.getAll({ per_page: 100 });
       if (response.success) {
-        setClasses(response.data);
+        setClasses(filterTeacherClasses(response.data));
       }
     } catch (error) {
       console.error('Error fetching classes:', error);
@@ -87,6 +89,28 @@ const AttendanceReport = () => {
     if (percentage >= 75) return 'text-yellow-600';
     return 'text-red-600';
   };
+
+  if (isStudent()) {
+    return (
+      <div className="p-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center max-w-lg mx-auto">
+          <div className="w-14 h-14 mx-auto mb-3 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-2xl">
+            🔒
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-1">Access Restricted</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Students cannot view class-wide attendance registers. You can only view your own attendance.
+          </p>
+          <button
+            onClick={() => navigate('/attendance')}
+            className="btn-primary px-4 py-2 text-xs font-semibold rounded-xl cursor-pointer"
+          >
+            ← View My Attendance
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">

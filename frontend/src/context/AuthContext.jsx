@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI } from '../services/api';
+import { authAPI, studentAPI } from '../services/api';
 import { toast } from 'react-toastify';
 import { showGlobalValidationError } from './AlertContext';
 import {
@@ -172,6 +172,53 @@ export const AuthProvider = ({ children }) => {
   const isBackOffice = () => hasRole('back-office') || hasRole('librarian') || hasRole('receptionist');
   const isGeneral = () => hasRole('general');
 
+  // Student profile state for student role or preview
+  const [studentProfile, setStudentProfile] = useState(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        return parsed.student || null;
+      } catch (_) {}
+    }
+    return null;
+  });
+  const [studentLoading, setStudentLoading] = useState(false);
+
+  useEffect(() => {
+    const loadStudentInfo = async () => {
+      const effective = getEffectiveRole();
+      if (effective !== 'student') return;
+
+      if (user?.student && user.student.id) {
+        setStudentProfile(user.student);
+        return;
+      }
+
+      setStudentLoading(true);
+      try {
+        if (user?.id) {
+          const res = await studentAPI.getProfileByUserId(user.id);
+          if (res?.data) {
+            setStudentProfile(res.data);
+            return;
+          }
+        }
+        // Simulated student or demo student fallback
+        const demoRes = await studentAPI.getDemoStudent();
+        if (demoRes?.data) {
+          setStudentProfile(demoRes.data);
+        }
+      } catch (err) {
+        console.warn('Failed to load student profile:', err);
+      } finally {
+        setStudentLoading(false);
+      }
+    };
+
+    loadStudentInfo();
+  }, [user, activeRole]);
+
   // Teacher class filtering helper
   const filterTeacherClasses = (classesList) => {
     if (!classesList || !Array.isArray(classesList)) return [];
@@ -205,6 +252,9 @@ export const AuthProvider = ({ children }) => {
     isBackOffice,
     isGeneral,
     filterTeacherClasses,
+    currentStudent: studentProfile,
+    studentProfile,
+    studentLoading,
     isAuthenticated: !!token,
   };
 

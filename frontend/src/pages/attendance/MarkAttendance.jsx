@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { attendanceAPI, classAPI, sectionAPI, studentAPI } from '../../services/api';
 import Badge from '../../components/common/Badge';
 import { useAlert } from '../../context/AlertContext';
+import { useAuth } from '../../context/AuthContext';
 
 const MarkAttendance = () => {
   const navigate = useNavigate();
   const { showValidationError } = useAlert();
+  const { filterTeacherClasses, isStudent } = useAuth();
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -18,6 +20,10 @@ const MarkAttendance = () => {
     section_id: '',
     date: new Date().toISOString().split('T')[0],
   });
+
+  if (isStudent()) {
+    return <Navigate to="/attendance" replace />;
+  }
 
   useEffect(() => {
     fetchClasses();
@@ -45,7 +51,7 @@ const MarkAttendance = () => {
     try {
       const response = await classAPI.getAll({ per_page: 100 });
       if (response.success) {
-        setClasses(response.data);
+        setClasses(filterTeacherClasses(response.data));
       }
     } catch (error) {
       console.error('Error fetching classes:', error);

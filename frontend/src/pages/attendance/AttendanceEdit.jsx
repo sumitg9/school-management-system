@@ -1,19 +1,25 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { attendanceAPI } from '../../services/api';
 import { useAlert } from '../../context/AlertContext';
+import { useAuth } from '../../context/AuthContext';
 
 const AttendanceEdit = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { showValidationError } = useAlert();
+  const { isStudent } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     status: 'present',
     remarks: '',
   });
   const [attendanceData, setAttendanceData] = useState(null);
+
+  if (isStudent()) {
+    return <Navigate to="/attendance" replace />;
+  }
 
   useEffect(() => {
     fetchAttendance();

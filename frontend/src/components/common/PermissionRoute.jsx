@@ -86,3 +86,4 @@ const PermissionRoute = ({ permission, children }) => {
 };
 
 export default PermissionRoute;
+
