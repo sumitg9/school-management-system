@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI, studentAPI } from '../services/api';
+import { authAPI, studentAPI, teacherAPI } from '../services/api';
 import { toast } from 'react-toastify';
 import { showGlobalValidationError } from './AlertContext';
 import {
@@ -23,7 +23,39 @@ export const AuthProvider = ({ children }) => {
 
     if (storedToken && storedUser) {
       setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsed = JSON.parse(storedUser);
+        const lowerEmail = parsed.email?.toLowerCase();
+        const KNOWN_TEACHERS = [
+          'teacher@school.com',
+          'rahul.mehta@school.com',
+          'rajesh.kumar@school.com',
+          'priya.sharma@school.com',
+          'amit.patel@school.com',
+          'anjali.gupta@school.com',
+        ];
+
+        // Self-heal misidentified roles for seeded teachers
+        if (KNOWN_TEACHERS.includes(lowerEmail) && parsed.roles?.[0] !== 'teacher') {
+          parsed.role = 'teacher';
+          parsed.roles = ['teacher'];
+          localStorage.setItem('user', JSON.stringify(parsed));
+        }
+
+        // If user is not an administrator, ensure no preview switcher overrides their identity
+        const isUserAdmin = parsed.roles?.some(r => {
+          const n = normalizeRole(r);
+          return n === 'admin' || n === 'super-admin';
+        });
+        if (!isUserAdmin) {
+          localStorage.removeItem('sms_active_role');
+          setActiveRole(null);
+        }
+
+        setUser(parsed);
+      } catch (_) {
+        setUser(JSON.parse(storedUser));
+      }
     }
     setLoading(false);
   }, []);
@@ -38,6 +70,10 @@ export const AuthProvider = ({ children }) => {
         // Store token and user
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify({ ...user, roles, permissions }));
+
+        // Reset role preview switcher state so logged-in user always operates under their real assigned role
+        localStorage.removeItem('sms_active_role');
+        setActiveRole(null);
 
         setToken(token);
         setUser({ ...user, roles, permissions });
@@ -85,6 +121,8 @@ export const AuthProvider = ({ children }) => {
       // Clear local storage and state
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem('sms_active_role');
+      setActiveRole(null);
       setToken(null);
       setUser(null);
       toast.info('Logged out successfully');
@@ -123,11 +161,22 @@ export const AuthProvider = ({ children }) => {
   });
 
   const getEffectiveRole = () => {
-    if (activeRole) return activeRole;
+    // Only real administrators/super-admins can use the activeRole preview switcher
+    const isRealAdmin = user?.roles?.some(r => {
+      const n = normalizeRole(r);
+      return n === 'admin' || n === 'super-admin';
+    });
+
+    if (isRealAdmin && activeRole) {
+      return normalizeRole(activeRole);
+    }
     if (user?.roles && user.roles.length > 0) {
       return normalizeRole(user.roles[0]);
     }
-    return 'admin';
+    if (user?.role) {
+      return normalizeRole(user.role);
+    }
+    return 'general';
   };
 
   const switchActiveRole = (newRole) => {
@@ -218,7 +267,10 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const loadStudentInfo = async () => {
       const effective = getEffectiveRole();
-      if (effective !== 'student') return;
+      if (effective !== 'student') {
+        setStudentProfile(null);
+        return;
+      }
 
       if (user?.student && user.student.id) {
         setStudentProfile(user.student);
@@ -247,6 +299,52 @@ export const AuthProvider = ({ children }) => {
     };
 
     loadStudentInfo();
+  }, [user, activeRole]);
+
+  // Teacher profile state for teacher role
+  const [teacherProfile, setTeacherProfile] = useState(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        return parsed.teacher || null;
+      } catch (_) {}
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    const loadTeacherInfo = async () => {
+      const effective = getEffectiveRole();
+      if (effective !== 'teacher') {
+        setTeacherProfile(null);
+        return;
+      }
+
+      if (user?.teacher && user.teacher.id) {
+        setTeacherProfile(user.teacher);
+        return;
+      }
+
+      try {
+        if (user?.email) {
+          const res = await teacherAPI.getAll({ search: user.email, per_page: 'all' });
+          if (res?.data && res.data.length > 0) {
+            const foundTeacher = res.data.find(t => 
+              t.email?.toLowerCase() === user.email?.toLowerCase() ||
+              String(t.user_id) === String(user.id)
+            );
+            if (foundTeacher) {
+              setTeacherProfile(foundTeacher);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load teacher profile:', err);
+      }
+    };
+
+    loadTeacherInfo();
   }, [user, activeRole]);
 
   // Teacher class filtering helper
@@ -288,6 +386,8 @@ export const AuthProvider = ({ children }) => {
     currentStudent: studentProfile,
     studentProfile,
     studentLoading,
+    currentTeacher: teacherProfile,
+    teacherProfile,
     isAuthenticated: !!token,
   };
 

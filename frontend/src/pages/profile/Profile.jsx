@@ -9,7 +9,7 @@ import Badge from '../../components/common/Badge';
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { user, activeRole, currentStudent, studentLoading, updateProfileData, hasPermission } = useAuth();
+  const { user, activeRole, currentStudent, currentTeacher, studentLoading, updateProfileData, hasPermission } = useAuth();
   const { formatDate, settings } = useSettings();
 
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'permissions' | 'edit' | 'security'
@@ -36,22 +36,51 @@ const Profile = () => {
     confirm_password: '',
   });
 
-  // Sync profileForm with user or currentStudent
+  // Sync profileForm with user or role-associated records
   useEffect(() => {
     if (user) {
+      const isTeacher = activeRole === 'teacher';
+      const isStudent = activeRole === 'student';
+      const teacherData = user.teacher || currentTeacher;
+      const studentData = isStudent ? (user.student || currentStudent) : null;
+
+      const resolvedName = user.name ||
+        (teacherData ? `${teacherData.first_name} ${teacherData.last_name}` : '') ||
+        (studentData ? `${studentData.first_name} ${studentData.last_name}` : '');
+
+      const resolvedPhone = user.phone ||
+        teacherData?.phone ||
+        studentData?.parent_phone ||
+        studentData?.emergency_contact ||
+        '';
+
+      const resolvedBio = user.bio || (
+        isTeacher
+          ? `Faculty member (${teacherData?.designation || 'Teacher'}, Department of ${teacherData?.department || 'Academics'}) at ${settings?.school_name || 'SMS'}`
+          : isStudent && studentData
+          ? `Enrolled student in ${studentData.class?.name || 'Class 10'}`
+          : `Staff member at ${settings?.school_name || 'SMS'}`
+      );
+
+      const resolvedAddress = user.address || teacherData?.address || studentData?.address || '123 Education Boulevard, Institutional Area';
+      const resolvedCity = user.city || teacherData?.city || studentData?.city || 'New Delhi';
+      const resolvedState = user.state || teacherData?.state || studentData?.state || 'Delhi';
+      const resolvedPincode = user.pincode || teacherData?.postal_code || studentData?.pincode || '110001';
+      const resolvedEmergency = user.emergency_contact || teacherData?.emergency_contact_phone || studentData?.emergency_contact || '+91 98765 43210';
+
       setProfileForm({
-        name: user.name || (currentStudent ? `${currentStudent.first_name} ${currentStudent.last_name}` : ''),
+        name: resolvedName,
         email: user.email || '',
-        phone: user.phone || currentStudent?.parent_phone || currentStudent?.emergency_contact || '',
-        bio: user.bio || (currentStudent ? `Enrolled student in ${currentStudent.class?.name || 'Class 10'}` : 'Staff member at ' + (settings?.school_name || 'SMS')),
-        address: user.address || currentStudent?.address || '123 Education Boulevard, Institutional Area',
-        city: user.city || currentStudent?.city || 'New Delhi',
-        state: user.state || currentStudent?.state || 'Delhi',
-        pincode: user.pincode || currentStudent?.pincode || '110001',
-        emergency_contact: user.emergency_contact || currentStudent?.emergency_contact || '+91 98765 43210',
+        phone: resolvedPhone,
+        bio: resolvedBio,
+        address: resolvedAddress,
+        city: resolvedCity,
+        state: resolvedState,
+        pincode: resolvedPincode,
+        emergency_contact: resolvedEmergency,
       });
     }
-  }, [user, currentStudent, settings?.school_name]);
+  }, [user, currentStudent, currentTeacher, activeRole, settings?.school_name]);
 
   const roleMeta = SYSTEM_ROLES.find(r => r.id === activeRole) || {
     id: activeRole || 'student',
@@ -257,19 +286,27 @@ const Profile = () => {
               <>
                 <div className="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-3.5">
                   <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider block">Department</span>
-                  <span className="text-base font-black text-indigo-950 mt-0.5 block">Faculty of Sciences</span>
+                  <span className="text-base font-black text-indigo-950 mt-0.5 block">
+                    {user?.teacher?.department || currentTeacher?.department || user?.department || 'Physical Education'}
+                  </span>
                 </div>
                 <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-3.5">
                   <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider block">Designation</span>
-                  <span className="text-base font-black text-blue-950 mt-0.5 block">Senior Teacher</span>
+                  <span className="text-base font-black text-blue-950 mt-0.5 block">
+                    {user?.teacher?.designation || currentTeacher?.designation || user?.designation || 'Sports Coach'}
+                  </span>
                 </div>
                 <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-3.5">
-                  <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider block">Assigned Classes</span>
-                  <span className="text-base font-black text-purple-950 font-mono mt-0.5 block">Scoped Classes</span>
+                  <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider block">Employee ID</span>
+                  <span className="text-base font-black text-purple-950 font-mono mt-0.5 block">
+                    {user?.teacher?.employee_id || currentTeacher?.employee_id || user?.employee_id || 'TCH0006'}
+                  </span>
                 </div>
                 <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-3.5">
                   <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">Status</span>
-                  <span className="text-base font-black text-emerald-950 mt-0.5 block">Active Faculty</span>
+                  <span className="text-base font-black text-emerald-950 mt-0.5 block">
+                    {user?.teacher?.status ? (user.teacher.status.charAt(0).toUpperCase() + user.teacher.status.slice(1)) : 'Active Faculty'}
+                  </span>
                 </div>
               </>
             ) : isAdminRole ? (
@@ -449,6 +486,38 @@ const Profile = () => {
                       <span className="text-gray-500 block">Parent / Guardian Name</span>
                       <span className="font-bold text-gray-900 text-sm mt-0.5 block">
                         {currentStudent?.parent_name || currentStudent?.guardian_name || 'Mr. Rajesh Sharma'}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {isTeacherRole && (
+                  <>
+                    <div className="p-3 bg-gray-50/70 rounded-xl border border-gray-100">
+                      <span className="text-gray-500 block">Faculty Department</span>
+                      <span className="font-bold text-gray-900 text-sm mt-0.5 block">
+                        {user?.teacher?.department || currentTeacher?.department || user?.department || 'Physical Education'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-gray-50/70 rounded-xl border border-gray-100">
+                      <span className="text-gray-500 block">Academic Designation</span>
+                      <span className="font-bold text-gray-900 text-sm mt-0.5 block">
+                        {user?.teacher?.designation || currentTeacher?.designation || user?.designation || 'Sports Coach'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-gray-50/70 rounded-xl border border-gray-100">
+                      <span className="text-gray-500 block">Qualification</span>
+                      <span className="font-bold text-gray-900 text-sm mt-0.5 block">
+                        {user?.teacher?.qualification || currentTeacher?.qualification || 'B.P.Ed'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-gray-50/70 rounded-xl border border-gray-100">
+                      <span className="text-gray-500 block">Teaching Experience</span>
+                      <span className="font-bold text-gray-900 text-sm mt-0.5 block">
+                        {user?.teacher?.experience_years || currentTeacher?.experience_years ? `${user?.teacher?.experience_years || currentTeacher?.experience_years} Years` : '4.0 Years'}
                       </span>
                     </div>
                   </>

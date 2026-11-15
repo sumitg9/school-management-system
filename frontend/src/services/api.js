@@ -106,6 +106,24 @@ export const authAPI = {
         if (authUser.user_metadata?.permissions) {
           permissions = authUser.user_metadata.permissions;
         }
+
+        // Detect seeded teachers or admins if metadata is missing
+        if (!authUser.user_metadata?.role && !authUser.user_metadata?.roles) {
+          const lowerEmail = email.toLowerCase();
+          const KNOWN_TEACHERS = [
+            'teacher@school.com',
+            'rahul.mehta@school.com',
+            'rajesh.kumar@school.com',
+            'priya.sharma@school.com',
+            'amit.patel@school.com',
+            'anjali.gupta@school.com',
+          ];
+          if (KNOWN_TEACHERS.includes(lowerEmail)) {
+            roles = ['teacher'];
+          } else if (lowerEmail.includes('admin')) {
+            roles = ['admin'];
+          }
+        }
       }
     } catch (e) {
       console.warn('Supabase auth sign-in error:', e);
@@ -142,6 +160,11 @@ export const authAPI = {
           'parent@school.com',
           'superadmin@school.com',
           'accountant@school.com',
+          'rahul.mehta@school.com',
+          'rajesh.kumar@school.com',
+          'priya.sharma@school.com',
+          'amit.patel@school.com',
+          'anjali.gupta@school.com',
         ];
         if (demoEmails.includes(email.toLowerCase())) {
           isPasswordValid = true;
@@ -152,24 +175,148 @@ export const authAPI = {
         throw new Error('Invalid email or password');
       }
 
-      // Retrieve user's role from model_has_roles and roles
-      try {
-        const { data: roleData } = await supabase
-          .from('model_has_roles')
-          .select('role_id, roles(name)')
-          .eq('model_id', dbUser.id)
-          .maybeSingle();
+      // Retrieve user's role and associated profiles
+      let detectedRole = null;
 
-        const userRole = roleData?.roles?.name || (
-          email.includes('admin') ? 'admin' :
-          email.includes('teacher') ? 'teacher' :
-          email.includes('parent') ? 'parent' : 'student'
-        );
-        roles = [userRole];
+      // 1. Check model_has_roles
+      try {
+        const { data: roleRecords } = await supabase
+          .from('model_has_roles')
+          .select('role_id, roles(id, name)')
+          .eq('model_id', dbUser.id);
+
+        if (roleRecords && roleRecords.length > 0) {
+          const firstRec = roleRecords[0];
+          const rawRoleName = Array.isArray(firstRec.roles)
+            ? firstRec.roles[0]?.name
+            : firstRec.roles?.name;
+
+          if (rawRoleName) {
+            detectedRole = rawRoleName;
+          } else if (firstRec.role_id) {
+            const { data: roleObj } = await supabase
+              .from('roles')
+              .select('name')
+              .eq('id', firstRec.role_id)
+              .maybeSingle();
+            if (roleObj?.name) detectedRole = roleObj.name;
+          }
+        }
       } catch (e) {
-        roles = [email.includes('admin') ? 'admin' : 'student'];
+        console.warn('Could not query model_has_roles:', e);
       }
 
+      // 2. Check if user exists in teachers table
+      let teacherRecord = null;
+      try {
+        const { data: tRecord } = await supabase
+          .from('teachers')
+          .select('*, classes:classes(*)')
+          .or(`user_id.eq.${dbUser.id},email.eq.${email}`)
+          .maybeSingle();
+
+        if (tRecord) {
+          teacherRecord = tRecord;
+          if (!detectedRole || detectedRole === 'student') {
+            detectedRole = 'teacher';
+          }
+        }
+      } catch (e) {
+        console.warn('Could not check teachers table:', e);
+      }
+
+      // 3. Check if user exists in students table
+      let studentRecord = null;
+      try {
+        const { data: sRecord } = await supabase
+          .from('students')
+          .select('*, class:classes(id, name), section:sections(id, name)')
+          .eq('user_id', dbUser.id)
+          .maybeSingle();
+
+        if (sRecord) {
+          studentRecord = sRecord;
+          if (!detectedRole) {
+            detectedRole = 'student';
+          }
+        }
+      } catch (e) {
+        console.warn('Could not check students table:', e);
+      }
+
+      // 4. Check if user exists in parents table
+      let parentRecord = null;
+      try {
+        const { data: pRecord } = await supabase
+          .from('parents')
+          .select('*')
+          .eq('user_id', dbUser.id)
+          .maybeSingle();
+
+        if (pRecord) {
+          parentRecord = pRecord;
+          if (!detectedRole) {
+            detectedRole = 'parent';
+          }
+        }
+      } catch (e) {
+        console.warn('Could not check parents table:', e);
+      }
+
+      // 5. Check localStorage sms_custom_users (persisted edits or creations from User Management)
+      try {
+        const customUsersStr = localStorage.getItem('sms_custom_users');
+        if (customUsersStr) {
+          const customList = JSON.parse(customUsersStr);
+          const matched = customList.find(
+            cu => cu.email?.toLowerCase() === email.toLowerCase() || String(cu.id) === String(dbUser.id)
+          );
+          if (matched && matched.role) {
+            detectedRole = matched.role;
+          }
+        }
+      } catch (_) {}
+
+      // 6. Known seeded demo users mapping fallback
+      if (!detectedRole) {
+        const lowerEmail = email.toLowerCase();
+        const KNOWN_TEACHERS = [
+          'teacher@school.com',
+          'rahul.mehta@school.com',
+          'rajesh.kumar@school.com',
+          'priya.sharma@school.com',
+          'amit.patel@school.com',
+          'anjali.gupta@school.com',
+        ];
+        const KNOWN_STUDENTS = [
+          'student@school.com',
+          'aarav.kumar@student.com',
+          'diya.sharma@student.com',
+          'vivaan.patel@student.com',
+          'ananya.singh@student.com',
+          'aarohi.verma@student.com',
+        ];
+        const KNOWN_PARENTS = [
+          'parent@school.com',
+          'ramesh.verma@school.com',
+        ];
+
+        if (lowerEmail === 'superadmin@school.com') detectedRole = 'super-admin';
+        else if (lowerEmail === 'admin@school.com') detectedRole = 'admin';
+        else if (KNOWN_TEACHERS.includes(lowerEmail)) detectedRole = 'teacher';
+        else if (lowerEmail === 'accountant@school.com' || lowerEmail === 'sunita.patel@school.com') detectedRole = 'finance';
+        else if (lowerEmail === 'librarian@school.com' || lowerEmail === 'anita.deshmukh@school.com') detectedRole = 'back-office';
+        else if (lowerEmail === 'staff@school.com' || lowerEmail === 'manoj.tiwari@school.com') detectedRole = 'general';
+        else if (KNOWN_PARENTS.includes(lowerEmail)) detectedRole = 'parent';
+        else if (KNOWN_STUDENTS.includes(lowerEmail)) detectedRole = 'student';
+        else if (lowerEmail.includes('admin')) detectedRole = 'admin';
+        else if (lowerEmail.includes('teacher') || lowerEmail.includes('faculty')) detectedRole = 'teacher';
+        else if (lowerEmail.includes('parent')) detectedRole = 'parent';
+        else if (lowerEmail.includes('student')) detectedRole = 'student';
+        else detectedRole = 'student';
+      }
+
+      roles = [detectedRole];
       permissions = roles.includes('admin') || roles.includes('super-admin') ? ['*'] : roles;
       authToken = `sb_token_${dbUser.id}_${Date.now()}`;
       userData = {
@@ -179,24 +326,31 @@ export const authAPI = {
         phone: dbUser.phone,
         status: dbUser.status || 'active',
         avatar: dbUser.avatar,
+        role: detectedRole,
+        roles: [detectedRole],
+        gender: dbUser.gender,
+        address: dbUser.address,
+        city: dbUser.city,
+        state: dbUser.state,
+        postal_code: dbUser.postal_code,
       };
 
-      // Retrieve linked student profile if applicable
-      try {
-        const { data: studentRecord } = await supabase
-          .from('students')
-          .select('*, class:classes(id, name), section:sections(id, name)')
-          .eq('user_id', dbUser.id)
-          .maybeSingle();
-
-        if (studentRecord) {
-          userData.student = studentRecord;
-          userData.student_id = studentRecord.id;
-          userData.class_id = studentRecord.class_id;
-          userData.section_id = studentRecord.section_id;
-        }
-      } catch (e) {
-        console.warn('Could not load student profile on login:', e);
+      if (teacherRecord) {
+        userData.teacher = teacherRecord;
+        userData.teacher_id = teacherRecord.id;
+        userData.employee_id = teacherRecord.employee_id;
+        userData.department = teacherRecord.department;
+        userData.designation = teacherRecord.designation;
+      }
+      if (studentRecord) {
+        userData.student = studentRecord;
+        userData.student_id = studentRecord.id;
+        userData.class_id = studentRecord.class_id;
+        userData.section_id = studentRecord.section_id;
+      }
+      if (parentRecord) {
+        userData.parent = parentRecord;
+        userData.parent_id = parentRecord.id;
       }
     } else {
       userData = {
@@ -204,6 +358,8 @@ export const authAPI = {
         name: authUser.user_metadata?.name || authUser.email.split('@')[0],
         email: authUser.email,
         status: 'active',
+        role: roles[0],
+        roles: roles,
       };
     }
 
@@ -382,6 +538,19 @@ const DEFAULT_SYSTEM_USERS = [
     gender: 'male',
     address: 'B-12, Teachers Enclave, Mayur Vihar',
     city: 'New Delhi',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+  {
+    id: 'user_tch_6',
+    name: 'Rahul Mehta',
+    email: 'rahul.mehta@school.com',
+    phone: '+91 98765 11006',
+    role: 'teacher',
+    roles: ['teacher'],
+    status: 'active',
+    gender: 'male',
+    address: '52, Shivaji Park, Dadar West',
+    city: 'Mumbai',
     created_at: '2025-10-12T00:00:00.000Z',
   },
   {
