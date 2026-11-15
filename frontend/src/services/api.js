@@ -1625,7 +1625,7 @@ export const feeAPI = {
   delete: async (id) => feeAPI.deleteStructure(id),
   getPayments: async (params) => {
     if (!useSupabase) return api.get('/fee-payments', { params });
-    let query = supabase.from('fee_payments').select('*, student:students(first_name, last_name, admission_number, roll_number), fee_structure:fee_structures(name, amount, type)', { count: 'exact' });
+    let query = supabase.from('fee_payments').select('*, student:students(first_name, last_name, admission_number, roll_number, class:classes(name), section:sections(name)), fee_structure:fee_structures(name, amount, type, frequency, academic_year:academic_years(name))', { count: 'exact' });
     if (params?.fee_structure_id) {
       query = query.eq('fee_structure_id', params.fee_structure_id);
     }
