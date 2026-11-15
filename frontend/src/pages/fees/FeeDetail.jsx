@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { feeAPI } from '../../services/api';
 import Badge from '../../components/common/Badge';
@@ -14,6 +14,10 @@ const FeeDetail = () => {
   const { isStudent, hasPermission } = useAuth();
   const [fee, setFee] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  if (isStudent()) {
+    return <Navigate to="/fees" replace />;
+  }
 
   useEffect(() => {
     fetchFee();

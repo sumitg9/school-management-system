@@ -8,16 +8,16 @@ const FeeTabs = () => {
 
   const allTabs = [
     {
-      name: 'Fee Structures',
+      name: isStudent() ? 'My Fee Obligations' : 'Fee Structures',
       path: '/fees',
-      icon: '📋',
+      icon: isStudent() ? '📊' : '📋',
       active:
         currentPath === '/fees' ||
         (currentPath.startsWith('/fees/') &&
           !currentPath.startsWith('/fees/payment') &&
           !currentPath.startsWith('/fees/payments') &&
           !currentPath.includes('/payments')),
-      description: 'Fee structures & class tuition rules',
+      description: isStudent() ? 'My upcoming, paid & overdue fee schedule' : 'Fee structures & class tuition rules',
     },
     {
       name: 'Collect Fees / Payment',
@@ -31,13 +31,13 @@ const FeeTabs = () => {
       description: 'Single or advance multi-month fee collection',
     },
     {
-      name: 'Payment Records',
+      name: isStudent() ? 'My Payment Receipts' : 'Payment Records',
       path: '/fees/payments',
       icon: '🧾',
       active:
         currentPath === '/fees/payments' ||
         currentPath.includes('/payments'),
-      description: 'Search, filter, and inspect past receipts',
+      description: isStudent() ? 'My paid fee receipts and transaction breakdown' : 'Search, filter, and inspect past receipts',
     },
   ];
 

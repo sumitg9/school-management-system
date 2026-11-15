@@ -6,7 +6,7 @@ import { SYSTEM_ROLES } from '../../utils/permissionRules';
 const Layout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, hasPermission, activeRole, switchActiveRole, resetActiveRole, isAdmin } = useAuth();
+  const { user, logout, hasPermission, activeRole, switchActiveRole, resetActiveRole, isAdmin, isStudent } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const handleLogout = async () => {
@@ -19,9 +19,9 @@ const Layout = ({ children }) => {
     { path: '/students', icon: '👨‍🎓', label: 'Students', permission: 'view-students' },
     { path: '/teachers', icon: '👨‍🏫', label: 'Teachers', permission: 'view-teachers' },
     { path: '/classes', icon: '📚', label: 'Classes', permission: 'view-classes' },
-    { path: '/attendance', icon: '📊', label: 'Attendance', permission: 'view-attendance' },
-    { path: '/exams', icon: '📝', label: 'Exams', permission: 'view-exams' },
-    { path: '/fees', icon: '💵', label: 'Fees', permission: 'view-fees' },
+    { path: '/attendance', icon: '📊', label: isStudent() ? 'My Attendance' : 'Attendance', permission: 'view-attendance' },
+    { path: '/exams', icon: '📝', label: isStudent() ? 'My Exams' : 'Exams', permission: 'view-exams' },
+    { path: '/fees', icon: '💵', label: isStudent() ? 'My Fees' : 'Fees', permission: 'view-fees' },
     { path: '/fees/payment', icon: '💳', label: 'Fee Payment', permission: 'collect-fees' },
     { path: '/assignments', icon: '📋', label: 'Assignments', permission: 'view-assignments' },
     { path: '/reports', icon: '📈', label: 'Reports', permission: 'view-reports' },

@@ -9,12 +9,17 @@ import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
 import { getAllFeeTypes, formatFeeTypeLabel, getFeeTypeBadgeVariant } from '../../utils/feeTypes';
 import FeeTabs from './FeeTabs';
+import StudentFeesView from './StudentFeesView';
 
 const FeeList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const { formatDate, formatCurrency } = useSettings();
   const { isStudent, hasPermission } = useAuth();
+
+  if (isStudent()) {
+    return <StudentFeesView />;
+  }
   const [fees, setFees] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [classes, setClasses] = useState([]);

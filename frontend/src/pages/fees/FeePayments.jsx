@@ -6,6 +6,7 @@ import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
 import { useAlert } from '../../context/AlertContext';
+import { useAuth } from '../../context/AuthContext';
 import { formatFeeTypeLabel, getFeeTypeBadgeVariant } from '../../utils/feeTypes';
 import { numberToWords } from '../../utils/numberToWords';
 import FeeTabs from './FeeTabs';
@@ -32,6 +33,7 @@ const FeePayments = () => {
   const { id } = useParams(); // fee_structure_id
   const { formatDate, formatCurrency } = useSettings();
   const { showValidationError } = useAlert();
+  const { isStudent, currentStudent, studentLoading, hasPermission } = useAuth();
 
   const [feeStructure, setFeeStructure] = useState(null);
   const [payments, setPayments] = useState([]);
@@ -68,7 +70,7 @@ const FeePayments = () => {
   useEffect(() => {
     fetchFeeStructure();
     fetchPayments();
-  }, [id, methodFilter, statusFilter]);
+  }, [id, methodFilter, statusFilter, isStudent(), currentStudent?.id, studentLoading]);
 
   const fetchFeeStructure = async () => {
     if (!id) return;
@@ -87,14 +89,25 @@ const FeePayments = () => {
   };
 
   const fetchPayments = async () => {
+    if (isStudent() && studentLoading) return;
     setLoading(true);
     try {
       const params = {
         per_page: 50,
       };
-      if (id) {
+
+      // Strict student enforcement: only fetch this student's payment records
+      if (isStudent()) {
+        if (!currentStudent?.id) {
+          setPayments([]);
+          setLoading(false);
+          return;
+        }
+        params.student_id = currentStudent.id;
+      } else if (id) {
         params.fee_structure_id = id;
       }
+
       if (methodFilter) {
         params.payment_method = methodFilter;
       }
@@ -280,7 +293,7 @@ const FeePayments = () => {
         </button>
       ),
     },
-    {
+    ...(!isStudent() ? [{
       key: 'student',
       label: 'Student',
       render: (row) => (
@@ -303,7 +316,24 @@ const FeePayments = () => {
           </div>
         </div>
       ),
-    },
+    }] : [{
+      key: 'fee_type',
+      label: 'Fee Structure',
+      render: (row) => (
+        <div>
+          <span className="font-semibold text-gray-900 text-sm">
+            {row.fee_structure?.name || 'School Fee'}
+          </span>
+          {row.fee_structure?.type && (
+            <div className="mt-0.5">
+              <Badge variant={getFeeTypeBadgeVariant(row.fee_structure.type)}>
+                {formatFeeTypeLabel(row.fee_structure.type)}
+              </Badge>
+            </div>
+          )}
+        </div>
+      ),
+    }]),
     {
       key: 'payment_date',
       label: 'Payment Date',
@@ -403,31 +433,52 @@ const FeePayments = () => {
         <div className="flex items-center space-x-4">
           <button
             type="button"
-            onClick={() => navigate(id ? `/fees/${id}` : '/fees')}
+            onClick={() => navigate('/fees')}
             className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition cursor-pointer"
-            title="Back"
+            title="Back to Fees"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-gray-900">
-                {feeStructure ? `Payments: ${feeStructure.name}` : 'Fee Payments Management'}
-              </h1>
-              {feeStructure?.type && (
-                <Badge variant={getFeeTypeBadgeVariant(feeStructure.type)}>
-                  {formatFeeTypeLabel(feeStructure.type)}
-                </Badge>
-              )}
+          {isStudent() ? (
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg shadow-xs">
+                {currentStudent ? `${currentStudent.first_name?.[0] || 'S'}${currentStudent.last_name?.[0] || ''}` : '👨‍🎓'}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold text-gray-900">My Payment Receipts</h1>
+                  <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold">
+                    Personal Records
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 font-mono mt-1">
+                  Student: <span className="font-semibold text-gray-800">{currentStudent ? `${currentStudent.first_name} ${currentStudent.last_name}` : 'Enrolled Student'}</span>
+                  {currentStudent?.admission_number && <span className="ml-2 pl-2 border-l border-gray-300">Adm: {currentStudent.admission_number}</span>}
+                  {currentStudent?.class?.name && <span className="ml-2 pl-2 border-l border-gray-300">Class: {currentStudent.class.name}</span>}
+                </p>
+              </div>
             </div>
-            <p className="text-sm text-gray-500 mt-1">
-              {feeStructure
-                ? `Standard Amount: ${formatCurrency(feeStructure.amount)} • Class: ${feeStructure.class?.name || 'All Classes'} • Academic Year: ${feeStructure.academic_year?.name || '-'}`
-                : 'Track and collect fee payments across students'}
-            </p>
-          </div>
+          ) : (
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {feeStructure ? `Payments: ${feeStructure.name}` : 'Fee Payments Management'}
+                </h1>
+                {feeStructure?.type && (
+                  <Badge variant={getFeeTypeBadgeVariant(feeStructure.type)}>
+                    {formatFeeTypeLabel(feeStructure.type)}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 mt-1">
+                {feeStructure
+                  ? `Standard Amount: ${formatCurrency(feeStructure.amount)} • Class: ${feeStructure.class?.name || 'All Classes'} • Academic Year: ${feeStructure.academic_year?.name || '-'}`
+                  : 'Track and collect fee payments across students'}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -439,14 +490,16 @@ const FeePayments = () => {
           >
             🔄 Refresh
           </button>
-          <button
-            type="button"
-            onClick={() => navigate('/fees/payment')}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl shadow-sm transition flex items-center space-x-2 cursor-pointer"
-          >
-            <span>💳</span>
-            <span>Collect Fees (Single / Advance)</span>
-          </button>
+          {!isStudent() && hasPermission('collect-fees') && (
+            <button
+              type="button"
+              onClick={() => navigate('/fees/payment')}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl shadow-sm transition flex items-center space-x-2 cursor-pointer"
+            >
+              <span>💳</span>
+              <span>Collect Fees (Single / Advance)</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -454,7 +507,7 @@ const FeePayments = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Collected</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{isStudent() ? 'Total Paid' : 'Total Collected'}</p>
             <p className="text-2xl font-bold text-gray-900 font-mono mt-1 text-emerald-600">
               {formatCurrency(totalCollected)}
             </p>
@@ -471,7 +524,7 @@ const FeePayments = () => {
             <p className="text-2xl font-bold text-gray-900 font-mono mt-1">
               {filteredPayments.length}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Completed entries</p>
+            <p className="text-xs text-gray-500 mt-1">{isStudent() ? 'Receipts issued' : 'Completed entries'}</p>
           </div>
           <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
             🧾
@@ -484,7 +537,7 @@ const FeePayments = () => {
             <p className="text-2xl font-bold text-gray-900 font-mono mt-1 text-blue-600">
               {formatCurrency(totalDiscounts)}
             </p>
-            <p className="text-xs text-gray-500 mt-1">Concessions given</p>
+            <p className="text-xs text-gray-500 mt-1">{isStudent() ? 'Concessions received' : 'Concessions given'}</p>
           </div>
           <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
             🎁
@@ -514,7 +567,7 @@ const FeePayments = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by student, receipt, txn..."
+              placeholder={isStudent() ? "Search receipt #, method, remarks..." : "Search by student, receipt, txn..."}
               className="input-field text-sm"
             />
           </div>
