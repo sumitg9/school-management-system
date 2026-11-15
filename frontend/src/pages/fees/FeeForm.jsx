@@ -5,6 +5,13 @@ import { feeAPI, academicYearAPI, classAPI } from '../../services/api';
 import { useAlert } from '../../context/AlertContext';
 import { getAllFeeTypes, saveCustomFeeType, formatFeeTypeLabel } from '../../utils/feeTypes';
 
+const getOrdinalSuffix = (day) => {
+  if (day === 1 || day === 21 || day === 31) return 'st';
+  if (day === 2 || day === 22) return 'nd';
+  if (day === 3 || day === 23) return 'rd';
+  return 'th';
+};
+
 const FeeForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -24,6 +31,7 @@ const FeeForm = () => {
     type: 'tuition',
     frequency: 'monthly',
     amount: '',
+    due_day: 10,
     due_date: '',
   });
 
@@ -82,6 +90,17 @@ const FeeForm = () => {
       const response = await feeAPI.getById(id);
       if (response.success) {
         const feeType = response.data.type || 'tuition';
+        let parsedDay = 10;
+        if (response.data.due_date) {
+          const parts = String(response.data.due_date).split('-');
+          if (parts.length >= 3) {
+            parsedDay = parseInt(parts[2], 10);
+          } else {
+            parsedDay = new Date(response.data.due_date).getDate();
+          }
+        }
+        const safeDay = (!isNaN(parsedDay) && parsedDay >= 1 && parsedDay <= 15) ? parsedDay : (parsedDay > 15 ? 15 : 10);
+
         setFeeTypes(prev => getAllFeeTypes([...prev.map(t => t.id), feeType]));
         setFormData({
           academic_year_id: response.data.academic_year_id || '',
@@ -91,6 +110,7 @@ const FeeForm = () => {
           type: feeType,
           frequency: response.data.frequency || 'monthly',
           amount: response.data.amount || '',
+          due_day: safeDay,
           due_date: response.data.due_date || '',
         });
       }
@@ -140,9 +160,24 @@ const FeeForm = () => {
 
     setLoading(true);
 
+    // Compute YYYY-MM-DD for PostgreSQL DATE column, using selected academic year start year
+    const selectedYear = academicYears.find(y => String(y.id) === String(formData.academic_year_id));
+    let startYear = new Date().getFullYear();
+    if (selectedYear?.start_date) {
+      const parsedYear = new Date(selectedYear.start_date).getFullYear();
+      if (!isNaN(parsedYear)) startYear = parsedYear;
+    } else if (selectedYear?.name) {
+      const match = selectedYear.name.match(/\d{4}/);
+      if (match) startYear = parseInt(match[0], 10);
+    }
+    const dayVal = Math.min(15, Math.max(1, parseInt(formData.due_day || 10, 10) || 10));
+    const dayStr = String(dayVal).padStart(2, '0');
+    const computedDueDate = `${startYear}-04-${dayStr}`;
+
     const payload = {
       ...formData,
       type: finalType,
+      due_date: computedDueDate,
     };
 
     try {
@@ -410,16 +445,24 @@ const FeeForm = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Due Date <span className="text-red-500">*</span>
+                Due Date (Day of Every Month) <span className="text-red-500">*</span>
               </label>
-              <input
-                type="date"
-                name="due_date"
-                value={formData.due_date}
-                onChange={handleChange}
+              <select
+                name="due_day"
+                value={formData.due_day || 10}
+                onChange={(e) => setFormData(prev => ({ ...prev, due_day: parseInt(e.target.value, 10) || 10 }))}
                 className="input-field"
                 required
-              />
+              >
+                {Array.from({ length: 15 }, (_, i) => i + 1).map((day) => (
+                  <option key={day} value={day}>
+                    {day}{getOrdinalSuffix(day)} of every month
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Monthly fee deadline: {formData.due_day || 10}{getOrdinalSuffix(formData.due_day || 10)} of every month
+              </p>
             </div>
           </div>
         </div>

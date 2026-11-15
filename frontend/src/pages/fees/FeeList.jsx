@@ -167,8 +167,21 @@ const FeeList = () => {
     },
     {
       key: 'due_date',
-      label: 'Due Date',
-      render: (row) => formatDate(row.due_date),
+      label: 'Monthly Due Date',
+      render: (row) => {
+        if (!row.due_date) return '-';
+        const parts = String(row.due_date).split('-');
+        const day = parts.length >= 3 ? parseInt(parts[2], 10) : new Date(row.due_date).getDate();
+        if (!isNaN(day) && day >= 1 && day <= 31) {
+          const suffix = (day === 1 || day === 21 || day === 31) ? 'st' : (day === 2 || day === 22) ? 'nd' : (day === 3 || day === 23) ? 'rd' : 'th';
+          return (
+            <span className="font-semibold text-gray-800 text-xs bg-gray-100 px-2 py-0.5 rounded border border-gray-200">
+              📅 {day}{suffix} of every month
+            </span>
+          );
+        }
+        return formatDate(row.due_date);
+      },
     },
   ];
 

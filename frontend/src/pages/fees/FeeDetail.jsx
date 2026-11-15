@@ -165,16 +165,24 @@ const FeeDetail = () => {
                 {formatCurrency(fee.amount)}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Due Date:</span>
-              <span className="font-medium text-gray-900">
-                {formatDate(fee.due_date)}
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">Monthly Due Date:</span>
+              <span className="font-semibold text-gray-900 bg-gray-50 px-2 py-0.5 rounded border border-gray-200 text-sm">
+                {fee.due_date ? (() => {
+                  const parts = String(fee.due_date).split('-');
+                  const day = parts.length >= 3 ? parseInt(parts[2], 10) : new Date(fee.due_date).getDate();
+                  if (!isNaN(day) && day >= 1 && day <= 31) {
+                    const suffix = (day === 1 || day === 21 || day === 31) ? 'st' : (day === 2 || day === 22) ? 'nd' : (day === 3 || day === 23) ? 'rd' : 'th';
+                    return `📅 ${day}${suffix} of every month`;
+                  }
+                  return formatDate(fee.due_date);
+                })() : '-'}
               </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-gray-600">Status:</span>
-              <Badge variant={new Date(fee.due_date) > new Date() ? 'success' : 'danger'}>
-                {new Date(fee.due_date) > new Date() ? 'Active' : 'Overdue'}
+              <Badge variant={fee.status === 'active' ? 'success' : 'danger'}>
+                {fee.status === 'active' ? 'Active' : (fee.status || 'Inactive')}
               </Badge>
             </div>
           </div>
