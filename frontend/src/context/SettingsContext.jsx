@@ -23,6 +23,11 @@ import {
   getDaysOverdue as baseGetDaysOverdue,
   LATE_FINE_TYPES
 } from '../utils/feeLateFine';
+import {
+  DEFAULT_ROLE_PERMISSIONS,
+  mergeRolePermissions,
+  hasRolePermission
+} from '../utils/permissionRules';
 import { toast } from 'react-toastify';
 import { showGlobalValidationError } from './AlertContext';
 
@@ -48,6 +53,9 @@ export const DEFAULT_SETTINGS = {
   fee_due_day_of_month: 10,
   fee_grace_period_days: 0,
   fee_late_fine_max_cap: 1000,
+
+  // User Role Permissions Matrix
+  user_role_permissions: DEFAULT_ROLE_PERMISSIONS,
 };
 
 const normalizeSettings = (raw) => {
@@ -63,6 +71,16 @@ const normalizeSettings = (raw) => {
   } else if (!merged.class_age_criteria || typeof merged.class_age_criteria !== 'object') {
     merged.class_age_criteria = DEFAULT_CLASS_AGE_CRITERIA;
   }
+
+  // Normalize user role permissions
+  if (typeof merged.user_role_permissions === 'string') {
+    try {
+      merged.user_role_permissions = JSON.parse(merged.user_role_permissions);
+    } catch {
+      merged.user_role_permissions = DEFAULT_ROLE_PERMISSIONS;
+    }
+  }
+  merged.user_role_permissions = mergeRolePermissions(merged.user_role_permissions);
 
   merged.student_min_age_years = parseInt(merged.student_min_age_years ?? 2, 10);
   merged.student_min_age_months = parseInt(merged.student_min_age_months ?? 6, 10);
@@ -241,6 +259,7 @@ export const SettingsProvider = ({ children }) => {
     calculateLateFine,
     isMonthOverdue,
     getDaysOverdue,
+    checkRolePermission: (role, permId) => hasRolePermission(settings.user_role_permissions, role, permId),
   };
 
   return (
@@ -259,6 +278,7 @@ export const useSettings = () => {
       loading: false,
       fetchSettings: () => {},
       updateSettings: async () => ({ success: false }),
+      checkRolePermission: (role, permId) => hasRolePermission(DEFAULT_ROLE_PERMISSIONS, role, permId),
       formatDateTime: (date, fmt) => baseFormatDateTime(date, fmt || DEFAULT_SETTINGS.date_time_format),
       formatDate: (date, fmt) => baseFormatDate(date, fmt || DEFAULT_SETTINGS.date_format),
       formatTime: (date, fmt) => baseFormatTime(date, fmt || DEFAULT_SETTINGS.time_format),

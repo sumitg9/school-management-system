@@ -2,6 +2,12 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { authAPI } from '../services/api';
 import { toast } from 'react-toastify';
 import { showGlobalValidationError } from './AlertContext';
+import {
+  SYSTEM_ROLES,
+  normalizeRole,
+  hasRolePermission,
+  DEFAULT_ROLE_PERMISSIONS
+} from '../utils/permissionRules';
 
 const AuthContext = createContext(null);
 
@@ -99,30 +105,82 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Active role state (allows administrators to preview the system as any role)
+  const [activeRole, setActiveRole] = useState(() => {
+    return localStorage.getItem('sms_active_role') || null;
+  });
+
+  const getEffectiveRole = () => {
+    if (activeRole) return activeRole;
+    if (user?.roles && user.roles.length > 0) {
+      return normalizeRole(user.roles[0]);
+    }
+    return 'admin';
+  };
+
+  const switchActiveRole = (newRole) => {
+    const normalized = normalizeRole(newRole);
+    setActiveRole(normalized);
+    localStorage.setItem('sms_active_role', normalized);
+    const roleObj = SYSTEM_ROLES.find(r => r.id === normalized);
+    toast.info(`Switched view to ${roleObj?.name || normalized}`);
+  };
+
+  const resetActiveRole = () => {
+    localStorage.removeItem('sms_active_role');
+    const defaultR = user?.roles?.[0] ? normalizeRole(user.roles[0]) : 'admin';
+    setActiveRole(defaultR);
+    toast.info(`Reset view to assigned role: ${defaultR}`);
+  };
+
   const hasRole = (role) => {
-    if (!user || !user.roles) return false;
-    return user.roles.includes(role);
+    const effective = getEffectiveRole();
+    return normalizeRole(role) === effective;
   };
 
   const hasPermission = (permission) => {
-    if (!user || !user.permissions) return false;
-    return user.permissions.includes(permission);
+    if (!permission) return true;
+    const effectiveRole = getEffectiveRole();
+    if (effectiveRole === 'super-admin') return true;
+
+    // Direct user permissions override if present
+    if (user?.permissions?.includes('*') || user?.permissions?.includes(permission)) {
+      return true;
+    }
+
+    // Check configured role permissions from settings
+    let configured = null;
+    try {
+      const storedSettings = localStorage.getItem('sms_settings');
+      if (storedSettings) {
+        const parsed = JSON.parse(storedSettings);
+        if (parsed.user_role_permissions) {
+          configured = parsed.user_role_permissions;
+        }
+      }
+    } catch (_) {}
+
+    return hasRolePermission(configured, effectiveRole, permission);
   };
 
-  const isAdmin = () => {
-    return hasRole('super-admin') || hasRole('admin');
-  };
+  const isSuperAdmin = () => hasRole('super-admin');
+  const isAdmin = () => hasRole('super-admin') || hasRole('admin');
+  const isTeacher = () => hasRole('teacher');
+  const isStudent = () => hasRole('student');
+  const isParent = () => hasRole('parent');
+  const isFinance = () => hasRole('finance') || hasRole('accountant');
+  const isBackOffice = () => hasRole('back-office') || hasRole('librarian') || hasRole('receptionist');
+  const isGeneral = () => hasRole('general');
 
-  const isTeacher = () => {
-    return hasRole('teacher');
-  };
-
-  const isStudent = () => {
-    return hasRole('student');
-  };
-
-  const isParent = () => {
-    return hasRole('parent');
+  // Teacher class filtering helper
+  const filterTeacherClasses = (classesList) => {
+    if (!classesList || !Array.isArray(classesList)) return [];
+    if (!isTeacher()) return classesList;
+    const assignedIds = user?.teacher?.assigned_class_ids || user?.assigned_class_ids;
+    if (Array.isArray(assignedIds) && assignedIds.length > 0) {
+      return classesList.filter(c => assignedIds.includes(c.id) || assignedIds.includes(String(c.id)));
+    }
+    return classesList;
   };
 
   const value = {
@@ -133,12 +191,20 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateUser,
+    activeRole: getEffectiveRole(),
+    switchActiveRole,
+    resetActiveRole,
     hasRole,
     hasPermission,
+    isSuperAdmin,
     isAdmin,
     isTeacher,
     isStudent,
     isParent,
+    isFinance,
+    isBackOffice,
+    isGeneral,
+    filterTeacherClasses,
     isAuthenticated: !!token,
   };
 

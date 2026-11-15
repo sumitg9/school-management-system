@@ -5,10 +5,12 @@ import { classAPI } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useAuth } from '../../context/AuthContext';
 
 const ClassList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const { hasPermission, isTeacher, filterTeacherClasses } = useAuth();
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
@@ -28,7 +30,9 @@ const ClassList = () => {
     try {
       const response = await classAPI.getAll(filters);
       if (response.success) {
-        setClasses(response.data);
+        const rawList = response.data || [];
+        const scopedList = filterTeacherClasses(rawList);
+        setClasses(scopedList);
         setPagination(response.meta);
       }
     } catch (error) {
@@ -118,10 +122,10 @@ const ClassList = () => {
   ];
 
   const actions = (row) => (
-    <>
+    <div className="flex items-center gap-2">
       <button
         onClick={() => navigate(`/classes/${row.id}`)}
-        className="text-blue-600 hover:text-blue-900"
+        className="text-blue-600 hover:text-blue-900 cursor-pointer"
         title="View"
       >
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -129,29 +133,44 @@ const ClassList = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
         </svg>
       </button>
-      <button
-        onClick={() => navigate(`/classes/${row.id}/edit`)}
-        className="text-green-600 hover:text-green-900"
-        title="Edit"
-      >
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-        </svg>
-      </button>
-      <button
-        onClick={() => handleDelete(row.id)}
-        className="text-red-600 hover:text-red-900"
-        title="Delete"
-      >
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      </button>
-    </>
+      {hasPermission('edit-classes') && (
+        <button
+          onClick={() => navigate(`/classes/${row.id}/edit`)}
+          className="text-green-600 hover:text-green-900 cursor-pointer"
+          title="Edit"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        </button>
+      )}
+      {hasPermission('delete-classes') && (
+        <button
+          onClick={() => handleDelete(row.id)}
+          className="text-red-600 hover:text-red-900 cursor-pointer"
+          title="Delete"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      )}
+    </div>
   );
 
   return (
     <div className="p-6">
+      {/* Teacher Scoped Class Notice */}
+      {isTeacher() && (
+        <div className="mb-4 p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3 text-xs text-blue-900 shadow-2xs">
+          <span className="text-xl">👨‍🏫</span>
+          <div>
+            <span className="font-bold block">Assigned Classes Faculty View</span>
+            <span>You have scoped access to view classes and sections assigned to your teaching schedule.</span>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
@@ -174,15 +193,17 @@ const ClassList = () => {
               <span>📚</span>
               <span>Subjects</span>
             </button>
-            <button
-              onClick={() => navigate('/classes/create')}
-              className="btn-primary flex items-center space-x-2"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Add Class</span>
-            </button>
+            {hasPermission('create-classes') && (
+              <button
+                onClick={() => navigate('/classes/create')}
+                className="btn-primary flex items-center space-x-2"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Add Class</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

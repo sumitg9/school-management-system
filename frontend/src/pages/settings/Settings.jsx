@@ -20,6 +20,7 @@ import {
   STANDARD_FEE_TYPES 
 } from '../../utils/feeTypes';
 import { toast } from 'react-toastify';
+import UserPermissionsTable from './UserPermissionsTable';
 
 const SAMPLE_DATE = new Date('2026-10-31T12:15:00');
 
@@ -371,6 +372,20 @@ const Settings = () => {
           }`}
         >
           <span>💳</span> Fee Rules & Late Fine
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('user_permissions')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
+            activeTab === 'user_permissions'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <span>🛡️</span> User Roles & Permissions
+          <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-800 font-bold">
+            8 Roles
+          </span>
         </button>
         <button
           type="button"
@@ -878,6 +893,11 @@ const Settings = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {/* SECTION: USER ROLES & PERMISSIONS */}
+        {(activeTab === 'all' || activeTab === 'user_permissions') && (
+          <UserPermissionsTable />
         )}
 
         {/* SECTION 2: LOCALIZATION & FORMATS */}

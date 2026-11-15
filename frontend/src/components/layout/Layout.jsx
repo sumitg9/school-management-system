@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { SYSTEM_ROLES } from '../../utils/permissionRules';
 
 const Layout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission, activeRole, switchActiveRole, resetActiveRole, isAdmin } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const handleLogout = async () => {
@@ -13,20 +14,26 @@ const Layout = ({ children }) => {
     navigate('/login');
   };
 
-  const menuItems = [
-    { path: '/', icon: '🏠', label: 'Dashboard' },
-    { path: '/students', icon: '👨‍🎓', label: 'Students' },
-    { path: '/teachers', icon: '👨‍🏫', label: 'Teachers' },
-    { path: '/classes', icon: '📚', label: 'Classes' },
-    { path: '/attendance', icon: '📊', label: 'Attendance' },
-    { path: '/exams', icon: '📝', label: 'Exams' },
-    { path: '/fees', icon: '💵', label: 'Fees' },
-    { path: '/fees/payment', icon: '💳', label: 'Fee Payment' },
-    { path: '/assignments', icon: '📋', label: 'Assignments' },
-    { path: '/reports', icon: '📈', label: 'Reports' },
-    { path: '/tools/bulk', icon: '🔧', label: 'Bulk Operations' },
-    { path: '/settings', icon: '⚙️', label: 'Settings' },
+  const allMenuItems = [
+    { path: '/', icon: '🏠', label: 'Dashboard', permission: 'view-dashboard' },
+    { path: '/students', icon: '👨‍🎓', label: 'Students', permission: 'view-students' },
+    { path: '/teachers', icon: '👨‍🏫', label: 'Teachers', permission: 'view-teachers' },
+    { path: '/classes', icon: '📚', label: 'Classes', permission: 'view-classes' },
+    { path: '/attendance', icon: '📊', label: 'Attendance', permission: 'view-attendance' },
+    { path: '/exams', icon: '📝', label: 'Exams', permission: 'view-exams' },
+    { path: '/fees', icon: '💵', label: 'Fees', permission: 'view-fees' },
+    { path: '/fees/payment', icon: '💳', label: 'Fee Payment', permission: 'collect-fees' },
+    { path: '/assignments', icon: '📋', label: 'Assignments', permission: 'view-assignments' },
+    { path: '/reports', icon: '📈', label: 'Reports', permission: 'view-reports' },
+    { path: '/tools/bulk', icon: '🔧', label: 'Bulk Operations', permission: 'manage-tools' },
+    { path: '/settings', icon: '⚙️', label: 'Settings', permission: 'manage-settings' },
   ];
+
+  // Dynamic permission-based menu filtering
+  const menuItems = allMenuItems.filter(item => {
+    if (!item.permission) return true;
+    return hasPermission(item.permission);
+  });
 
   const isActive = (path) => {
     if (path === '/') {
@@ -115,6 +122,35 @@ const Layout = ({ children }) => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              {/* Role Preview Switcher for Admins */}
+              {user && (user?.roles?.includes('admin') || user?.roles?.includes('super-admin')) && (
+                <div className="hidden sm:flex items-center gap-1.5 bg-blue-50/80 border border-blue-200 rounded-xl px-2.5 py-1 text-xs">
+                  <span className="text-gray-500 font-medium">Role View:</span>
+                  <select
+                    value={activeRole || 'admin'}
+                    onChange={(e) => switchActiveRole(e.target.value)}
+                    className="bg-transparent font-bold text-blue-900 border-none outline-hidden cursor-pointer text-xs"
+                    title="Simulate SMS permissions as another user role"
+                  >
+                    {SYSTEM_ROLES.map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.badge}
+                      </option>
+                    ))}
+                  </select>
+                  {activeRole && activeRole !== user?.roles?.[0] && (
+                    <button
+                      type="button"
+                      onClick={resetActiveRole}
+                      className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded hover:bg-blue-700 transition"
+                      title="Reset to your real role"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              )}
+
               <button className="relative text-gray-600 hover:text-gray-800">
                 <span className="text-2xl">🔔</span>
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
@@ -128,18 +164,20 @@ const Layout = ({ children }) => {
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{user?.name || 'User'}</p>
                   <p className="text-xs text-gray-500">
-                    {user?.roles?.[0]?.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'User'}
+                    {SYSTEM_ROLES.find(r => r.id === activeRole)?.name || user?.roles?.[0]?.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'User'}
                   </p>
                 </div>
 
                 {/* Dropdown Menu */}
-                <div className="absolute right-0 top-full w-48 bg-white rounded-lg shadow-lg py-2 hidden group-hover:block">
+                <div className="absolute right-0 top-full w-48 bg-white rounded-lg shadow-lg py-2 hidden group-hover:block z-50">
                   <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                     👤 Profile
                   </Link>
-                  <Link to="/settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                    ⚙️ Settings
-                  </Link>
+                  {hasPermission('manage-settings') && (
+                    <Link to="/settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                      ⚙️ Settings & Permissions
+                    </Link>
+                  )}
                   <hr className="my-2" />
                   <button
                     onClick={handleLogout}
