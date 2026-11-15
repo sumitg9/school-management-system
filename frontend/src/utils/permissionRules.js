@@ -190,6 +190,16 @@ export const PERMISSION_MODULES = [
       { id: 'manage-permissions', label: 'Manage Permissions', description: 'Edit user role permissions matrix' },
     ],
   },
+  {
+    id: 'users',
+    name: 'User Management',
+    icon: '👥',
+    description: 'System user accounts, credentials, and role assignments',
+    permissions: [
+      { id: 'view-users', label: 'View Users', description: 'Browse and inspect system user directory' },
+      { id: 'manage-users', label: 'Manage Users', description: 'Create users, assign roles, edit details, and delete users' },
+    ],
+  },
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS = {
@@ -205,6 +215,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-reports', 'generate-reports',
     'manage-tools',
     'manage-settings', 'manage-permissions',
+    'view-users', 'manage-users',
   ],
   'admin': [
     'view-dashboard',

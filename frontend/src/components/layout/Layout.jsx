@@ -26,6 +26,7 @@ const Layout = ({ children }) => {
     { path: '/assignments', icon: '📋', label: isStudent() ? 'My Assignments' : 'Assignments', permission: 'view-assignments' },
     { path: '/reports', icon: '📈', label: 'Reports', permission: 'view-reports' },
     { path: '/tools/bulk', icon: '🔧', label: 'Bulk Operations', permission: 'manage-tools' },
+    { path: '/users', icon: '👥', label: 'Users', permission: 'manage-users' },
     { path: '/settings', icon: '⚙️', label: 'Settings', permission: 'manage-settings' },
   ];
 

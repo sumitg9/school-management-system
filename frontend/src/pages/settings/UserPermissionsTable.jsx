@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Fragment } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useSettings } from '../../context/SettingsContext';
 import { useAuth } from '../../context/AuthContext';
@@ -13,7 +14,7 @@ import {
 
 const UserPermissionsTable = () => {
   const { settings, updateSettings } = useSettings();
-  const { activeRole, switchActiveRole } = useAuth();
+  const { activeRole, switchActiveRole, isSuperAdmin } = useAuth();
   const confirm = useConfirm();
 
   // Local state for role permissions matrix
@@ -39,6 +40,11 @@ const UserPermissionsTable = () => {
   const handleTogglePermission = (roleId, permissionId) => {
     if (roleId === 'super-admin') {
       toast.info('Super Admin role retains full root permissions by default.');
+      return;
+    }
+
+    if ((permissionId === 'manage-users' || permissionId === 'view-users') && !isSuperAdmin()) {
+      toast.warning('Only Super Admin can grant or revoke User Management permissions.');
       return;
     }
 
@@ -69,6 +75,11 @@ const UserPermissionsTable = () => {
   // Toggle all permissions in a module for a role
   const handleToggleModulePermissions = (roleId, moduleObj) => {
     if (roleId === 'super-admin') return;
+
+    if (moduleObj.id === 'users' && !isSuperAdmin()) {
+      toast.warning('Only Super Admin can grant or revoke User Management permissions.');
+      return;
+    }
 
     let modulePermIds = moduleObj.permissions.map(p => p.id);
     if (roleId === 'student') {
@@ -224,6 +235,16 @@ const UserPermissionsTable = () => {
                 <span>📊 Full Matrix Table</span>
               </button>
             </div>
+
+            {(isSuperAdmin() || hasRolePermission(rolePermissions, activeRole, 'manage-users')) && (
+              <Link
+                to="/users"
+                className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition flex items-center gap-1.5"
+                title="Go to User Management table"
+              >
+                <span>👥 User Accounts</span>
+              </Link>
+            )}
 
             <button
               type="button"

@@ -342,6 +342,401 @@ export const authAPI = {
 };
 
 // ==========================================
+// User Management API
+// ==========================================
+const DEFAULT_SYSTEM_USERS = [
+  {
+    id: 'user_sa_1',
+    name: 'Dr. Rameshwar Sharma',
+    email: 'superadmin@school.com',
+    phone: '+91 98765 00001',
+    role: 'super-admin',
+    roles: ['super-admin'],
+    status: 'active',
+    gender: 'male',
+    address: '42, Shanti Kunj, Sector 14, Dwarka',
+    city: 'New Delhi',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+  {
+    id: 'user_adm_2',
+    name: 'Rajesh Sharma',
+    email: 'admin@school.com',
+    phone: '+91 98765 00002',
+    role: 'admin',
+    roles: ['admin'],
+    status: 'active',
+    gender: 'male',
+    address: '42, Shanti Kunj, Sector 14, Dwarka',
+    city: 'New Delhi',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+  {
+    id: 'user_tch_3',
+    name: 'Vikram Malhotra',
+    email: 'teacher@school.com',
+    phone: '+91 98765 00003',
+    role: 'teacher',
+    roles: ['teacher'],
+    status: 'active',
+    gender: 'male',
+    address: 'B-12, Teachers Enclave, Mayur Vihar',
+    city: 'New Delhi',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+  {
+    id: 'user_stu_4',
+    name: 'Aarohi Verma',
+    email: 'student@school.com',
+    phone: '+91 98765 00004',
+    role: 'student',
+    roles: ['student'],
+    status: 'active',
+    gender: 'female',
+    address: 'Flat 302, Green Glen Layout, Bellandur',
+    city: 'Bengaluru',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+  {
+    id: 'user_par_5',
+    name: 'Ramesh Verma',
+    email: 'parent@school.com',
+    phone: '+91 98765 00005',
+    role: 'parent',
+    roles: ['parent'],
+    status: 'active',
+    gender: 'male',
+    address: 'Flat 302, Green Glen Layout, Bellandur',
+    city: 'Bengaluru',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+  {
+    id: 'user_fin_6',
+    name: 'Sunita Patel',
+    email: 'accountant@school.com',
+    phone: '+91 98765 00006',
+    role: 'finance',
+    roles: ['finance'],
+    status: 'active',
+    gender: 'female',
+    address: '108, Navrangpura',
+    city: 'Ahmedabad',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+  {
+    id: 'user_bo_7',
+    name: 'Anita Deshmukh',
+    email: 'librarian@school.com',
+    phone: '+91 98765 00007',
+    role: 'back-office',
+    roles: ['back-office'],
+    status: 'active',
+    gender: 'female',
+    address: 'Sector 5, Rohini',
+    city: 'New Delhi',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+  {
+    id: 'user_gen_8',
+    name: 'Manoj Tiwari',
+    email: 'staff@school.com',
+    phone: '+91 98765 00008',
+    role: 'general',
+    roles: ['general'],
+    status: 'active',
+    gender: 'male',
+    address: 'Civil Lines',
+    city: 'New Delhi',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+];
+
+export const userAPI = {
+  getAll: async (params = {}) => {
+    let usersList = [];
+    let customUsers = [];
+
+    try {
+      const stored = localStorage.getItem('sms_custom_users');
+      if (stored) {
+        customUsers = JSON.parse(stored);
+      }
+    } catch (_) {}
+
+    if (useSupabase) {
+      try {
+        const { data: dbUsers, error } = await supabase
+          .from('users')
+          .select('id, name, email, phone, avatar, gender, address, city, state, postal_code, status, created_at');
+
+        if (!error && Array.isArray(dbUsers) && dbUsers.length > 0) {
+          let rolesMap = {};
+          try {
+            const { data: mhr } = await supabase
+              .from('model_has_roles')
+              .select('model_id, roles(name)');
+            if (mhr) {
+              mhr.forEach(item => {
+                const rName = item.roles?.name;
+                if (rName) {
+                  rolesMap[item.model_id] = rName;
+                }
+              });
+            }
+          } catch (_) {}
+
+          usersList = dbUsers.map(u => {
+            const assignedRole = rolesMap[u.id] || (
+              u.email?.includes('superadmin') ? 'super-admin' :
+              u.email?.includes('admin') ? 'admin' :
+              u.email?.includes('teacher') ? 'teacher' :
+              u.email?.includes('student') ? 'student' :
+              u.email?.includes('parent') ? 'parent' :
+              u.email?.includes('accountant') ? 'finance' : 'general'
+            );
+            return {
+              ...u,
+              role: assignedRole,
+              roles: [assignedRole],
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('Could not query Supabase users:', err);
+      }
+    }
+
+    if (!usersList || usersList.length === 0) {
+      usersList = [...DEFAULT_SYSTEM_USERS];
+    }
+
+    // Merge customUsers
+    if (customUsers && customUsers.length > 0) {
+      customUsers.forEach(cu => {
+        const idx = usersList.findIndex(u => String(u.id) === String(cu.id) || u.email?.toLowerCase() === cu.email?.toLowerCase());
+        if (idx >= 0) {
+          usersList[idx] = { ...usersList[idx], ...cu };
+        } else {
+          usersList.unshift(cu);
+        }
+      });
+    }
+
+    // Exclude deleted IDs
+    try {
+      const deletedStored = localStorage.getItem('sms_deleted_users');
+      if (deletedStored) {
+        const deletedIds = JSON.parse(deletedStored);
+        usersList = usersList.filter(u => !deletedIds.includes(String(u.id)));
+      }
+    } catch (_) {}
+
+    // Filter by search
+    if (params.search) {
+      const q = params.search.toLowerCase().trim();
+      usersList = usersList.filter(u =>
+        u.name?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.phone?.toLowerCase().includes(q)
+      );
+    }
+
+    // Filter by role
+    if (params.role && params.role !== 'all') {
+      const targetRole = params.role.toLowerCase().trim();
+      usersList = usersList.filter(u => u.role === targetRole || (u.roles && u.roles.includes(targetRole)));
+    }
+
+    // Filter by status
+    if (params.status && params.status !== 'all') {
+      const targetStatus = params.status.toLowerCase().trim();
+      usersList = usersList.filter(u => (u.status || 'active').toLowerCase() === targetStatus);
+    }
+
+    // Sort: newest first or ID
+    usersList.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+    const totalCount = usersList.length;
+    const page = parseInt(params.page || 1, 10);
+    const perPage = params.per_page === 'all' ? (totalCount || 1) : parseInt(params.per_page || 10, 10);
+    const from = (page - 1) * perPage;
+    const paginated = usersList.slice(from, from + perPage);
+
+    return {
+      success: true,
+      data: paginated,
+      meta: {
+        total: totalCount,
+        current_page: page,
+        per_page: perPage,
+        last_page: Math.max(1, Math.ceil(totalCount / perPage)),
+      },
+      stats: {
+        total: totalCount,
+        superAdmin: usersList.filter(u => u.role === 'super-admin').length,
+        admin: usersList.filter(u => u.role === 'admin').length,
+        teacher: usersList.filter(u => u.role === 'teacher').length,
+        student: usersList.filter(u => u.role === 'student').length,
+        parent: usersList.filter(u => u.role === 'parent').length,
+        finance: usersList.filter(u => u.role === 'finance').length,
+        backOffice: usersList.filter(u => u.role === 'back-office').length,
+        general: usersList.filter(u => u.role === 'general').length,
+        active: usersList.filter(u => (u.status || 'active') === 'active').length,
+        inactive: usersList.filter(u => u.status === 'inactive' || u.status === 'suspended').length,
+      }
+    };
+  },
+
+  getById: async (id) => {
+    const listRes = await userAPI.getAll({ per_page: 'all' });
+    const user = listRes.data.find(u => String(u.id) === String(id));
+    if (!user) throw new Error('User not found');
+    return { success: true, data: user };
+  },
+
+  create: async (userData) => {
+    const listRes = await userAPI.getAll({ per_page: 'all' });
+    const exists = listRes.data.some(u => u.email?.toLowerCase() === userData.email?.toLowerCase().trim());
+    if (exists) {
+      throw new Error(`A user with email "${userData.email}" already exists.`);
+    }
+
+    const newId = `user_${Date.now()}`;
+    const newUser = {
+      id: newId,
+      name: userData.name?.trim(),
+      email: userData.email?.toLowerCase().trim(),
+      phone: userData.phone?.trim() || '',
+      role: userData.role || 'student',
+      roles: [userData.role || 'student'],
+      status: userData.status || 'active',
+      gender: userData.gender || 'male',
+      address: userData.address || '',
+      city: userData.city || '',
+      state: userData.state || '',
+      postal_code: userData.postal_code || '',
+      created_at: new Date().toISOString(),
+    };
+
+    if (useSupabase) {
+      try {
+        const hashedPassword = bcrypt.hashSync(userData.password || 'password', 10);
+        await supabase.from('users').insert({
+          name: newUser.name,
+          email: newUser.email,
+          password: hashedPassword,
+          phone: newUser.phone,
+          status: newUser.status,
+          gender: newUser.gender,
+          address: newUser.address,
+          city: newUser.city,
+        });
+      } catch (err) {
+        console.warn('Could not mirror created user to Supabase:', err);
+      }
+    }
+
+    try {
+      const stored = localStorage.getItem('sms_custom_users');
+      const customList = stored ? JSON.parse(stored) : [];
+      customList.unshift(newUser);
+      localStorage.setItem('sms_custom_users', JSON.stringify(customList));
+    } catch (_) {}
+
+    return { success: true, message: 'User created successfully!', data: newUser };
+  },
+
+  update: async (id, userData) => {
+    if (userData.email === 'superadmin@school.com' && userData.role && userData.role !== 'super-admin') {
+      throw new Error('Root Super Admin role cannot be changed.');
+    }
+
+    if (useSupabase) {
+      try {
+        await supabase.from('users').update({
+          name: userData.name,
+          phone: userData.phone,
+          status: userData.status,
+          gender: userData.gender,
+          address: userData.address,
+          city: userData.city,
+        }).eq('id', id);
+      } catch (_) {}
+    }
+
+    try {
+      const stored = localStorage.getItem('sms_custom_users');
+      let customList = stored ? JSON.parse(stored) : [];
+      const idx = customList.findIndex(u => String(u.id) === String(id));
+      if (idx >= 0) {
+        customList[idx] = { ...customList[idx], ...userData };
+      } else {
+        const listRes = await userAPI.getAll({ per_page: 'all' });
+        const existing = listRes.data.find(u => String(u.id) === String(id));
+        if (existing) {
+          customList.push({ ...existing, ...userData });
+        }
+      }
+      localStorage.setItem('sms_custom_users', JSON.stringify(customList));
+    } catch (_) {}
+
+    return { success: true, message: 'User updated successfully!' };
+  },
+
+  delete: async (id, currentUser) => {
+    if (String(id) === String(currentUser?.id)) {
+      throw new Error('You cannot delete your own logged-in account.');
+    }
+
+    const listRes = await userAPI.getAll({ per_page: 'all' });
+    const target = listRes.data.find(u => String(u.id) === String(id));
+    if (!target) {
+      throw new Error('User not found.');
+    }
+
+    if (target.email === 'superadmin@school.com') {
+      throw new Error('The primary root Super Admin account cannot be deleted.');
+    }
+
+    if (target.role === 'super-admin' && currentUser?.roles?.[0] !== 'super-admin') {
+      throw new Error('Only a Super Admin can delete another Super Admin.');
+    }
+
+    if (useSupabase) {
+      try {
+        await supabase.from('users').delete().eq('id', id);
+      } catch (_) {}
+    }
+
+    try {
+      const stored = localStorage.getItem('sms_custom_users');
+      let customList = stored ? JSON.parse(stored) : [];
+      customList = customList.filter(u => String(u.id) !== String(id));
+      const deletedStored = localStorage.getItem('sms_deleted_users');
+      const deletedList = deletedStored ? JSON.parse(deletedStored) : [];
+      deletedList.push(String(id));
+      localStorage.setItem('sms_deleted_users', JSON.stringify(deletedList));
+      localStorage.setItem('sms_custom_users', JSON.stringify(customList));
+    } catch (_) {}
+
+    return { success: true, message: 'User deleted successfully.' };
+  },
+
+  resetPassword: async (id, newPassword) => {
+    if (!newPassword || newPassword.length < 6) {
+      throw new Error('Password must be at least 6 characters.');
+    }
+    if (useSupabase) {
+      try {
+        const hashedPassword = bcrypt.hashSync(newPassword, 10);
+        await supabase.from('users').update({ password: hashedPassword }).eq('id', id);
+      } catch (_) {}
+    }
+    return { success: true, message: 'Password has been reset successfully.' };
+  },
+};
+
+// ==========================================
 // Academic Year API
 // ==========================================
 export const academicYearAPI = {
