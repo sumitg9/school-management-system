@@ -105,6 +105,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateProfileData = async (partialData) => {
+    try {
+      const res = await authAPI.updateProfile(partialData);
+      const updatedUser = { ...user, ...partialData };
+      setUser(updatedUser);
+      return res;
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+      throw err;
+    }
+  };
+
   // Active role state (allows administrators to preview the system as any role)
   const [activeRole, setActiveRole] = useState(() => {
     return localStorage.getItem('sms_active_role') || null;
@@ -256,6 +268,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateUser,
+    updateProfileData,
     activeRole: getEffectiveRole(),
     switchActiveRole,
     resetActiveRole,

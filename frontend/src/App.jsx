@@ -48,6 +48,7 @@ import EnhancedDashboard from './pages/EnhancedDashboard';
 import AdvancedReports from './pages/reports/AdvancedReports';
 import BulkOperations from './pages/tools/BulkOperations';
 import Settings from './pages/settings/Settings';
+import Profile from './pages/profile/Profile';
 import PermissionRoute from './components/common/PermissionRoute';
 
 // Protected Route Component
@@ -124,6 +125,7 @@ function AppRoutes() {
                   <Route path="/assignments/:id" element={<PermissionRoute permission="view-assignments"><AssignmentDetail /></PermissionRoute>} />
                   <Route path="/assignments/:id/edit" element={<PermissionRoute permission="create-assignments"><AssignmentForm /></PermissionRoute>} />
                   <Route path="/settings" element={<PermissionRoute permission="manage-settings"><Settings /></PermissionRoute>} />
+                  <Route path="/profile" element={<Profile />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Layout>

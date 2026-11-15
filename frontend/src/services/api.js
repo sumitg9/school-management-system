@@ -311,6 +311,34 @@ export const authAPI = {
   changePassword: (data) => supabase.auth.updateUser({ password: data.password }),
   forgotPassword: (email) => supabase.auth.resetPasswordForEmail(email),
   resetPassword: (data) => supabase.auth.updateUser({ password: data.password }),
+  updateProfile: async (userData) => {
+    if (useSupabase) {
+      if (userData.id) {
+        try {
+          await supabase.from('users').update({
+            name: userData.name,
+            phone: userData.phone,
+          }).eq('id', userData.id);
+        } catch (_) {}
+      }
+      try {
+        await supabase.auth.updateUser({
+          data: {
+            name: userData.name,
+            phone: userData.phone,
+          }
+        });
+      } catch (_) {}
+    }
+    const stored = localStorage.getItem('user');
+    let currentUser = {};
+    if (stored) {
+      try { currentUser = JSON.parse(stored); } catch (_) {}
+    }
+    const updated = { ...currentUser, ...userData };
+    localStorage.setItem('user', JSON.stringify(updated));
+    return { success: true, data: updated };
+  },
 };
 
 // ==========================================
