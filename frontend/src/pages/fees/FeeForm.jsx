@@ -22,6 +22,7 @@ const FeeForm = () => {
     name: '',
     description: '',
     type: 'tuition',
+    frequency: 'monthly',
     amount: '',
     due_date: '',
   });
@@ -88,6 +89,7 @@ const FeeForm = () => {
           name: response.data.name || '',
           description: response.data.description || '',
           type: feeType,
+          frequency: response.data.frequency || 'monthly',
           amount: response.data.amount || '',
           due_date: response.data.due_date || '',
         });
@@ -372,7 +374,7 @@ const FeeForm = () => {
         {/* Fee Details */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Fee Details</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Amount (₹) <span className="text-red-500">*</span>
@@ -388,6 +390,23 @@ const FeeForm = () => {
                 step="0.01"
                 required
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Billing Cycle / Frequency
+              </label>
+              <select
+                name="frequency"
+                value={formData.frequency}
+                onChange={handleChange}
+                className="input-field"
+              >
+                <option value="monthly">Monthly (Charged every month)</option>
+                <option value="quarterly">Quarterly (Charged every quarter)</option>
+                <option value="half-yearly">Half-Yearly (Charged every 6 months)</option>
+                <option value="yearly">Yearly (Charged once per academic year)</option>
+                <option value="one-time">One-Time (Charged only once)</option>
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

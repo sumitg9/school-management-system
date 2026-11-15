@@ -26,6 +26,35 @@ const SHORT_MONTH_NAMES = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
+/**
+ * Determines whether a fee structure should default to 'monthly' or 'one-time'
+ */
+const detectDefaultFrequency = (struct) => {
+  if (struct?.frequency === 'monthly') return 'monthly';
+  if (struct?.frequency === 'quarterly') return 'quarterly';
+  if (struct?.frequency === 'half-yearly') return 'half-yearly';
+
+  const lowerName = (struct?.name || '').toLowerCase();
+  const lowerType = (struct?.type || '').toLowerCase();
+
+  if (
+    lowerName.includes('admission') ||
+    lowerName.includes('annual') ||
+    lowerName.includes('registration') ||
+    lowerName.includes('one-time') ||
+    lowerName.includes('caution') ||
+    lowerName.includes('security deposit') ||
+    lowerName.includes('development fee') ||
+    lowerType === 'admission' ||
+    struct?.frequency === 'one-time'
+  ) {
+    return 'one-time';
+  }
+
+  // All regular school charges (tuition, transport, library, lab, computer, sports, activity) default to monthly!
+  return 'monthly';
+};
+
 const FeePaymentCollect = () => {
   const navigate = useNavigate();
   const { formatDate, formatCurrency } = useSettings();
@@ -65,7 +94,7 @@ const FeePaymentCollect = () => {
     name: '',
     type: 'other',
     amount: '',
-    frequency: 'one-time',
+    frequency: 'monthly',
   });
 
   // Global Adjustments
@@ -86,6 +115,17 @@ const FeePaymentCollect = () => {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
 
+  // Listen for Escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showReceiptModal) {
+        setShowReceiptModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showReceiptModal]);
+
   // 1. Initial Load: Academic Years and Classes
   useEffect(() => {
     const initData = async () => {
@@ -99,7 +139,6 @@ const FeePaymentCollect = () => {
 
         if (yearsRes?.success && yearsRes.data) {
           setAcademicYears(yearsRes.data);
-          // Set current or latest academic year by default
           if (currentYearRes?.data?.id) {
             setSelectedAcademicYearId(String(currentYearRes.data.id));
           } else if (yearsRes.data.length > 0) {
@@ -222,7 +261,6 @@ const FeePaymentCollect = () => {
   }, [academicYears, selectedAcademicYearId]);
 
   const academicMonths = useMemo(() => {
-    // Determine start and end year
     let startYear = new Date().getFullYear();
     let startMonth = 3; // April (0-indexed) by default for Indian academic sessions
 
@@ -267,9 +305,19 @@ const FeePaymentCollect = () => {
     if (!studentPayments || studentPayments.length === 0) return paidSet;
 
     studentPayments.forEach(pay => {
-      const text = `${pay.remarks || ''} ${pay.receipt_number || ''}`;
+      const text = `${pay.remarks || ''} ${pay.receipt_number || ''}`.toLowerCase();
       academicMonths.forEach(m => {
-        if (text.includes(m.name) || text.includes(m.shortName)) {
+        const fullMonth = m.name.toLowerCase();
+        const shortMonth = m.shortName.toLowerCase().replace("'", "");
+        const rawShort = SHORT_MONTH_NAMES[m.monthIndex].toLowerCase();
+        const yearStr = String(m.year);
+
+        if (
+          text.includes(fullMonth) ||
+          text.includes(m.shortName.toLowerCase()) ||
+          text.includes(shortMonth) ||
+          (text.includes(rawShort) && text.includes(yearStr))
+        ) {
           paidSet.add(m.key);
         }
       });
@@ -278,20 +326,25 @@ const FeePaymentCollect = () => {
     return paidSet;
   }, [studentPayments, academicMonths]);
 
-  // Set default selected month (e.g. current month or first unpaid month) on mount
-  useEffect(() => {
-    if (academicMonths.length > 0 && selectedMonthKeys.length === 0) {
-      const now = new Date();
-      const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      const foundCurrent = academicMonths.find(m => m.key === currentKey);
+  // Unpaid months remaining for this session
+  const unpaidMonths = useMemo(() => {
+    return academicMonths.filter(m => !paidMonthsSet.has(m.key));
+  }, [academicMonths, paidMonthsSet]);
 
-      if (foundCurrent) {
-        setSelectedMonthKeys([foundCurrent.key]);
-      } else {
-        setSelectedMonthKeys([academicMonths[0].key]);
-      }
-    }
-  }, [academicMonths]);
+  // Ensure selectedMonthKeys NEVER contains already-paid months
+  useEffect(() => {
+    setSelectedMonthKeys(prev => {
+      // Filter out any months that are already paid
+      const filtered = prev.filter(key => !paidMonthsSet.has(key));
+      
+      // If we still have valid unpaid selections, keep them
+      if (filtered.length > 0) return filtered;
+
+      // Otherwise default to the first unpaid month (if available)
+      const firstUnpaid = academicMonths.find(m => !paidMonthsSet.has(m.key));
+      return firstUnpaid ? [firstUnpaid.key] : [];
+    });
+  }, [paidMonthsSet, academicMonths]);
 
   // 6. Fetch Fee Structures when Academic Year or Class changes
   useEffect(() => {
@@ -311,20 +364,23 @@ const FeePaymentCollect = () => {
         });
 
         if (res?.success && res.data) {
-          const items = (res.data || []).map(struct => ({
-            id: `fs_${struct.id}`,
-            fee_structure_id: struct.id,
-            name: struct.name,
-            type: struct.type || 'tuition',
-            frequency: struct.frequency || (struct.type === 'tuition' || struct.type === 'transport' ? 'monthly' : 'yearly'),
-            base_amount: parseFloat(struct.amount) || 0,
-            is_mandatory: struct.is_mandatory !== false,
-            enabled: true,
-            is_custom: false,
-            discount: '0',
-            fine: '0',
-            description: struct.description || '',
-          }));
+          const items = (res.data || []).map(struct => {
+            const freq = detectDefaultFrequency(struct);
+            return {
+              id: `fs_${struct.id}`,
+              fee_structure_id: struct.id,
+              name: struct.name,
+              type: struct.type || 'tuition',
+              frequency: freq,
+              base_amount: parseFloat(struct.amount) || 0,
+              is_mandatory: struct.is_mandatory !== false,
+              enabled: true,
+              is_custom: false,
+              discount: '0',
+              fine: '0',
+              description: struct.description || '',
+            };
+          });
           setFeeItems(items);
         }
       } catch (err) {
@@ -350,8 +406,12 @@ const FeePaymentCollect = () => {
     });
   }, [students, studentSearch]);
 
-  // Month selection handlers
+  // Month selection handlers - Prevents selecting already paid months
   const handleToggleMonth = (key) => {
+    if (paidMonthsSet.has(key)) {
+      toast.warning('This month has already been paid and cannot be selected again.');
+      return;
+    }
     setSelectedMonthKeys(prev => {
       if (prev.includes(key)) {
         return prev.filter(k => k !== key);
@@ -362,34 +422,21 @@ const FeePaymentCollect = () => {
   };
 
   const handleSelectPresetMonths = (count) => {
-    if (academicMonths.length === 0) return;
+    if (unpaidMonths.length === 0) {
+      toast.info('All session months have already been settled for this student.');
+      setSelectedMonthKeys([]);
+      return;
+    }
 
     if (count === 1) {
-      const now = new Date();
-      const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      const cur = academicMonths.find(m => m.key === curKey) || academicMonths[0];
-      setSelectedMonthKeys([cur.key]);
+      // Pick first unpaid month
+      setSelectedMonthKeys([unpaidMonths[0].key]);
       return;
     }
 
-    if (count === 12) {
-      setSelectedMonthKeys(academicMonths.map(m => m.key));
-      return;
-    }
-
-    // Advance count months starting from first unpaid month or current month
-    const now = new Date();
-    const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    let startIndex = academicMonths.findIndex(m => m.key === curKey);
-    if (startIndex === -1) startIndex = 0;
-
-    const slice = academicMonths.slice(startIndex, startIndex + count);
-    if (slice.length < count) {
-      // Wrap around or pick first count
-      setSelectedMonthKeys(academicMonths.slice(0, count).map(m => m.key));
-    } else {
-      setSelectedMonthKeys(slice.map(m => m.key));
-    }
+    // Pick next 'count' unpaid months (e.g. 3, 6, or all remaining for 12)
+    const toSelect = unpaidMonths.slice(0, count).map(m => m.key);
+    setSelectedMonthKeys(toSelect);
   };
 
   const handleClearMonths = () => {
@@ -409,7 +456,6 @@ const FeePaymentCollect = () => {
       const count = selectedMonthsNames.length;
       const desc = `Fee payment for ${selectedMonthsNames.join(', ')} (${count} Month${count > 1 ? 's' : ''})`;
       setRemarks(prev => {
-        // If remarks was empty or was an auto-generated fee string, update it
         if (!prev || prev.startsWith('Fee payment for')) {
           return desc;
         }
@@ -422,6 +468,12 @@ const FeePaymentCollect = () => {
   const handleToggleFeeItem = (id) => {
     setFeeItems(prev =>
       prev.map(item => (item.id === id ? { ...item, enabled: !item.enabled } : item))
+    );
+  };
+
+  const handleItemFrequencyChange = (id, newFrequency) => {
+    setFeeItems(prev =>
+      prev.map(item => (item.id === id ? { ...item, frequency: newFrequency } : item))
     );
   };
 
@@ -453,7 +505,7 @@ const FeePaymentCollect = () => {
       fee_structure_id: null,
       name: customItemForm.name.trim(),
       type: customItemForm.type,
-      frequency: customItemForm.frequency,
+      frequency: customItemForm.frequency || 'monthly',
       base_amount: parseFloat(customItemForm.amount),
       is_mandatory: false,
       enabled: true,
@@ -464,12 +516,12 @@ const FeePaymentCollect = () => {
     };
 
     setFeeItems(prev => [...prev, newItem]);
-    setCustomItemForm({ name: '', type: 'other', amount: '', frequency: 'one-time' });
+    setCustomItemForm({ name: '', type: 'other', amount: '', frequency: 'monthly' });
     setShowAddCustomItem(false);
     toast.success('Custom fee item added');
   };
 
-  // Detailed Breakdown Calculations
+  // Detailed Breakdown Calculations (Always multiplies monthly fees by selected months count)
   const calculatedBreakdown = useMemo(() => {
     const monthsCount = selectedMonthKeys.length;
 
@@ -492,7 +544,7 @@ const FeePaymentCollect = () => {
         periodLabel = `${multiplier} Half-Year${multiplier > 1 ? 's' : ''}`;
       } else {
         multiplier = 1;
-        periodLabel = 'Annual / Fixed';
+        periodLabel = 'Annual / One-Time';
       }
 
       const subtotal = item.enabled ? item.base_amount * multiplier : 0;
@@ -593,6 +645,9 @@ const FeePaymentCollect = () => {
         items: enabledItems.map(item => ({
           fee_structure_id: item.fee_structure_id,
           name: item.name,
+          frequency: item.frequency,
+          multiplier: item.multiplier,
+          base_amount: item.base_amount,
           subtotal: item.subtotal,
           discount: item.discount,
           fine: item.fine,
@@ -661,7 +716,7 @@ const FeePaymentCollect = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Trigger Print
+  // Trigger Print (triggers native print/save as PDF dialog)
   const handlePrintReceipt = () => {
     window.print();
   };
@@ -679,7 +734,7 @@ const FeePaymentCollect = () => {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Student Fee Payment</h1>
               <p className="text-sm text-gray-600 mt-0.5">
-                Collect monthly or multi-month advance student fees with automatic breakdown and instant receipt
+                Collect monthly or multi-month advance student fees with automatic calculation, breakdown, and official receipts
               </p>
             </div>
           </div>
@@ -921,53 +976,72 @@ const FeePaymentCollect = () => {
 
             {/* Quick Preset Buttons */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-                ⚡ Quick Advance Presets:
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  ⚡ Quick Advance Presets:
+                </label>
+                {unpaidMonths.length > 0 ? (
+                  <span className="text-[11px] text-blue-700 font-semibold">
+                    {unpaidMonths.length} Unpaid Month{unpaidMonths.length !== 1 ? 's' : ''} Remaining
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-emerald-700 font-bold">
+                    ✓ All Session Months Settled
+                  </span>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
+                  disabled={unpaidMonths.length === 0}
                   onClick={() => handleSelectPresetMonths(1)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition cursor-pointer ${
-                    selectedMonthKeys.length === 1
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                    selectedMonthKeys.length === 1 && unpaidMonths.length > 0
                       ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                       : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                   }`}
+                  title={unpaidMonths.length === 0 ? 'All months paid' : 'Select next single unpaid month'}
                 >
-                  Current Month (1 mo)
+                  Current / Next Month (1 mo)
                 </button>
                 <button
                   type="button"
+                  disabled={unpaidMonths.length === 0}
                   onClick={() => handleSelectPresetMonths(3)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition cursor-pointer ${
-                    selectedMonthKeys.length === 3
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                    selectedMonthKeys.length === Math.min(3, unpaidMonths.length) && unpaidMonths.length > 0
                       ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                       : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                   }`}
+                  title={unpaidMonths.length === 0 ? 'All months paid' : 'Select next 3 unpaid months'}
                 >
                   Quarter (3 mos)
                 </button>
                 <button
                   type="button"
+                  disabled={unpaidMonths.length === 0}
                   onClick={() => handleSelectPresetMonths(6)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition cursor-pointer ${
-                    selectedMonthKeys.length === 6
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                    selectedMonthKeys.length === Math.min(6, unpaidMonths.length) && unpaidMonths.length > 0
                       ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                       : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                   }`}
+                  title={unpaidMonths.length === 0 ? 'All months paid' : 'Select next 6 unpaid months'}
                 >
                   Half-Year (6 mos)
                 </button>
                 <button
                   type="button"
+                  disabled={unpaidMonths.length === 0}
                   onClick={() => handleSelectPresetMonths(12)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition cursor-pointer ${
-                    selectedMonthKeys.length === 12
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                    selectedMonthKeys.length === unpaidMonths.length && unpaidMonths.length > 0
                       ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                       : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                   }`}
+                  title={unpaidMonths.length === 0 ? 'All months paid' : 'Select all remaining unpaid months'}
                 >
-                  Full Year (12 mos)
+                  Full Year ({unpaidMonths.length} mos)
                 </button>
                 <button
                   type="button"
@@ -980,15 +1054,55 @@ const FeePaymentCollect = () => {
               </div>
             </div>
 
+            {/* Banner when all session months are settled */}
+            {selectedStudent && unpaidMonths.length === 0 && (
+              <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3 text-emerald-900 text-xs flex items-center gap-2 font-medium">
+                <span className="text-xl">🎉</span>
+                <span>
+                  All 12 months for this academic session have been fully paid for <strong>{selectedStudent.first_name}</strong>! No pending session fees.
+                </span>
+              </div>
+            )}
+
             {/* Individual Months Grid (12 Months of Academic Session) */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-                Session Months ({academicMonths.length}):
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500">
+                  Session Months ({academicMonths.length}):
+                </label>
+                <div className="text-[11px] text-gray-500">
+                  <span className="text-emerald-700 font-bold">{paidMonthsSet.size} Paid</span> •{' '}
+                  <span className="text-blue-700 font-bold">{unpaidMonths.length} Unpaid</span>
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {academicMonths.map((m) => {
-                  const isSelected = selectedMonthKeys.includes(m.key);
                   const isPaid = paidMonthsSet.has(m.key);
+                  const isSelected = selectedMonthKeys.includes(m.key);
+
+                  if (isPaid) {
+                    return (
+                      <div
+                        key={m.key}
+                        className="relative p-2.5 text-left rounded-xl border border-gray-200 bg-gray-100/90 text-gray-400 cursor-not-allowed select-none flex flex-col justify-between opacity-80"
+                        title="This month has already been paid and cannot be re-selected for payment."
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-semibold text-gray-500 line-through decoration-emerald-600 decoration-2">
+                            {m.shortName}
+                          </span>
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-300">
+                            ✓ Paid
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-gray-500 mt-1 flex items-center gap-1 font-medium">
+                          <span>🔒</span>
+                          <span>Past Paid</span>
+                        </div>
+                      </div>
+                    );
+                  }
 
                   return (
                     <button
@@ -997,23 +1111,24 @@ const FeePaymentCollect = () => {
                       onClick={() => handleToggleMonth(m.key)}
                       className={`relative p-2.5 text-left rounded-xl border transition-all text-xs cursor-pointer flex flex-col justify-between ${
                         isSelected
-                          ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-500/20 text-blue-900 font-semibold'
-                          : isPaid
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-900 opacity-90'
-                          : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
+                          ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-500/20 text-blue-900 font-semibold shadow-xs'
+                          : 'bg-white border-gray-200 hover:border-blue-300 hover:bg-gray-50 text-gray-700'
                       }`}
                     >
                       <div className="flex items-center justify-between w-full">
                         <span className="font-medium">{m.shortName}</span>
-                        {isSelected && (
+                        {isSelected ? (
                           <span className="text-blue-600 font-bold">✓</span>
-                        )}
-                        {!isSelected && isPaid && (
-                          <span className="text-emerald-600 text-[10px] font-bold" title="Already marked paid">Paid</span>
+                        ) : (
+                          <span className="text-gray-300 text-xs">○</span>
                         )}
                       </div>
-                      <div className="text-[10px] text-gray-500 mt-1">
-                        {isSelected ? 'Selected' : isPaid ? 'Past Paid' : 'Unpaid'}
+                      <div className="text-[10px] mt-1 font-medium">
+                        {isSelected ? (
+                          <span className="text-blue-700 font-bold">Selected</span>
+                        ) : (
+                          <span className="text-gray-400">Unpaid</span>
+                        )}
                       </div>
                     </button>
                   );
@@ -1022,15 +1137,15 @@ const FeePaymentCollect = () => {
             </div>
 
             {/* Selected Month Summary Tag */}
-            <div className="bg-gray-50 rounded-xl p-3 border border-gray-200 text-xs flex items-center justify-between">
+            <div className="bg-blue-50/60 rounded-xl p-3 border border-blue-200 text-xs flex items-center justify-between">
               <div>
                 <span className="font-semibold text-gray-800">Selected Duration:</span>{' '}
-                <span className="font-bold text-blue-700">
+                <span className="font-bold text-blue-700 text-sm">
                   {selectedMonthKeys.length} Month{selectedMonthKeys.length !== 1 ? 's' : ''}
                 </span>
               </div>
-              <div className="text-gray-500 text-[11px] font-medium">
-                Monthly Fees Multiplier: <span className="font-bold text-gray-800">{selectedMonthKeys.length}×</span>
+              <div className="text-blue-900 text-xs font-semibold">
+                Multiplies monthly fees by: <span className="font-extrabold text-blue-700 text-sm font-mono">{selectedMonthKeys.length}×</span>
               </div>
             </div>
           </div>
@@ -1049,7 +1164,7 @@ const FeePaymentCollect = () => {
                   <span>Fees Breakdown</span>
                 </h2>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Itemized charges for selected class and {selectedMonthKeys.length} advance month(s)
+                  Itemized charges for selected class — monthly fees multiplied by <strong className="text-blue-700">{selectedMonthKeys.length} advance month(s)</strong>
                 </p>
               </div>
 
@@ -1105,8 +1220,8 @@ const FeePaymentCollect = () => {
                       onChange={(e) => setCustomItemForm({ ...customItemForm, frequency: e.target.value })}
                       className="input-field text-xs py-1.5"
                     >
-                      <option value="one-time">One-Time (1×)</option>
                       <option value="monthly">Monthly ({selectedMonthKeys.length}×)</option>
+                      <option value="one-time">One-Time (1×)</option>
                     </select>
                   </div>
                 </div>
@@ -1156,12 +1271,13 @@ const FeePaymentCollect = () => {
                     <tr>
                       <th className="p-2.5 w-10 text-center">Include</th>
                       <th className="p-2.5">Fee Particulars</th>
-                      <th className="p-2.5 text-right">Rate (₹)</th>
+                      <th className="p-2.5 text-center">Billing Frequency</th>
+                      <th className="p-2.5 text-right">Base Rate (₹)</th>
                       <th className="p-2.5 text-center">Multiplier</th>
                       <th className="p-2.5 text-right">Subtotal (₹)</th>
                       <th className="p-2.5 text-right w-20">Discount (₹)</th>
                       <th className="p-2.5 text-right w-20">Fine (₹)</th>
-                      <th className="p-2.5 text-right">Net (₹)</th>
+                      <th className="p-2.5 text-right">Net Amount (₹)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -1195,19 +1311,38 @@ const FeePaymentCollect = () => {
                               </button>
                             )}
                           </div>
-                          <div className="text-[11px] text-gray-500 capitalize">
-                            Frequency: {item.frequency}
-                          </div>
+                          {item.description && (
+                            <div className="text-[11px] text-gray-500 truncate max-w-[220px]">
+                              {item.description}
+                            </div>
+                          )}
                         </td>
-                        <td className="p-2.5 text-right font-mono text-gray-700">
+                        <td className="p-2.5 text-center">
+                          <select
+                            value={item.frequency}
+                            disabled={!item.enabled}
+                            onChange={(e) => handleItemFrequencyChange(item.id, e.target.value)}
+                            className="text-xs font-medium py-1 px-2 rounded-lg border border-gray-300 bg-white text-gray-800 focus:ring-1 focus:ring-blue-500 cursor-pointer disabled:bg-gray-100 disabled:text-gray-400"
+                          >
+                            <option value="monthly">Monthly ({selectedMonthKeys.length}×)</option>
+                            <option value="one-time">One-Time / Annual (1×)</option>
+                            <option value="quarterly">Quarterly ({Math.max(1, Math.ceil(selectedMonthKeys.length / 3))}×)</option>
+                            <option value="half-yearly">Half-Yearly ({Math.max(1, Math.ceil(selectedMonthKeys.length / 6))}×)</option>
+                          </select>
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-gray-700 font-medium">
                           {formatCurrency(item.base_amount)}
                         </td>
                         <td className="p-2.5 text-center">
-                          <span className="inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold bg-gray-100 text-gray-800">
-                            {item.frequency === 'monthly' ? `× ${item.multiplier} mo` : '× 1'}
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${
+                            item.multiplier > 1
+                              ? 'bg-blue-100 text-blue-800 ring-1 ring-blue-300'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            × {item.multiplier}
                           </span>
                         </td>
-                        <td className="p-2.5 text-right font-mono font-semibold text-gray-900">
+                        <td className="p-2.5 text-right font-mono font-bold text-gray-900">
                           {formatCurrency(item.subtotal)}
                         </td>
                         <td className="p-2.5 text-right">
@@ -1234,7 +1369,7 @@ const FeePaymentCollect = () => {
                             placeholder="0"
                           />
                         </td>
-                        <td className="p-2.5 text-right font-mono font-bold text-gray-900">
+                        <td className="p-2.5 text-right font-mono font-extrabold text-blue-900">
                           {formatCurrency(item.total)}
                         </td>
                       </tr>
@@ -1278,13 +1413,13 @@ const FeePaymentCollect = () => {
             </div>
 
             {/* Total Summary Banner */}
-            <div className="bg-gradient-to-r from-gray-900 to-indigo-950 text-white rounded-2xl p-5 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="bg-gradient-to-r from-gray-900 via-indigo-950 to-blue-950 text-white rounded-2xl p-5 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="space-y-1 text-center sm:text-left">
-                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                  Total Settlement for {selectedMonthKeys.length} Month{selectedMonthKeys.length !== 1 ? 's' : ''}
+                <p className="text-xs font-semibold uppercase tracking-wider text-blue-200">
+                  Total Settlement for {selectedMonthKeys.length} Month{selectedMonthKeys.length !== 1 ? 's' : ''} Advance
                 </p>
-                <div className="flex items-center gap-3 text-xs text-gray-300">
-                  <span>Gross: {formatCurrency(calculatedBreakdown.grossTotal)}</span>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-gray-300">
+                  <span>Gross Total: <strong className="text-white">{formatCurrency(calculatedBreakdown.grossTotal)}</strong></span>
                   {calculatedBreakdown.totalDiscount > 0 && (
                     <span className="text-emerald-400">Discount: -{formatCurrency(calculatedBreakdown.totalDiscount)}</span>
                   )}
@@ -1295,7 +1430,7 @@ const FeePaymentCollect = () => {
               </div>
 
               <div className="text-center sm:text-right">
-                <span className="text-xs uppercase text-gray-400 block">Net Total Payable</span>
+                <span className="text-xs uppercase text-gray-400 block font-medium">Net Total Payable</span>
                 <span className="text-3xl font-extrabold text-emerald-400 font-mono tracking-tight">
                   {formatCurrency(calculatedBreakdown.netPayable)}
                 </span>
@@ -1412,13 +1547,18 @@ const FeePaymentCollect = () => {
 
               <button
                 type="submit"
-                disabled={submittingPayment || !selectedStudentId || calculatedBreakdown.items.filter(i => i.enabled).length === 0}
+                disabled={submittingPayment || !selectedStudentId || unpaidMonths.length === 0 || selectedMonthKeys.length === 0 || calculatedBreakdown.items.filter(i => i.enabled).length === 0}
                 className="w-full sm:w-auto btn-primary px-6 py-2.5 text-sm font-bold flex items-center justify-center space-x-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
                 {submittingPayment ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                     <span>Processing Payment...</span>
+                  </>
+                ) : selectedStudent && unpaidMonths.length === 0 ? (
+                  <>
+                    <span>✅</span>
+                    <span>All Session Fees Paid</span>
                   </>
                 ) : (
                   <>
@@ -1438,233 +1578,313 @@ const FeePaymentCollect = () => {
       {/* PROFESSIONAL PRINTABLE RECEIPT MODAL                      */}
       {/* ========================================================= */}
       {showReceiptModal && receiptData && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden border border-gray-200 my-8">
+        <div
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowReceiptModal(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-gray-300">
             
-            {/* Modal Actions Bar (Hidden during print) */}
-            <div className="print:hidden bg-gray-900 text-white px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">✅</span>
-                <span className="font-bold text-sm">Payment Recorded Successfully</span>
-              </div>
+            {/* Modal Top Actions Header Bar (Always visible & Sticky) */}
+            <div className="print:hidden bg-gray-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-gray-800 flex-shrink-0">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
+                  onClick={() => setShowReceiptModal(false)}
+                  className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-white text-xs font-semibold rounded-xl border border-gray-600 transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  title="Close receipt and go back to payment screen"
+                >
+                  <span className="text-sm">←</span>
+                  <span>Back to Payment</span>
+                </button>
+                <div className="hidden sm:flex items-center gap-2">
+                  <span className="text-emerald-400 text-lg">✅</span>
+                  <span className="font-bold text-xs sm:text-sm text-gray-100">Payment Recorded Successfully</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 sm:gap-3">
+                <button
+                  type="button"
                   onClick={handlePrintReceipt}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow flex items-center gap-1.5 cursor-pointer"
+                  className="px-3.5 py-1.5 sm:px-4 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow flex items-center gap-1.5 cursor-pointer"
+                  title="Print or Save Receipt as PDF"
                 >
                   <span>🖨️</span>
-                  <span>Print Receipt</span>
+                  <span>Print / Save PDF</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleResetForm}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow cursor-pointer"
+                  className="px-3.5 py-1.5 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow flex items-center gap-1.5 cursor-pointer"
+                  title="Collect fee for next student"
                 >
-                  Collect Another
+                  <span>➕</span>
+                  <span className="hidden sm:inline">Collect Next Student</span>
+                  <span className="sm:hidden">Next</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowReceiptModal(false)}
-                  className="text-gray-400 hover:text-white text-lg font-bold p-1"
+                  className="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 text-white text-xs font-bold rounded-xl transition flex items-center gap-1 cursor-pointer"
+                  title="Close receipt dialog"
                 >
-                  ✕
+                  <span>✕</span>
+                  <span>Close</span>
                 </button>
               </div>
             </div>
 
-            {/* Printable Receipt Area */}
-            <div id="printable-fee-receipt" className="p-8 bg-white text-gray-900 text-xs">
-              
-              {/* Receipt Header */}
-              <div className="border-b-2 border-gray-900 pb-4 mb-4 text-center space-y-1">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <span className="text-2xl">🎓</span>
-                  <h2 className="text-2xl font-black uppercase tracking-wider text-gray-900">
-                    Delhi Public Academy
-                  </h2>
+            {/* Scrollable Printable Receipt Content */}
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-white">
+              <div id="printable-fee-receipt" className="text-gray-900 text-xs">
+                
+                {/* Receipt Header */}
+                <div className="border-b-2 border-gray-900 pb-4 mb-4 text-center space-y-1">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <span className="text-2xl">🎓</span>
+                    <h2 className="text-2xl font-black uppercase tracking-wider text-gray-900">
+                      Delhi Public Academy
+                    </h2>
+                  </div>
+                  <p className="text-xs text-gray-600">
+                    Affiliated to CBSE / State Board • Reg. No: SMS-EDU-2024-9988
+                  </p>
+                  <p className="text-[11px] text-gray-500">
+                    Knowledge Park, Institutional Area, New Delhi • Contact: +91 98765 43210 • Email: accounts@school.edu
+                  </p>
+                  <div className="pt-2">
+                    <span className="inline-block px-3 py-1 bg-gray-900 text-white font-bold text-xs uppercase tracking-widest rounded">
+                      Official Fee Receipt / Tax Invoice
+                    </span>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-600">
-                  Affiliated to CBSE / State Board • Reg. No: SMS-EDU-2024-9988
-                </p>
-                <p className="text-[11px] text-gray-500">
-                  Knowledge Park, Institutional Area, New Delhi • Contact: +91 98765 43210 • Email: accounts@school.edu
-                </p>
-                <div className="pt-2">
-                  <span className="inline-block px-3 py-1 bg-gray-900 text-white font-bold text-xs uppercase tracking-widest rounded">
-                    Official Fee Receipt / Tax Invoice
+
+                {/* Receipt Meta & Student Info */}
+                <div className="grid grid-cols-2 gap-4 mb-5 border border-gray-200 rounded-xl p-3.5 bg-gray-50/50">
+                  <div className="space-y-1">
+                    <div>
+                      <span className="text-gray-500 uppercase text-[10px] font-semibold">Student Name:</span>{' '}
+                      <span className="font-bold text-gray-900 text-sm">
+                        {receiptData.student?.first_name} {receiptData.student?.last_name}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 uppercase text-[10px] font-semibold">Admission No:</span>{' '}
+                      <span className="font-semibold text-gray-800 font-mono">
+                        {receiptData.student?.admission_number || 'N/A'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 uppercase text-[10px] font-semibold">Class & Section:</span>{' '}
+                      <span className="font-semibold text-gray-800">
+                        {receiptData.class_name} {receiptData.section_name ? `- Section ${receiptData.section_name}` : ''}
+                      </span>
+                      {receiptData.student?.roll_number && (
+                        <span className="text-gray-600 ml-2">(Roll: {receiptData.student.roll_number})</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 text-right">
+                    <div>
+                      <span className="text-gray-500 uppercase text-[10px] font-semibold">Receipt No:</span>{' '}
+                      <span className="font-bold text-gray-900 font-mono text-sm">
+                        {receiptData.receipt_number}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 uppercase text-[10px] font-semibold">Date of Payment:</span>{' '}
+                      <span className="font-semibold text-gray-800">
+                        {formatDate(receiptData.payment_date)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 uppercase text-[10px] font-semibold">Academic Session:</span>{' '}
+                      <span className="font-semibold text-gray-800">
+                        {receiptData.academic_year_name}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 uppercase text-[10px] font-semibold">Payment Mode:</span>{' '}
+                      <span className="font-bold text-gray-800 uppercase font-mono">
+                        {receiptData.payment_method} {receiptData.transaction_id ? `(Ref: ${receiptData.transaction_id})` : ''}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Coverage / Period Banner */}
+                <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-xs">
+                  <span className="font-bold text-blue-900">Paid Period:</span>{' '}
+                  <span className="text-blue-800 font-medium">
+                    {receiptData.months_paid?.join(', ')} ({receiptData.months_paid?.length} Month{receiptData.months_paid?.length > 1 ? 's' : ''} Covered)
                   </span>
                 </div>
-              </div>
 
-              {/* Receipt Meta & Student Info */}
-              <div className="grid grid-cols-2 gap-4 mb-5 border border-gray-200 rounded-xl p-3.5 bg-gray-50/50">
-                <div className="space-y-1">
-                  <div>
-                    <span className="text-gray-500 uppercase text-[10px] font-semibold">Student Name:</span>{' '}
-                    <span className="font-bold text-gray-900 text-sm">
-                      {receiptData.student?.first_name} {receiptData.student?.last_name}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 uppercase text-[10px] font-semibold">Admission No:</span>{' '}
-                    <span className="font-semibold text-gray-800 font-mono">
-                      {receiptData.student?.admission_number || 'N/A'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 uppercase text-[10px] font-semibold">Class & Section:</span>{' '}
-                    <span className="font-semibold text-gray-800">
-                      {receiptData.class_name} {receiptData.section_name ? `- Section ${receiptData.section_name}` : ''}
-                    </span>
-                    {receiptData.student?.roll_number && (
-                      <span className="text-gray-600 ml-2">(Roll: {receiptData.student.roll_number})</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-1 text-right">
-                  <div>
-                    <span className="text-gray-500 uppercase text-[10px] font-semibold">Receipt No:</span>{' '}
-                    <span className="font-bold text-gray-900 font-mono text-sm">
-                      {receiptData.receipt_number}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 uppercase text-[10px] font-semibold">Date of Payment:</span>{' '}
-                    <span className="font-semibold text-gray-800">
-                      {formatDate(receiptData.payment_date)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 uppercase text-[10px] font-semibold">Academic Session:</span>{' '}
-                    <span className="font-semibold text-gray-800">
-                      {receiptData.academic_year_name}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 uppercase text-[10px] font-semibold">Payment Mode:</span>{' '}
-                    <span className="font-bold text-gray-800 uppercase font-mono">
-                      {receiptData.payment_method} {receiptData.transaction_id ? `(Ref: ${receiptData.transaction_id})` : ''}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Coverage / Period Banner */}
-              <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-2.5 text-xs">
-                <span className="font-bold text-blue-900">Paid Period:</span>{' '}
-                <span className="text-blue-800 font-medium">
-                  {receiptData.months_paid?.join(', ')} ({receiptData.months_paid?.length} Month{receiptData.months_paid?.length > 1 ? 's' : ''} Covered)
-                </span>
-              </div>
-
-              {/* Itemized Fee Table */}
-              <div className="mb-5 overflow-hidden border border-gray-300 rounded-lg">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-100 text-gray-800 font-bold border-b border-gray-300">
-                    <tr>
-                      <th className="p-2 w-10 text-center">#</th>
-                      <th className="p-2">Particulars</th>
-                      <th className="p-2 text-center">Period / Qty</th>
-                      <th className="p-2 text-right">Rate (₹)</th>
-                      <th className="p-2 text-right">Subtotal (₹)</th>
-                      <th className="p-2 text-right">Discount (₹)</th>
-                      <th className="p-2 text-right">Net Amount (₹)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {receiptData.breakdown_items.map((item, idx) => (
-                      <tr key={item.id}>
-                        <td className="p-2 text-center text-gray-500">{idx + 1}</td>
-                        <td className="p-2 font-semibold text-gray-900">
-                          {item.name}
-                          <span className="text-[10px] text-gray-500 block font-normal capitalize">
-                            Category: {item.type}
-                          </span>
-                        </td>
-                        <td className="p-2 text-center text-gray-700 font-medium">
-                          {item.frequency === 'monthly' ? `${item.multiplier} Month(s)` : '1'}
-                        </td>
-                        <td className="p-2 text-right font-mono text-gray-700">
-                          {formatCurrency(item.base_amount)}
-                        </td>
-                        <td className="p-2 text-right font-mono text-gray-800">
-                          {formatCurrency(item.subtotal)}
-                        </td>
-                        <td className="p-2 text-right font-mono text-emerald-700">
-                          {parseFloat(item.discount) > 0 ? `-${formatCurrency(item.discount)}` : '-'}
-                        </td>
-                        <td className="p-2 text-right font-mono font-bold text-gray-900">
-                          {formatCurrency(item.total)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-gray-50 font-bold border-t border-gray-300">
-                    <tr>
-                      <td colSpan={4} className="p-2 text-right text-gray-700">Gross Total:</td>
-                      <td className="p-2 text-right font-mono">{formatCurrency(receiptData.gross_total)}</td>
-                      <td className="p-2 text-right font-mono text-emerald-700">
-                        {receiptData.discount > 0 ? `-${formatCurrency(receiptData.discount)}` : '-'}
-                      </td>
-                      <td className="p-2 text-right font-mono text-gray-900">{formatCurrency(receiptData.gross_total - receiptData.discount)}</td>
-                    </tr>
-                    {receiptData.fine > 0 && (
+                {/* Itemized Fee Table */}
+                <div className="mb-5 overflow-hidden border border-gray-300 rounded-lg">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-gray-100 text-gray-800 font-bold border-b border-gray-300">
                       <tr>
-                        <td colSpan={6} className="p-1.5 text-right text-red-600">Late Fine / Penalty:</td>
-                        <td className="p-1.5 text-right font-mono text-red-600">+{formatCurrency(receiptData.fine)}</td>
+                        <th className="p-2 w-10 text-center">#</th>
+                        <th className="p-2">Particulars</th>
+                        <th className="p-2 text-center">Period / Qty</th>
+                        <th className="p-2 text-right">Rate (₹)</th>
+                        <th className="p-2 text-right">Subtotal (₹)</th>
+                        <th className="p-2 text-right">Discount (₹)</th>
+                        <th className="p-2 text-right">Net Amount (₹)</th>
                       </tr>
-                    )}
-                    <tr className="bg-gray-900 text-white text-sm">
-                      <td colSpan={6} className="p-2.5 text-right uppercase tracking-wider font-extrabold">
-                        Total Amount Received:
-                      </td>
-                      <td className="p-2.5 text-right font-mono text-emerald-400 font-extrabold text-base">
-                        {formatCurrency(receiptData.net_amount)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-
-              {/* Amount in Words */}
-              <div className="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                <span className="font-bold text-gray-700">Amount in Words:</span>{' '}
-                <span className="font-semibold text-gray-900 italic">
-                  {numberToWords(receiptData.net_amount)}
-                </span>
-              </div>
-
-              {/* Remarks */}
-              {receiptData.remarks && (
-                <div className="mb-6 text-[11px] text-gray-600">
-                  <span className="font-bold">Remarks:</span> {receiptData.remarks}
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {receiptData.breakdown_items.map((item, idx) => (
+                        <tr key={item.id}>
+                          <td className="p-2 text-center text-gray-500">{idx + 1}</td>
+                          <td className="p-2 font-semibold text-gray-900">
+                            {item.name}
+                            <span className="text-[10px] text-gray-500 block font-normal capitalize">
+                              Category: {item.type}
+                            </span>
+                          </td>
+                          <td className="p-2 text-center text-gray-700 font-medium">
+                            {item.frequency === 'monthly' ? `${item.multiplier} Month(s)` : '1'}
+                          </td>
+                          <td className="p-2 text-right font-mono text-gray-700">
+                            {formatCurrency(item.base_amount)}
+                          </td>
+                          <td className="p-2 text-right font-mono text-gray-800 font-semibold">
+                            {formatCurrency(item.subtotal)}
+                          </td>
+                          <td className="p-2 text-right font-mono text-emerald-700">
+                            {parseFloat(item.discount) > 0 ? `-${formatCurrency(item.discount)}` : '-'}
+                          </td>
+                          <td className="p-2 text-right font-mono font-bold text-gray-900">
+                            {formatCurrency(item.total)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-gray-50 font-bold border-t border-gray-300">
+                      <tr>
+                        <td colSpan={4} className="p-2 text-right text-gray-700">Gross Total:</td>
+                        <td className="p-2 text-right font-mono">{formatCurrency(receiptData.gross_total)}</td>
+                        <td className="p-2 text-right font-mono text-emerald-700">
+                          {receiptData.discount > 0 ? `-${formatCurrency(receiptData.discount)}` : '-'}
+                        </td>
+                        <td className="p-2 text-right font-mono text-gray-900">{formatCurrency(receiptData.gross_total - receiptData.discount)}</td>
+                      </tr>
+                      {receiptData.fine > 0 && (
+                        <tr>
+                          <td colSpan={6} className="p-1.5 text-right text-red-600">Late Fine / Penalty:</td>
+                          <td className="p-1.5 text-right font-mono text-red-600">+{formatCurrency(receiptData.fine)}</td>
+                        </tr>
+                      )}
+                      <tr className="bg-gray-900 text-white text-sm">
+                        <td colSpan={6} className="p-2.5 text-right uppercase tracking-wider font-extrabold">
+                          Total Amount Received:
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-emerald-400 font-extrabold text-base">
+                          {formatCurrency(receiptData.net_amount)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
-              )}
 
-              {/* Signatures & Footer */}
-              <div className="pt-8 grid grid-cols-2 gap-8 text-center text-xs">
-                <div>
-                  <div className="border-t border-gray-400 pt-1.5 mx-auto w-48 font-semibold text-gray-700">
-                    Parent / Student Signature
+                {/* Amount in Words */}
+                <div className="mb-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <span className="font-bold text-gray-700">Amount in Words:</span>{' '}
+                  <span className="font-semibold text-gray-900 italic">
+                    {numberToWords(receiptData.net_amount)}
+                  </span>
+                </div>
+
+                {/* Remarks */}
+                {receiptData.remarks && (
+                  <div className="mb-6 text-[11px] text-gray-600">
+                    <span className="font-bold">Remarks:</span> {receiptData.remarks}
+                  </div>
+                )}
+
+                {/* Signatures & Footer */}
+                <div className="pt-8 grid grid-cols-2 gap-8 text-center text-xs">
+                  <div>
+                    <div className="border-t border-gray-400 pt-1.5 mx-auto w-48 font-semibold text-gray-700">
+                      Parent / Student Signature
+                    </div>
+                  </div>
+                  <div>
+                    <div className="border-t border-gray-400 pt-1.5 mx-auto w-48 font-semibold text-gray-700">
+                      Cashier / Accounts Officer
+                    </div>
+                    <div className="text-[10px] text-gray-500 mt-0.5">
+                      Authorized Signatory • {receiptData.collected_by}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div className="border-t border-gray-400 pt-1.5 mx-auto w-48 font-semibold text-gray-700">
-                    Cashier / Accounts Officer
-                  </div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">
-                    Authorized Signatory • {receiptData.collected_by}
-                  </div>
+
+                {/* Computer generated disclaimer */}
+                <div className="text-center text-[10px] text-gray-400 mt-6 pt-3 border-t">
+                  This is a computer-generated fee receipt and does not require a physical signature. Thank you for your payment!
                 </div>
+
+              </div>
+            </div>
+
+            {/* Bottom Actions Footer Bar (Always visible & Easy Exit) */}
+            <div className="print:hidden bg-gray-50 border-t border-gray-200 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReceiptModal(false)}
+                  className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-800 text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span className="text-sm">←</span>
+                  <span>Back to Form</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowReceiptModal(false);
+                    navigate('/fees/payments');
+                  }}
+                  className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-100 text-gray-700 text-xs font-semibold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>🧾</span>
+                  <span>View All Payments</span>
+                </button>
               </div>
 
-              {/* Computer generated disclaimer */}
-              <div className="text-center text-[10px] text-gray-400 mt-6 pt-3 border-t">
-                This is a computer-generated fee receipt and does not require a physical signature. Thank you for your payment!
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetForm}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>➕</span>
+                  <span>Collect Another Payment</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePrintReceipt}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>🖨️</span>
+                  <span>Print / Save as PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowReceiptModal(false)}
+                  className="px-3.5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-bold rounded-xl transition cursor-pointer"
+                  title="Close receipt dialog"
+                >
+                  <span>✕</span>
+                  <span>Close</span>
+                </button>
               </div>
-
             </div>
 
           </div>
@@ -1700,4 +1920,3 @@ const FeePaymentCollect = () => {
 };
 
 export default FeePaymentCollect;
-
