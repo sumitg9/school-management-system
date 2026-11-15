@@ -437,6 +437,51 @@ export const AuthProvider = ({ children }) => {
     return assigned;
   };
 
+  const DEPARTMENT_SUBJECT_KEYWORDS = {
+    science: ['science', 'physics', 'chemistry', 'biology', 'environmental', 'botany', 'zoology'],
+    mathematics: ['math', 'mathematics', 'maths', 'algebra', 'geometry', 'calculus', 'arithmetic', 'statistics', 'trigonometry'],
+    english: ['english', 'grammar', 'literature', 'comprehension'],
+    'social studies': ['social science', 'social studies', 'history', 'geography', 'civics', 'economics', 'political science', 'sst'],
+    'computer science': ['computer', 'coding', 'programming', 'information technology', 'software'],
+    'physical education': ['physical education', 'sports', 'gym', 'yoga', 'fitness', 'athletics', 'games', 'pt'],
+    arts: ['art', 'arts', 'drawing', 'painting', 'craft'],
+    music: ['music', 'vocal', 'instrumental', 'dance'],
+    languages: ['hindi', 'sanskrit', 'french', 'spanish', 'german', 'urdu'],
+  };
+
+  const resolveDepartmentGroup = (dept) => {
+    if (!dept) return null;
+    const d = dept.toLowerCase().trim();
+    if (d.includes('computer') || d.includes('informati') || d === 'cs' || d === 'it') {
+      return 'computer science';
+    }
+    if (d.includes('physic') && (d.includes('edu') || d.includes('sport') || d.includes('pe') || d.includes('gym')) || d === 'pe' || d === 'sports') {
+      return 'physical education';
+    }
+    if (d.includes('science') || d.includes('physics') || d.includes('chemistry') || d.includes('biology')) {
+      return 'science';
+    }
+    if (d.includes('math')) {
+      return 'mathematics';
+    }
+    if (d.includes('english')) {
+      return 'english';
+    }
+    if (d.includes('social') || d.includes('history') || d.includes('geography') || d.includes('civic') || d.includes('sst')) {
+      return 'social studies';
+    }
+    if (d.includes('art')) {
+      return 'arts';
+    }
+    if (d.includes('music')) {
+      return 'music';
+    }
+    if (d.includes('lang') || d.includes('hindi') || d.includes('french') || d.includes('sanskrit')) {
+      return 'languages';
+    }
+    return d;
+  };
+
   const getTeacherAssignedSectionIds = (sectionsList = [], classesList = []) => {
     if (!isTeacher()) return null;
     const tId = teacherProfile?.id ? String(teacherProfile.id) : null;
@@ -455,9 +500,7 @@ export const AuthProvider = ({ children }) => {
 
     // A section is assigned if:
     // 1. Teacher is assigned as section teacher
-    // 2. OR teacher is Class Teacher of this section's parent class
-    const assignedClassIds = getTeacherAssignedClassIds(classesList);
-
+    // 2. OR teacher is Head Class Teacher of this section's parent class
     sectionsList.forEach(sec => {
       const sId = String(sec.id);
       const meta = secMeta[sId] || {};
@@ -467,8 +510,18 @@ export const AuthProvider = ({ children }) => {
         assigned.add(sId);
       } else if (tEmail && sec.section_teacher?.email?.toLowerCase() === tEmail) {
         assigned.add(sId);
-      } else if (sec.class_id && assignedClassIds && assignedClassIds.has(String(sec.class_id))) {
-        assigned.add(sId);
+      } else if (sec.class_id) {
+        // Only grant all sections if explicitly the Head Class Teacher of this class
+        const cMeta = classMeta[String(sec.class_id)] || {};
+        const headClassTeacherId = cMeta.class_teacher_id;
+        const matchingClass = classesList.find(c => String(c.id) === String(sec.class_id));
+        const directClassTeacherId = matchingClass?.class_teacher_id || matchingClass?.class_teacher?.id;
+
+        const isHead = (tId && (String(headClassTeacherId) === tId || String(directClassTeacherId) === tId)) ||
+                       (tEmail && matchingClass?.class_teacher?.email?.toLowerCase() === tEmail);
+        if (isHead) {
+          assigned.add(sId);
+        }
       }
     });
 
@@ -481,6 +534,87 @@ export const AuthProvider = ({ children }) => {
     });
 
     return assigned;
+  };
+
+  const getTeacherAssignedSubjectIds = (subjectsList = []) => {
+    if (!isTeacher()) return null;
+    const tId = teacherProfile?.id ? String(teacherProfile.id) : null;
+    const teacherSubjectsMeta = getLocalMetaSafe('sms_teacher_subjects');
+    const assigned = new Set();
+
+    // 1. Explicit admin assignment via sms_teacher_subjects or teacher profile
+    if (tId && Array.isArray(teacherSubjectsMeta[tId])) {
+      teacherSubjectsMeta[tId].forEach(id => assigned.add(String(id)));
+    }
+    const explicitSubjectIds = teacherProfile?.assigned_subject_ids || user?.assigned_subject_ids;
+    if (Array.isArray(explicitSubjectIds)) {
+      explicitSubjectIds.forEach(id => assigned.add(String(id)));
+    }
+
+    const dept = (teacherProfile?.department || '').trim();
+    const spec = (teacherProfile?.specialization || '').trim().toLowerCase();
+    const groupDept = resolveDepartmentGroup(dept);
+    const keywords = groupDept ? (DEPARTMENT_SUBJECT_KEYWORDS[groupDept] || [groupDept]) : [];
+
+    // 2. Department & Specialization keyword matching across subjects
+    if (Array.isArray(subjectsList) && subjectsList.length > 0) {
+      subjectsList.forEach(sub => {
+        const subId = String(sub.id);
+        const subName = (sub.name || '').toLowerCase().trim();
+        const subCode = (sub.code || '').toLowerCase().trim();
+
+        // Direct specialization match
+        if (spec && (subName.includes(spec) || spec.includes(subName) || subCode === spec)) {
+          assigned.add(subId);
+          return;
+        }
+
+        if (groupDept) {
+          // If testing general science, exclude computer science and social science
+          if (groupDept === 'science') {
+            if (subName.includes('computer') || subCode === 'cs' || subName.includes('social') || subCode === 'sst') {
+              return;
+            }
+          }
+
+          // Exact code match
+          if (groupDept === 'computer science' && subCode === 'cs') { assigned.add(subId); return; }
+          if (groupDept === 'physical education' && (subCode === 'pe' || subCode === 'pt')) { assigned.add(subId); return; }
+          if (groupDept === 'mathematics' && (subCode === 'math' || subCode === 'maths')) { assigned.add(subId); return; }
+          if (groupDept === 'english' && subCode === 'eng') { assigned.add(subId); return; }
+          if (groupDept === 'science' && (subCode === 'sci' || subCode === 'phy' || subCode === 'chem' || subCode === 'bio')) { assigned.add(subId); return; }
+
+          // Keyword check with boundary checks for short keywords
+          const hasKeyword = keywords.some(kw => {
+            if (kw.length <= 3) {
+              const regex = new RegExp(`\\b${kw}\\b`, 'i');
+              return regex.test(subName) || subCode === kw;
+            }
+            return subName.includes(kw);
+          });
+
+          if (hasKeyword) {
+            assigned.add(subId);
+          }
+        }
+      });
+    }
+
+    return assigned;
+  };
+
+  const filterTeacherSubjects = (subjectsList) => {
+    if (!subjectsList || !Array.isArray(subjectsList)) return [];
+    if (!isTeacher()) return subjectsList;
+    const assignedIds = getTeacherAssignedSubjectIds(subjectsList);
+    if (!assignedIds) return subjectsList;
+    return subjectsList.filter(s => assignedIds.has(String(s.id)));
+  };
+
+  const isSubjectAssignedToTeacher = (subjectId, subjectsList = []) => {
+    if (!isTeacher()) return true;
+    const assignedIds = getTeacherAssignedSubjectIds(subjectsList);
+    return assignedIds ? assignedIds.has(String(subjectId)) : true;
   };
 
   const filterTeacherClasses = (classesList) => {
@@ -561,11 +695,14 @@ export const AuthProvider = ({ children }) => {
     filterTeacherClasses,
     filterTeacherSections,
     filterTeacherStudents,
+    filterTeacherSubjects,
     getTeacherAssignedClassIds,
     getTeacherAssignedSectionIds,
+    getTeacherAssignedSubjectIds,
     isClassAssignedToTeacher,
     isSectionAssignedToTeacher,
     isStudentAssignedToTeacher,
+    isSubjectAssignedToTeacher,
     currentStudent: studentProfile,
     studentProfile,
     studentLoading,

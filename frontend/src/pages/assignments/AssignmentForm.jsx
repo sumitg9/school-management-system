@@ -10,7 +10,18 @@ const AssignmentForm = () => {
   const { id } = useParams();
   const isEditMode = Boolean(id);
   const { showValidationError } = useAlert();
-  const { isStudent, isTeacher, currentTeacher, filterTeacherClasses, filterTeacherSections } = useAuth();
+  const {
+    isStudent,
+    isTeacher,
+    user,
+    currentTeacher,
+    filterTeacherClasses,
+    filterTeacherSections,
+    filterTeacherSubjects,
+    isClassAssignedToTeacher,
+    isSectionAssignedToTeacher,
+    isSubjectAssignedToTeacher,
+  } = useAuth();
 
   if (isStudent()) {
     return <Navigate to="/assignments" replace />;
@@ -71,7 +82,7 @@ const AssignmentForm = () => {
     try {
       const response = await subjectAPI.getAll({ per_page: 100 });
       if (response.success) {
-        setSubjects(response.data);
+        setSubjects(isTeacher() ? filterTeacherSubjects(response.data || []) : (response.data || []));
       }
     } catch (error) {
       console.error('Error fetching subjects:', error);
@@ -83,14 +94,37 @@ const AssignmentForm = () => {
     try {
       const response = await assignmentAPI.getById(id);
       if (response.success) {
+        const data = response.data;
+        if (isTeacher()) {
+          const tId = currentTeacher?.id ? String(currentTeacher.id) : null;
+          const uId = user?.id ? String(user.id) : null;
+          const isOwner = (tId && String(data.teacher_id) === tId) || (uId && String(data.created_by) === uId);
+          if (!isOwner) {
+            if (data.class_id && !isClassAssignedToTeacher(data.class_id, classes)) {
+              toast.error('You are not authorized to edit this assignment');
+              navigate('/assignments');
+              return;
+            }
+            if (data.section_id && !isSectionAssignedToTeacher(data.section_id, [], classes)) {
+              toast.error('You are not authorized to edit this assignment');
+              navigate('/assignments');
+              return;
+            }
+            if (data.subject_id && !isSubjectAssignedToTeacher(data.subject_id, [])) {
+              toast.error('You are not authorized to edit this assignment');
+              navigate('/assignments');
+              return;
+            }
+          }
+        }
         setFormData({
-          class_id: response.data.class_id || '',
-          section_id: response.data.section_id || '',
-          subject_id: response.data.subject_id || '',
-          title: response.data.title || '',
-          description: response.data.description || '',
-          due_date: response.data.due_date || '',
-          total_marks: response.data.total_marks || '',
+          class_id: data.class_id || '',
+          section_id: data.section_id || '',
+          subject_id: data.subject_id || '',
+          title: data.title || '',
+          description: data.description || '',
+          due_date: data.due_date || '',
+          total_marks: data.total_marks || '',
         });
       }
     } catch (error) {

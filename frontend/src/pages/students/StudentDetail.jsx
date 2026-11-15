@@ -78,7 +78,7 @@ const StudentDetail = () => {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            {!isStudent() && hasPermission('edit-students') && (
+            {!isStudent() && !isTeacher() && hasPermission('edit-students') && (
               <button
                 onClick={() => navigate(`/students/${id}/edit`)}
                 className="btn-primary flex items-center space-x-2 cursor-pointer"

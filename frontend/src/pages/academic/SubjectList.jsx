@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 const SubjectList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const { isStudent, hasPermission } = useAuth();
+  const { isStudent, isTeacher, filterTeacherSubjects, hasPermission } = useAuth();
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
@@ -30,8 +30,12 @@ const SubjectList = () => {
     try {
       const response = await subjectAPI.getAll(filters);
       if (response.success) {
-        setSubjects(response.data);
-        setPagination(response.meta);
+        const list = isTeacher() ? filterTeacherSubjects(response.data || []) : (response.data || []);
+        setSubjects(list);
+        setPagination(response.meta ? {
+          ...response.meta,
+          total: isTeacher() ? list.length : response.meta.total,
+        } : null);
       }
     } catch (error) {
       toast.error('Failed to fetch subjects');
@@ -138,7 +142,7 @@ const SubjectList = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
         </svg>
       </button>
-      {!isStudent() && hasPermission('edit-classes') && (
+      {!isStudent() && !isTeacher() && hasPermission('edit-classes') && (
         <button
           onClick={() => navigate(`/subjects/${row.id}/edit`)}
           className="text-green-600 hover:text-green-900 cursor-pointer"
@@ -149,7 +153,7 @@ const SubjectList = () => {
           </svg>
         </button>
       )}
-      {!isStudent() && hasPermission('delete-classes') && (
+      {!isStudent() && !isTeacher() && hasPermission('delete-classes') && (
         <button
           onClick={() => handleDelete(row.id)}
           className="text-red-600 hover:text-red-900 cursor-pointer"
@@ -165,6 +169,17 @@ const SubjectList = () => {
 
   return (
     <div className="p-6">
+      {/* Teacher Scoped Notice */}
+      {isTeacher() && (
+        <div className="mb-4 p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3 text-xs text-blue-900 shadow-2xs">
+          <span className="text-xl">👨‍🏫</span>
+          <div>
+            <span className="font-bold block">Assigned Subjects</span>
+            <span>Displaying subjects linked to your department and teaching assignments ({subjects.length} subjects).</span>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
@@ -187,7 +202,7 @@ const SubjectList = () => {
               <span>📋</span>
               <span>Sections</span>
             </button>
-            {!isStudent() && hasPermission('create-classes') && (
+            {!isStudent() && !isTeacher() && hasPermission('create-classes') && (
               <button
                 onClick={() => navigate('/subjects/create')}
                 className="btn-primary flex items-center space-x-2 cursor-pointer"

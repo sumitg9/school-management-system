@@ -10,7 +10,7 @@ const ExamGrades = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { showValidationError } = useAlert();
-  const { isStudent, isTeacher, filterTeacherClasses, filterTeacherSections } = useAuth();
+  const { isStudent, isTeacher, filterTeacherClasses, filterTeacherSections, filterTeacherSubjects } = useAuth();
 
   if (isStudent()) {
     return <Navigate to="/exams" replace />;
@@ -90,7 +90,7 @@ const ExamGrades = () => {
     try {
       const response = await subjectAPI.getAll({ per_page: 100 });
       if (response.success) {
-        setSubjects(response.data);
+        setSubjects(isTeacher() ? filterTeacherSubjects(response.data || []) : (response.data || []));
       }
     } catch (error) {
       console.error('Error fetching subjects:', error);

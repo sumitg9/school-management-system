@@ -28,6 +28,7 @@ const AttendanceList = () => {
   const [attendances, setAttendances] = useState([]);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
+  const [allSections, setAllSections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
 
@@ -63,12 +64,24 @@ const AttendanceList = () => {
     };
   });
 
-  // Fetch classes only for staff
+  // Fetch classes and all sections only for staff
   useEffect(() => {
     if (!isStudent()) {
       fetchClasses();
+      fetchAllSections();
     }
   }, [isStudent()]);
+
+  const fetchAllSections = async () => {
+    try {
+      const response = await sectionAPI.getAll({ per_page: 200 });
+      if (response.success) {
+        setAllSections(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching all sections:', error);
+    }
+  };
 
   // Fetch sections when class changes (staff only)
   useEffect(() => {
@@ -163,11 +176,13 @@ const AttendanceList = () => {
         let records = response.data || [];
         if (isTeacher()) {
           const classIds = getTeacherAssignedClassIds(classes) || new Set();
-          const secIds = getTeacherAssignedSectionIds(sections, classes) || new Set();
+          const effectiveSecs = allSections.length > 0 ? allSections : sections;
+          const secIds = getTeacherAssignedSectionIds(effectiveSecs, classes) || new Set();
           records = records.filter(rec => {
-            const cMatch = rec.class_id && classIds.has(String(rec.class_id));
-            const sMatch = rec.section_id && secIds.has(String(rec.section_id));
-            return cMatch || sMatch;
+            if (rec.section_id) {
+              return secIds.has(String(rec.section_id));
+            }
+            return rec.class_id ? classIds.has(String(rec.class_id)) : false;
           });
         }
         setAttendances(records);

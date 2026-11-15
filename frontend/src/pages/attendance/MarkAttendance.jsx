@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 const MarkAttendance = () => {
   const navigate = useNavigate();
   const { showValidationError } = useAlert();
-  const { filterTeacherClasses, filterTeacherSections, isStudent, isTeacher } = useAuth();
+  const { filterTeacherClasses, filterTeacherSections, isSectionAssignedToTeacher, isStudent, isTeacher } = useAuth();
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -70,6 +70,11 @@ const MarkAttendance = () => {
   };
 
   const fetchStudents = async () => {
+    if (isTeacher() && filters.section_id && !isSectionAssignedToTeacher(filters.section_id, sections, classes)) {
+      toast.error('You are not authorized to mark attendance for this section');
+      setStudents([]);
+      return;
+    }
     setLoading(true);
     try {
       const response = await studentAPI.getAll({

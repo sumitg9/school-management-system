@@ -35,6 +35,7 @@ const EnhancedDashboard = () => {
     filterTeacherClasses,
     filterTeacherSections,
     filterTeacherStudents,
+    getTeacherAssignedSubjectIds,
     currentTeacher,
   } = useAuth();
   const [initialLoading, setInitialLoading] = useState(true);
@@ -99,10 +100,14 @@ const EnhancedDashboard = () => {
         const presentCount = myAttendance.filter(a => a.status === 'present').length;
         const attPercent = myAttendance.length > 0 ? Math.round((presentCount / myAttendance.length) * 100) : 100;
 
-        const myAssignments = rawAssignments.filter(a => 
-          (currentTeacher?.id && String(a.teacher_id) === String(currentTeacher.id)) ||
-          (a.class_id && myClassIds.has(String(a.class_id)))
-        );
+        const mySubIds = getTeacherAssignedSubjectIds() || new Set();
+        const myAssignments = rawAssignments.filter(a => {
+          const byMe = (currentTeacher?.id && String(a.teacher_id) === String(currentTeacher.id));
+          if (byMe) return true;
+          const matchSection = a.section_id ? mySecIds.has(String(a.section_id)) : (a.class_id ? myClassIds.has(String(a.class_id)) : false);
+          const matchSubject = a.subject_id ? mySubIds.has(String(a.subject_id)) : true;
+          return matchSection && matchSubject;
+        });
 
         setStats({
           students: { total: myStudents.length, active: myStudents.length, inactive: 0 },

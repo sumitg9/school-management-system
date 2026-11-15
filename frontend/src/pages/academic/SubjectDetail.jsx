@@ -8,7 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 const SubjectDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { isStudent, hasPermission } = useAuth();
+  const { isStudent, isTeacher, isSubjectAssignedToTeacher, hasPermission } = useAuth();
   const [subject, setSubject] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -21,6 +21,11 @@ const SubjectDetail = () => {
     try {
       const response = await subjectAPI.getById(id);
       if (response.success) {
+        if (isTeacher() && !isSubjectAssignedToTeacher(id, [response.data])) {
+          toast.error("You don't have permission to view this subject.");
+          navigate('/subjects');
+          return;
+        }
         setSubject(response.data);
       }
     } catch (error) {
@@ -77,7 +82,7 @@ const SubjectDetail = () => {
               <p className="text-gray-600 mt-1">View subject information</p>
             </div>
           </div>
-          {!isStudent() && hasPermission('edit-classes') && (
+          {!isStudent() && !isTeacher() && hasPermission('edit-classes') && (
             <button
               onClick={() => navigate(`/subjects/${id}/edit`)}
               className="btn-primary flex items-center space-x-2 cursor-pointer"

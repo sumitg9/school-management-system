@@ -10,7 +10,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 const ClassDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { isStudent, isTeacher, hasPermission, isClassAssignedToTeacher, filterTeacherSections } = useAuth();
+  const { isStudent, isTeacher, hasPermission, isClassAssignedToTeacher, filterTeacherSections, filterTeacherStudents } = useAuth();
   const confirm = useConfirm();
 
   const [classData, setClassData] = useState(null);
@@ -262,6 +262,9 @@ const ClassDetail = () => {
   const displayedSections = isTeacher()
     ? filterTeacherSections(sections, classData ? [classData] : [])
     : sections;
+  const displayedStudents = isTeacher()
+    ? filterTeacherStudents(students, classData ? [classData] : [], displayedSections)
+    : students;
 
   return (
     <div className="p-6 space-y-6">
@@ -672,12 +675,12 @@ const ClassDetail = () => {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <h3 className="text-sm font-bold text-gray-900">Enrolled Students in {classData.name}</h3>
-            <span className="text-xs text-gray-500 font-medium">{students.length} Students Listed</span>
+            <span className="text-xs text-gray-500 font-medium">{displayedStudents.length} Students Listed</span>
           </div>
 
-          {students.length === 0 ? (
+          {displayedStudents.length === 0 ? (
             <div className="p-8 text-center text-xs text-gray-500">
-              No students enrolled in this class yet.
+              No students enrolled in your assigned sections yet.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -692,7 +695,7 @@ const ClassDetail = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {students.map((stu) => (
+                  {displayedStudents.map((stu) => (
                     <tr key={stu.id} className="hover:bg-gray-50 transition">
                       <td className="px-6 py-3 font-semibold text-gray-900">
                         {stu.first_name} {stu.last_name}

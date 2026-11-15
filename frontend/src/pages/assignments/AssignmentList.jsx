@@ -13,7 +13,19 @@ const AssignmentList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const { formatDate } = useSettings();
-  const { isStudent, isTeacher, user, currentTeacher, hasPermission, filterTeacherClasses, filterTeacherSections, getTeacherAssignedClassIds, getTeacherAssignedSectionIds } = useAuth();
+  const {
+    isStudent,
+    isTeacher,
+    user,
+    currentTeacher,
+    hasPermission,
+    filterTeacherClasses,
+    filterTeacherSections,
+    filterTeacherSubjects,
+    getTeacherAssignedClassIds,
+    getTeacherAssignedSectionIds,
+    getTeacherAssignedSubjectIds,
+  } = useAuth();
 
   if (isStudent()) {
     return <StudentAssignmentsView />;
@@ -21,6 +33,7 @@ const AssignmentList = () => {
   const [assignments, setAssignments] = useState([]);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
+  const [allSections, setAllSections] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
@@ -34,11 +47,23 @@ const AssignmentList = () => {
     subject_id: '',
   });
 
-  // Fetch classes and subjects once on mount
+  // Fetch classes, sections and subjects once on mount
   useEffect(() => {
     fetchClasses();
     fetchSubjects();
+    fetchAllSections();
   }, []);
+
+  const fetchAllSections = async () => {
+    try {
+      const response = await sectionAPI.getAll({ per_page: 200 });
+      if (response.success) {
+        setAllSections(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching all sections:', error);
+    }
+  };
 
   // Debounce search input
   useEffect(() => {
@@ -92,7 +117,7 @@ const AssignmentList = () => {
     try {
       const response = await subjectAPI.getAll({ per_page: 100 });
       if (response.success) {
-        setSubjects(response.data);
+        setSubjects(isTeacher() ? filterTeacherSubjects(response.data || []) : (response.data || []));
       }
     } catch (error) {
       console.error('Error fetching subjects:', error);
@@ -107,15 +132,24 @@ const AssignmentList = () => {
         let list = response.data || [];
         if (isTeacher()) {
           const classIds = getTeacherAssignedClassIds(classes) || new Set();
-          const secIds = getTeacherAssignedSectionIds(sections, classes) || new Set();
+          const effectiveSections = allSections.length > 0 ? allSections : sections;
+          const secIds = getTeacherAssignedSectionIds(effectiveSections, classes) || new Set();
+          const subIds = getTeacherAssignedSubjectIds(subjects) || new Set();
           const tId = currentTeacher?.id ? String(currentTeacher.id) : null;
           const uId = user?.id ? String(user.id) : null;
 
           list = list.filter(a => {
             const byTeacher = (tId && String(a.teacher_id) === tId) || (uId && String(a.created_by) === uId);
-            const forClass = a.class_id && classIds.has(String(a.class_id));
-            const forSection = a.section_id && secIds.has(String(a.section_id));
-            return byTeacher || forClass || forSection;
+            if (byTeacher) return true;
+
+            // Must match assigned section (or class if no section specified) AND assigned subject
+            const matchSection = a.section_id
+              ? secIds.has(String(a.section_id))
+              : (a.class_id ? classIds.has(String(a.class_id)) : false);
+            const matchSubject = a.subject_id
+              ? subIds.has(String(a.subject_id))
+              : true;
+            return matchSection && matchSubject;
           });
         }
         setAssignments(list);

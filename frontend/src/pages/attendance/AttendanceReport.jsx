@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { attendanceAPI, classAPI, sectionAPI } from '../../services/api';
 import Badge from '../../components/common/Badge';
@@ -8,6 +8,10 @@ import { useAuth } from '../../context/AuthContext';
 const AttendanceReport = () => {
   const navigate = useNavigate();
   const { isStudent, isTeacher, filterTeacherClasses, filterTeacherSections } = useAuth();
+
+  if (isStudent()) {
+    return <Navigate to="/attendance" replace />;
+  }
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);

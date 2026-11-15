@@ -17,6 +17,7 @@ const AssignmentDetail = () => {
     user,
     isClassAssignedToTeacher,
     isSectionAssignedToTeacher,
+    isSubjectAssignedToTeacher,
     currentStudent,
     hasPermission,
   } = useAuth();
@@ -43,9 +44,12 @@ const AssignmentDetail = () => {
           const tId = currentTeacher?.id ? String(currentTeacher.id) : null;
           const uId = user?.id ? String(user.id) : null;
           const byMe = (tId && String(a.teacher_id) === tId) || (uId && String(a.created_by) === uId);
-          const classOk = a.class_id ? isClassAssignedToTeacher(a.class_id) : false;
-          const secOk = a.section_id ? isSectionAssignedToTeacher(a.section_id) : false;
-          if (!byMe && !classOk && !secOk) {
+          const secOrClassOk = a.section_id
+            ? isSectionAssignedToTeacher(a.section_id)
+            : (a.class_id ? isClassAssignedToTeacher(a.class_id) : false);
+          const subjectOk = a.subject_id ? isSubjectAssignedToTeacher(a.subject_id) : true;
+
+          if (!byMe && (!secOrClassOk || !subjectOk)) {
             toast.error("You don't have permission to view this assignment.");
             navigate('/assignments');
             return;
