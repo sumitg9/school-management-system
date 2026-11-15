@@ -174,10 +174,13 @@ const FeeForm = () => {
     const dayStr = String(dayVal).padStart(2, '0');
     const computedDueDate = `${startYear}-04-${dayStr}`;
 
-    const payload = {
+    const { due_day, ...payload } = {
       ...formData,
       type: finalType,
       due_date: computedDueDate,
+      class_id: formData.class_id ? parseInt(formData.class_id, 10) : null,
+      academic_year_id: parseInt(formData.academic_year_id, 10),
+      amount: parseFloat(formData.amount) || 0,
     };
 
     try {

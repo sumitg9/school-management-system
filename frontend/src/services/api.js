@@ -1594,14 +1594,24 @@ export const feeAPI = {
   },
   createStructure: async (data) => {
     if (!useSupabase) return api.post('/fee-structures', data);
-    const { data: res, error } = await supabase.from('fee_structures').insert(data).select().single();
+    const { due_day, class: _c, academic_year: _ay, id: _id, created_at: _ca, updated_at: _ua, deleted_at: _da, ...payload } = data;
+    if (payload.class_id === '') payload.class_id = null;
+    if (payload.academic_year_id) payload.academic_year_id = parseInt(payload.academic_year_id, 10) || payload.academic_year_id;
+    if (payload.class_id) payload.class_id = parseInt(payload.class_id, 10) || payload.class_id;
+    if (payload.amount !== undefined) payload.amount = parseFloat(payload.amount) || 0;
+    const { data: res, error } = await supabase.from('fee_structures').insert(payload).select().single();
     if (error) throw error;
     return { success: true, data: res };
   },
   create: async (data) => feeAPI.createStructure(data),
   updateStructure: async (id, data) => {
     if (!useSupabase) return api.put(`/fee-structures/${id}`, data);
-    const { data: res, error } = await supabase.from('fee_structures').update(data).eq('id', id).select().single();
+    const { due_day, class: _c, academic_year: _ay, id: _id, created_at: _ca, updated_at: _ua, deleted_at: _da, ...payload } = data;
+    if (payload.class_id === '') payload.class_id = null;
+    if (payload.academic_year_id) payload.academic_year_id = parseInt(payload.academic_year_id, 10) || payload.academic_year_id;
+    if (payload.class_id) payload.class_id = parseInt(payload.class_id, 10) || payload.class_id;
+    if (payload.amount !== undefined) payload.amount = parseFloat(payload.amount) || 0;
+    const { data: res, error } = await supabase.from('fee_structures').update(payload).eq('id', id).select().single();
     if (error) throw error;
     return { success: true, data: res };
   },
