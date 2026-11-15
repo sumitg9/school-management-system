@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { teacherAPI } from '../../services/api';
 import { useAlert } from '../../context/AlertContext';
 import { useSettings } from '../../context/SettingsContext';
+import { useAuth } from '../../context/AuthContext';
 import { getMaxTeacherDateOfBirth, validateTeacherDateOfBirth } from '../../utils/dateFormatter';
 
 const TeacherForm = () => {
@@ -12,6 +13,11 @@ const TeacherForm = () => {
   const isEdit = !!id;
   const { showValidationError } = useAlert();
   const { settings } = useSettings();
+  const { isStudent } = useAuth();
+
+  if (isStudent()) {
+    return <Navigate to="/teachers" replace />;
+  }
 
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({

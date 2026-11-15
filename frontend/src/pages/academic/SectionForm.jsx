@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { sectionAPI, classAPI, teacherAPI } from '../../services/api';
 import { useAlert } from '../../context/AlertContext';
+import { useAuth } from '../../context/AuthContext';
 
 const SectionForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = !!id;
   const { showValidationError } = useAlert();
+  const { isStudent } = useAuth();
+
+  if (isStudent()) {
+    return <Navigate to="/sections" replace />;
+  }
 
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState([]);

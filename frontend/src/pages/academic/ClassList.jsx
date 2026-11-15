@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 const ClassList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const { hasPermission, isTeacher, filterTeacherClasses } = useAuth();
+  const { hasPermission, isTeacher, isStudent, filterTeacherClasses } = useAuth();
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
@@ -133,7 +133,7 @@ const ClassList = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
         </svg>
       </button>
-      {hasPermission('edit-classes') && (
+      {!isStudent() && hasPermission('edit-classes') && (
         <button
           onClick={() => navigate(`/classes/${row.id}/edit`)}
           className="text-green-600 hover:text-green-900 cursor-pointer"
@@ -144,7 +144,7 @@ const ClassList = () => {
           </svg>
         </button>
       )}
-      {hasPermission('delete-classes') && (
+      {!isStudent() && hasPermission('delete-classes') && (
         <button
           onClick={() => handleDelete(row.id)}
           className="text-red-600 hover:text-red-900 cursor-pointer"
@@ -193,7 +193,7 @@ const ClassList = () => {
               <span>📚</span>
               <span>Subjects</span>
             </button>
-            {hasPermission('create-classes') && (
+            {!isStudent() && hasPermission('create-classes') && (
               <button
                 onClick={() => navigate('/classes/create')}
                 className="btn-primary flex items-center space-x-2"

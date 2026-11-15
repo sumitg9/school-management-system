@@ -4,11 +4,13 @@ import { toast } from 'react-toastify';
 import { teacherAPI } from '../../services/api';
 import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
+import { useAuth } from '../../context/AuthContext';
 
 const TeacherDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { formatDate, formatCurrency } = useSettings();
+  const { isStudent, hasPermission } = useAuth();
   const [teacher, setTeacher] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('profile');
@@ -97,15 +99,17 @@ const TeacherDetail = () => {
               <p className="text-gray-600 mt-1">View teacher information</p>
             </div>
           </div>
-          <button
-            onClick={() => navigate(`/teachers/${id}/edit`)}
-            className="btn-primary flex items-center space-x-2"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            <span>Edit</span>
-          </button>
+          {!isStudent() && hasPermission('edit-teachers') && (
+            <button
+              onClick={() => navigate(`/teachers/${id}/edit`)}
+              className="btn-primary flex items-center space-x-2 cursor-pointer"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span>Edit</span>
+            </button>
+          )}
         </div>
       </div>
 

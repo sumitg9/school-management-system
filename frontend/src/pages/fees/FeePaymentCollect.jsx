@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
   feeAPI,
@@ -59,7 +59,11 @@ const FeePaymentCollect = () => {
   const navigate = useNavigate();
   const { formatDate, formatCurrency, settings, calculateLateFine, isMonthOverdue } = useSettings();
   const { showValidationError } = useAlert();
-  const { user } = useAuth();
+  const { user, isStudent } = useAuth();
+
+  if (isStudent()) {
+    return <Navigate to="/fees" replace />;
+  }
 
   // Core Dropdown Data
   const [academicYears, setAcademicYears] = useState([]);

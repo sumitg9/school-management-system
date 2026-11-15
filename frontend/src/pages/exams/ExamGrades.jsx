@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { examAPI, gradeAPI, classAPI, sectionAPI, subjectAPI, studentAPI } from '../../services/api';
 import Badge from '../../components/common/Badge';
 import { useAlert } from '../../context/AlertContext';
+import { useAuth } from '../../context/AuthContext';
 
 const ExamGrades = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { showValidationError } = useAlert();
+  const { isStudent } = useAuth();
+
+  if (isStudent()) {
+    return <Navigate to="/exams" replace />;
+  }
   const [exam, setExam] = useState(null);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);

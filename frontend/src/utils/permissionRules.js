@@ -279,12 +279,35 @@ export const normalizeRole = (rawRole) => {
 };
 
 /**
+ * Strict system constraint check:
+ * Returns true if a permission is forbidden for students (e.g. edit, delete, create, manage, mark, enter, collect, root)
+ */
+export const isRestrictedForStudent = (permissionId) => {
+  if (!permissionId) return false;
+  return (
+    permissionId.startsWith('edit-') ||
+    permissionId.startsWith('delete-') ||
+    permissionId.startsWith('create-') ||
+    permissionId.startsWith('manage-') ||
+    permissionId.startsWith('mark-') ||
+    permissionId.startsWith('enter-') ||
+    permissionId.startsWith('collect-') ||
+    permissionId === '*'
+  );
+};
+
+/**
  * Checks if a given role has a specific permission based on configured permissions
  */
 export const hasRolePermission = (configuredMatrix, role, permissionId) => {
   if (!role || !permissionId) return false;
   const normalized = normalizeRole(role);
   if (normalized === 'super-admin') return true;
+
+  // Strict system constraint: students are strictly forbidden from having any edit, delete, create, mark, or manage permissions
+  if (normalized === 'student') {
+    if (isRestrictedForStudent(permissionId)) return false;
+  }
 
   const matrix = configuredMatrix && typeof configuredMatrix === 'object'
     ? configuredMatrix

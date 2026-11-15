@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { examAPI, academicYearAPI } from '../../services/api';
 import { useAlert } from '../../context/AlertContext';
+import { useAuth } from '../../context/AuthContext';
 
 const ExamForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
   const { showValidationError } = useAlert();
+  const { isStudent } = useAuth();
+
+  if (isStudent()) {
+    return <Navigate to="/exams" replace />;
+  }
   const [loading, setLoading] = useState(false);
   const [academicYears, setAcademicYears] = useState([]);
   const [formData, setFormData] = useState({

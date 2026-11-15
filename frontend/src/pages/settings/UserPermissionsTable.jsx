@@ -7,7 +7,8 @@ import {
   SYSTEM_ROLES,
   PERMISSION_MODULES,
   DEFAULT_ROLE_PERMISSIONS,
-  mergeRolePermissions
+  mergeRolePermissions,
+  isRestrictedForStudent
 } from '../../utils/permissionRules';
 
 const UserPermissionsTable = () => {
@@ -41,6 +42,11 @@ const UserPermissionsTable = () => {
       return;
     }
 
+    if (roleId === 'student' && isRestrictedForStudent(permissionId)) {
+      toast.warning('Edit, delete, and management capabilities are strictly restricted for student users.');
+      return;
+    }
+
     setRolePermissions(prev => {
       const currentPerms = prev[roleId] || [];
       const isCurrentlyEnabled = currentPerms.includes(permissionId);
@@ -64,9 +70,17 @@ const UserPermissionsTable = () => {
   const handleToggleModulePermissions = (roleId, moduleObj) => {
     if (roleId === 'super-admin') return;
 
+    let modulePermIds = moduleObj.permissions.map(p => p.id);
+    if (roleId === 'student') {
+      modulePermIds = modulePermIds.filter(id => !isRestrictedForStudent(id));
+      if (modulePermIds.length === 0) {
+        toast.info('All capabilities in this module are restricted for students.');
+        return;
+      }
+    }
+
     setRolePermissions(prev => {
       const currentPerms = prev[roleId] || [];
-      const modulePermIds = moduleObj.permissions.map(p => p.id);
       const allEnabled = modulePermIds.every(id => currentPerms.includes(id));
 
       let updatedList;
@@ -90,13 +104,16 @@ const UserPermissionsTable = () => {
   // Enable all permissions for a role
   const handleEnableAllForRole = (roleId) => {
     if (roleId === 'super-admin') return;
-    const allIds = PERMISSION_MODULES.flatMap(m => m.permissions.map(p => p.id));
+    let allIds = PERMISSION_MODULES.flatMap(m => m.permissions.map(p => p.id));
+    if (roleId === 'student') {
+      allIds = allIds.filter(id => !isRestrictedForStudent(id));
+    }
     setRolePermissions(prev => ({
       ...prev,
       [roleId]: allIds,
     }));
     setHasChanges(true);
-    toast.info(`Enabled all permissions for ${SYSTEM_ROLES.find(r => r.id === roleId)?.name}`);
+    toast.info(`Enabled all permitted capabilities for ${SYSTEM_ROLES.find(r => r.id === roleId)?.name}`);
   };
 
   // Disable all permissions for a role
@@ -161,7 +178,10 @@ const UserPermissionsTable = () => {
 
   const totalPermissionsCount = PERMISSION_MODULES.flatMap(m => m.permissions).length;
   const currentRoleObj = SYSTEM_ROLES.find(r => r.id === selectedRole) || SYSTEM_ROLES[0];
-  const activeRolePerms = rolePermissions[selectedRole] || [];
+  const rawRolePerms = rolePermissions[selectedRole] || [];
+  const activeRolePerms = selectedRole === 'student'
+    ? rawRolePerms.filter(p => !isRestrictedForStudent(p))
+    : rawRolePerms;
 
   return (
     <div className="space-y-6">
@@ -262,7 +282,9 @@ const UserPermissionsTable = () => {
         <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-thin">
           {SYSTEM_ROLES.map(role => {
             const isSelected = selectedRole === role.id;
-            const count = (rolePermissions[role.id] || []).length;
+            const count = role.id === 'student'
+              ? (rolePermissions[role.id] || []).filter(p => !isRestrictedForStudent(p)).length
+              : (rolePermissions[role.id] || []).length;
             const isSuper = role.id === 'super-admin';
             return (
               <button
@@ -302,6 +324,24 @@ const UserPermissionsTable = () => {
           </p>
         </div>
       </div>
+
+      {/* Student Security Policy Notice */}
+      {selectedRole === 'student' && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3 shadow-2xs">
+          <span className="text-2xl mt-0.5">🔒</span>
+          <div className="text-xs space-y-1">
+            <h4 className="font-bold text-emerald-950 flex items-center gap-2">
+              <span>Student Role Protection Policy</span>
+              <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                Strict Constraint
+              </span>
+            </h4>
+            <p className="text-emerald-900 leading-relaxed">
+              To preserve data integrity, enrolled <b>Students</b> are strictly restricted to read-only viewing of their own records and assignment submission. All create, edit, delete, mark, and administrative capabilities are permanently locked.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* VIEW MODE 1: SINGLE ROLE INSPECTOR */}
       {viewMode === 'inspector' && (
@@ -396,7 +436,8 @@ const UserPermissionsTable = () => {
                   {/* Module Permissions List */}
                   <div className="p-4 divide-y divide-gray-100 flex-1">
                     {module.permissions.map(perm => {
-                      const isEnabled = isSuper || activeRolePerms.includes(perm.id);
+                      const isRestricted = currentRoleObj.id === 'student' && isRestrictedForStudent(perm.id);
+                      const isEnabled = !isRestricted && (isSuper || activeRolePerms.includes(perm.id));
 
                       return (
                         <div
@@ -419,6 +460,14 @@ const UserPermissionsTable = () => {
                             {isSuper ? (
                               <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
                                 Root Always
+                              </span>
+                            ) : isRestricted ? (
+                              <span
+                                className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1 select-none"
+                                title="Edit, delete, and management capabilities cannot be granted to student accounts"
+                              >
+                                <span>🔒</span>
+                                <span>Restricted</span>
                               </span>
                             ) : (
                               <button
@@ -480,7 +529,9 @@ const UserPermissionsTable = () => {
                     <th key={role.id} className="p-3.5 text-center min-w-[105px]">
                       <span className="block font-bold">{role.name}</span>
                       <span className="text-[10px] text-gray-300 font-mono font-normal">
-                        {(rolePermissions[role.id] || []).length} allowed
+                        {role.id === 'student'
+                          ? (rolePermissions[role.id] || []).filter(p => !isRestrictedForStudent(p)).length
+                          : (rolePermissions[role.id] || []).length} allowed
                       </span>
                     </th>
                   ))}
@@ -518,13 +569,21 @@ const UserPermissionsTable = () => {
 
                           {SYSTEM_ROLES.map(role => {
                             const isSuper = role.id === 'super-admin';
-                            const isEnabled = isSuper || (rolePermissions[role.id] || []).includes(perm.id);
+                            const isRestricted = role.id === 'student' && isRestrictedForStudent(perm.id);
+                            const isEnabled = !isRestricted && (isSuper || (rolePermissions[role.id] || []).includes(perm.id));
 
                             return (
                               <td key={role.id} className="p-3 text-center border-r border-gray-100 last:border-r-0">
                                 {isSuper ? (
                                   <span className="text-purple-600 font-bold text-sm" title="Always Allowed">
                                     ✓
+                                  </span>
+                                ) : isRestricted ? (
+                                  <span
+                                    className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-gray-100 text-gray-400 text-xs border border-gray-200 cursor-not-allowed mx-auto select-none"
+                                    title="Restricted: Students cannot perform edit, delete, create, or management actions"
+                                  >
+                                    🔒
                                   </span>
                                 ) : (
                                   <button

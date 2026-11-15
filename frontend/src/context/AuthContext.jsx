@@ -143,7 +143,21 @@ export const AuthProvider = ({ children }) => {
     const effectiveRole = getEffectiveRole();
     if (effectiveRole === 'super-admin') return true;
 
-    // Direct user permissions override if present
+    // Strict system constraint: students are strictly forbidden from edit, delete, create, manage, mark, or collect permissions
+    if (effectiveRole === 'student') {
+      const isForbidden =
+        permission.startsWith('edit-') ||
+        permission.startsWith('delete-') ||
+        permission.startsWith('create-') ||
+        permission.startsWith('manage-') ||
+        permission.startsWith('mark-') ||
+        permission.startsWith('enter-') ||
+        permission.startsWith('collect-') ||
+        permission === '*';
+      if (isForbidden) return false;
+    }
+
+    // Direct user permissions override if present (for non-students)
     if (user?.permissions?.includes('*') || user?.permissions?.includes(permission)) {
       return true;
     }
@@ -171,6 +185,10 @@ export const AuthProvider = ({ children }) => {
   const isFinance = () => hasRole('finance') || hasRole('accountant');
   const isBackOffice = () => hasRole('back-office') || hasRole('librarian') || hasRole('receptionist');
   const isGeneral = () => hasRole('general');
+
+  // Explicit edit & delete checks (guarantees student NEVER has edit or delete anywhere)
+  const canEdit = (perm) => !isStudent() && (perm ? hasPermission(perm) : (isAdmin() || isTeacher()));
+  const canDelete = (perm) => !isStudent() && (perm ? hasPermission(perm) : isAdmin());
 
   // Student profile state for student role or preview
   const [studentProfile, setStudentProfile] = useState(() => {
@@ -251,6 +269,8 @@ export const AuthProvider = ({ children }) => {
     isFinance,
     isBackOffice,
     isGeneral,
+    canEdit,
+    canDelete,
     filterTeacherClasses,
     currentStudent: studentProfile,
     studentProfile,

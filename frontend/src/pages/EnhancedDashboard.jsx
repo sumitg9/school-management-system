@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { studentAPI, teacherAPI, classAPI, attendanceAPI, examAPI, feeAPI, assignmentAPI } from '../services/api';
 import Badge from '../components/common/Badge';
 import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
 
 // Isolated clock component so second-by-second ticks only re-render this badge
 const LiveClock = memo(({ formatDateTime }) => {
@@ -27,6 +28,7 @@ LiveClock.displayName = 'LiveClock';
 const EnhancedDashboard = () => {
   const navigate = useNavigate();
   const { formatDateTime } = useSettings();
+  const { isStudent, hasPermission } = useAuth();
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
@@ -159,14 +161,25 @@ const EnhancedDashboard = () => {
     }
   };
 
-  const quickActions = [
-    { name: 'Add Student', icon: '👨‍🎓', color: 'blue', path: '/students/create' },
-    { name: 'Add Teacher', icon: '👨‍🏫', color: 'green', path: '/teachers/create' },
-    { name: 'Mark Attendance', icon: '📊', color: 'orange', path: '/attendance/mark' },
-    { name: 'Create Exam', icon: '📝', color: 'red', path: '/exams/create' },
-    { name: 'Add Fee', icon: '💰', color: 'emerald', path: '/fees/create' },
-    { name: 'Create Assignment', icon: '📚', color: 'purple', path: '/assignments/create' },
+  const staffQuickActions = [
+    { name: 'Add Student', icon: '👨‍🎓', color: 'blue', path: '/students/create', permission: 'create-students' },
+    { name: 'Add Teacher', icon: '👨‍🏫', color: 'green', path: '/teachers/create', permission: 'create-teachers' },
+    { name: 'Mark Attendance', icon: '📊', color: 'orange', path: '/attendance/mark', permission: 'mark-attendance' },
+    { name: 'Create Exam', icon: '📝', color: 'red', path: '/exams/create', permission: 'create-exams' },
+    { name: 'Add Fee', icon: '💰', color: 'emerald', path: '/fees/create', permission: 'create-fees' },
+    { name: 'Create Assignment', icon: '📚', color: 'purple', path: '/assignments/create', permission: 'create-assignments' },
   ];
+
+  const studentQuickActions = [
+    { name: 'My Attendance', icon: '📊', color: 'blue', path: '/attendance' },
+    { name: 'My Examinations', icon: '📝', color: 'red', path: '/exams' },
+    { name: 'My Assignments', icon: '📚', color: 'purple', path: '/assignments' },
+    { name: 'My Fee Details', icon: '💰', color: 'emerald', path: '/fees' },
+  ];
+
+  const quickActions = isStudent()
+    ? studentQuickActions
+    : staffQuickActions.filter(action => !action.permission || hasPermission(action.permission));
 
   return (
     <div className="p-6">

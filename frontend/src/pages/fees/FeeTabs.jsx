@@ -1,10 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const FeeTabs = () => {
   const location = useLocation();
   const currentPath = location.pathname;
+  const { isStudent, hasPermission } = useAuth();
 
-  const tabs = [
+  const allTabs = [
     {
       name: 'Fee Structures',
       path: '/fees',
@@ -21,6 +23,8 @@ const FeeTabs = () => {
       name: 'Collect Fees / Payment',
       path: '/fees/payment',
       icon: '💳',
+      permission: 'collect-fees',
+      adminOnly: true,
       active:
         currentPath === '/fees/payment' ||
         currentPath === '/fees/collect',
@@ -36,6 +40,12 @@ const FeeTabs = () => {
       description: 'Search, filter, and inspect past receipts',
     },
   ];
+
+  const tabs = allTabs.filter(tab => {
+    if (tab.adminOnly && isStudent()) return false;
+    if (tab.permission && (!hasPermission(tab.permission) || isStudent())) return false;
+    return true;
+  });
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 pb-3 mb-6">
