@@ -40,6 +40,12 @@ class SettingController extends Controller
             'teacher_min_age_years' => 'nullable|numeric|min:15',
             'staff_min_age_years' => 'nullable|numeric|min:15',
             'class_age_criteria' => 'nullable',
+            'fee_late_fine_enabled' => 'nullable',
+            'fee_late_fine_type' => 'nullable|string|max:50',
+            'fee_late_fine_amount' => 'nullable|numeric|min:0',
+            'fee_due_day_of_month' => 'nullable|integer|min:1|max:31',
+            'fee_grace_period_days' => 'nullable|integer|min:0|max:60',
+            'fee_late_fine_max_cap' => 'nullable|numeric|min:0',
             'settings' => 'nullable|array',
         ]);
 
@@ -57,7 +63,7 @@ class SettingController extends Controller
         foreach ($payload as $key => $value) {
             $group = in_array($key, ['date_time_format', 'date_format', 'time_format', 'timezone', 'currency', 'currency_symbol'])
                 ? 'localization'
-                : 'age_criteria';
+                : (str_starts_with($key, 'fee_') ? 'fees' : 'age_criteria');
             $valStr = (is_array($value) || is_object($value)) ? json_encode($value) : (string)$value;
             Setting::set($key, $valStr, $group);
         }

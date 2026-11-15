@@ -49,6 +49,14 @@ const Settings = () => {
   const [staffMinAgeYears, setStaffMinAgeYears] = useState(18);
   const [classAgeCriteria, setClassAgeCriteria] = useState(DEFAULT_CLASS_AGE_CRITERIA);
 
+  // Form states - Fee Rules & Late Fine
+  const [feeLateFineEnabled, setFeeLateFineEnabled] = useState(true);
+  const [feeLateFineType, setFeeLateFineType] = useState('fixed_per_month');
+  const [feeLateFineAmount, setFeeLateFineAmount] = useState(100);
+  const [feeDueDayOfMonth, setFeeDueDayOfMonth] = useState(10);
+  const [feeGracePeriodDays, setFeeGracePeriodDays] = useState(0);
+  const [feeLateFineMaxCap, setFeeLateFineMaxCap] = useState(1000);
+
   // Class criteria helpers
   const [availableClasses, setAvailableClasses] = useState([]);
   const [newClassName, setNewClassName] = useState('');
@@ -118,6 +126,14 @@ const Settings = () => {
         }
       }
       setClassAgeCriteria(criteria && typeof criteria === 'object' ? criteria : DEFAULT_CLASS_AGE_CRITERIA);
+
+      // Fee Rules & Late Fine
+      setFeeLateFineEnabled(settings.fee_late_fine_enabled !== undefined ? !!settings.fee_late_fine_enabled : true);
+      setFeeLateFineType(settings.fee_late_fine_type || 'fixed_per_month');
+      setFeeLateFineAmount(settings.fee_late_fine_amount !== undefined ? settings.fee_late_fine_amount : 100);
+      setFeeDueDayOfMonth(settings.fee_due_day_of_month !== undefined ? settings.fee_due_day_of_month : 10);
+      setFeeGracePeriodDays(settings.fee_grace_period_days !== undefined ? settings.fee_grace_period_days : 0);
+      setFeeLateFineMaxCap(settings.fee_late_fine_max_cap !== undefined ? settings.fee_late_fine_max_cap : 1000);
     }
   }, [settings]);
 
@@ -232,6 +248,12 @@ const Settings = () => {
       teacher_min_age_years: parseInt(teacherMinAgeYears, 10),
       staff_min_age_years: parseInt(staffMinAgeYears, 10),
       class_age_criteria: classAgeCriteria,
+      fee_late_fine_enabled: feeLateFineEnabled,
+      fee_late_fine_type: feeLateFineType,
+      fee_late_fine_amount: parseFloat(feeLateFineAmount) || 0,
+      fee_due_day_of_month: parseInt(feeDueDayOfMonth, 10) || 10,
+      fee_grace_period_days: parseInt(feeGracePeriodDays, 10) || 0,
+      fee_late_fine_max_cap: parseFloat(feeLateFineMaxCap) || 0,
     };
 
     await updateSettings(payload);
@@ -241,7 +263,7 @@ const Settings = () => {
   const handleResetDefaults = async () => {
     const isConfirmed = await confirm({
       title: 'Reset System Settings',
-      message: 'Are you sure you want to reset all localization, date/time, and age criteria settings to default values?',
+      message: 'Are you sure you want to reset all localization, date/time, age criteria, and fee fine settings to default values?',
       confirmText: 'Reset to Defaults',
       cancelText: 'Cancel',
       type: 'warning',
@@ -261,6 +283,12 @@ const Settings = () => {
         teacher_min_age_years: 20,
         staff_min_age_years: 18,
         class_age_criteria: DEFAULT_CLASS_AGE_CRITERIA,
+        fee_late_fine_enabled: true,
+        fee_late_fine_type: 'fixed_per_month',
+        fee_late_fine_amount: 100,
+        fee_due_day_of_month: 10,
+        fee_grace_period_days: 0,
+        fee_late_fine_max_cap: 1000,
       });
       setSelectedPreset('DD-MM-YYYY HH:mm:ss');
       setIsCustom(false);
@@ -275,6 +303,12 @@ const Settings = () => {
       setTeacherMinAgeYears(20);
       setStaffMinAgeYears(18);
       setClassAgeCriteria(DEFAULT_CLASS_AGE_CRITERIA);
+      setFeeLateFineEnabled(true);
+      setFeeLateFineType('fixed_per_month');
+      setFeeLateFineAmount(100);
+      setFeeDueDayOfMonth(10);
+      setFeeGracePeriodDays(0);
+      setFeeLateFineMaxCap(1000);
       setSaving(false);
     }
   };
@@ -326,6 +360,17 @@ const Settings = () => {
           <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800 font-bold">
             Custom
           </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('fee_rules')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
+            activeTab === 'fee_rules'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <span>💳</span> Fee Rules & Late Fine
         </button>
         <button
           type="button"
@@ -643,6 +688,193 @@ const Settings = () => {
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECTION: FEE RULES & LATE FINE SETTINGS */}
+        {(activeTab === 'all' || activeTab === 'fee_rules') && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between border-b pb-4 gap-2">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <span>💳</span> Fee Payment Rules & Late Fine Policy
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Configure monthly fee due dates, overdue grace periods, and automatic late fine calculations.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
+                  feeLateFineEnabled ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {feeLateFineEnabled ? '✓ Late Fine Active' : '✕ Late Fine Disabled'}
+                </span>
+              </div>
+            </div>
+
+            {/* Toggle Switch */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <div>
+                <label htmlFor="feeLateFineToggle" className="text-sm font-bold text-gray-900 cursor-pointer">
+                  Enable Automatic Late Fine for Overdue Fee Months
+                </label>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  When enabled, overdue months selected in the Fee Collection screen automatically incur this penalty.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  id="feeLateFineToggle"
+                  type="checkbox"
+                  checked={feeLateFineEnabled}
+                  onChange={(e) => setFeeLateFineEnabled(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            {/* Settings Grid */}
+            <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 transition-opacity ${!feeLateFineEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+              {/* Calculation Type */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-gray-700">
+                  Late Fine Calculation Method
+                </label>
+                <select
+                  value={feeLateFineType}
+                  onChange={(e) => setFeeLateFineType(e.target.value)}
+                  className="input-field text-sm"
+                >
+                  <option value="fixed_per_month">Fixed Amount Per Overdue Month (₹)</option>
+                  <option value="percentage">Percentage of Monthly Fee (% per month)</option>
+                  <option value="daily">Daily Late Fine (₹ per day overdue)</option>
+                </select>
+                <p className="text-[11px] text-gray-500">
+                  {feeLateFineType === 'fixed_per_month' && 'Applies a flat fine for each month past its due date.'}
+                  {feeLateFineType === 'percentage' && 'Calculates fine as a percentage of 1 month base fee.'}
+                  {feeLateFineType === 'daily' && 'Multiplies days elapsed past due date by the daily rate.'}
+                </p>
+              </div>
+
+              {/* Amount / Rate */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-gray-700">
+                  {feeLateFineType === 'percentage' ? 'Fine Percentage (%)' : `Fine Rate (${currencySymbol})`}
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 font-semibold text-sm">
+                    {feeLateFineType === 'percentage' ? '%' : currencySymbol}
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step={feeLateFineType === 'percentage' ? '0.1' : '1'}
+                    value={feeLateFineAmount}
+                    onChange={(e) => setFeeLateFineAmount(e.target.value)}
+                    className="input-field text-sm pl-8 font-semibold"
+                    placeholder="100"
+                  />
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  {feeLateFineType === 'percentage' ? 'e.g. 5% = ₹100 on ₹2000 fee' : 'e.g. ₹100/mo or ₹5/day'}
+                </p>
+              </div>
+
+              {/* Due Day of Month */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-gray-700">
+                  Monthly Fee Due Day
+                </label>
+                <select
+                  value={feeDueDayOfMonth}
+                  onChange={(e) => setFeeDueDayOfMonth(parseInt(e.target.value, 10))}
+                  className="input-field text-sm"
+                >
+                  {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
+                    <option key={day} value={day}>
+                      {day}{day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th'} of each month
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-gray-500">
+                  Day of the month by which monthly fee must be paid without penalty.
+                </p>
+              </div>
+
+              {/* Grace Period */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-gray-700">
+                  Grace Period (Days After Due Date)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="30"
+                    value={feeGracePeriodDays}
+                    onChange={(e) => setFeeGracePeriodDays(parseInt(e.target.value, 10) || 0)}
+                    className="input-field text-sm"
+                    placeholder="0"
+                  />
+                  <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 text-xs">
+                    days
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Extra days allowed before late fine kicks in (0 = immediate fine after due day).
+                </p>
+              </div>
+
+              {/* Maximum Fine Cap */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-gray-700">
+                  Maximum Late Fine Cap ({currencySymbol})
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 font-semibold text-sm">
+                    {currencySymbol}
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="50"
+                    value={feeLateFineMaxCap}
+                    onChange={(e) => setFeeLateFineMaxCap(e.target.value)}
+                    className="input-field text-sm pl-8"
+                    placeholder="1000"
+                  />
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Maximum fine ceiling (enter 0 for unlimited / no maximum cap).
+                </p>
+              </div>
+            </div>
+
+            {/* Live Interactive Simulation Card */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 text-xs space-y-2">
+              <div className="font-bold text-blue-900 flex items-center gap-1.5 text-sm">
+                <span>💡</span>
+                <span>Live Rule Simulation & Preview</span>
+              </div>
+              <p className="text-gray-700 leading-relaxed">
+                If a student has <strong>3 overdue months</strong> (with monthly fee of <strong>{currencySymbol}2,000</strong>):
+              </p>
+              <div className="flex flex-wrap items-center gap-3 bg-white p-2.5 rounded-lg border border-blue-100 font-mono text-xs">
+                <span>Due deadline: <strong className="text-gray-900">{feeDueDayOfMonth}th of month</strong> (+{feeGracePeriodDays} days grace)</span>
+                <span>•</span>
+                <span>Calculated Late Fine: <strong className="text-red-600 font-bold">
+                  {feeLateFineEnabled ? (
+                    feeLateFineType === 'percentage'
+                      ? `${currencySymbol}${Math.min(feeLateFineMaxCap > 0 ? feeLateFineMaxCap : Infinity, Math.round(3 * 2000 * ((parseFloat(feeLateFineAmount) || 0) / 100)))}`
+                      : feeLateFineType === 'daily'
+                      ? `${currencySymbol}${Math.min(feeLateFineMaxCap > 0 ? feeLateFineMaxCap : Infinity, Math.round(3 * 15 * (parseFloat(feeLateFineAmount) || 0)))} (assuming 15 days/mo)`
+                      : `${currencySymbol}${Math.min(feeLateFineMaxCap > 0 ? feeLateFineMaxCap : Infinity, Math.round(3 * (parseFloat(feeLateFineAmount) || 0)))}`
+                  ) : `${currencySymbol}0 (Disabled)`}
+                </strong></span>
+                {feeLateFineMaxCap > 0 && <span>(Cap: {currencySymbol}{feeLateFineMaxCap})</span>}
               </div>
             </div>
           </div>

@@ -17,6 +17,12 @@ import {
   formatCurrency as baseFormatCurrency,
   DEFAULT_CURRENCY_SYMBOL
 } from '../utils/currencyFormatter';
+import {
+  calculateLateFine as baseCalculateLateFine,
+  isMonthOverdue as baseIsMonthOverdue,
+  getDaysOverdue as baseGetDaysOverdue,
+  LATE_FINE_TYPES
+} from '../utils/feeLateFine';
 import { toast } from 'react-toastify';
 import { showGlobalValidationError } from './AlertContext';
 
@@ -34,6 +40,14 @@ export const DEFAULT_SETTINGS = {
   teacher_min_age_years: 20,
   staff_min_age_years: 18,
   class_age_criteria: DEFAULT_CLASS_AGE_CRITERIA,
+
+  // Fee Rules & Late Fine
+  fee_late_fine_enabled: true,
+  fee_late_fine_type: 'fixed_per_month', // 'fixed_per_month' | 'percentage' | 'daily'
+  fee_late_fine_amount: 100,
+  fee_due_day_of_month: 10,
+  fee_grace_period_days: 0,
+  fee_late_fine_max_cap: 1000,
 };
 
 const normalizeSettings = (raw) => {
@@ -54,6 +68,20 @@ const normalizeSettings = (raw) => {
   merged.student_min_age_months = parseInt(merged.student_min_age_months ?? 6, 10);
   merged.teacher_min_age_years = parseInt(merged.teacher_min_age_years ?? 20, 10);
   merged.staff_min_age_years = parseInt(merged.staff_min_age_years ?? 18, 10);
+
+  // Late Fine normalization
+  merged.fee_late_fine_enabled =
+    merged.fee_late_fine_enabled === true ||
+    merged.fee_late_fine_enabled === 'true' ||
+    merged.fee_late_fine_enabled === 1 ||
+    merged.fee_late_fine_enabled === '1';
+  merged.fee_late_fine_type = ['fixed_per_month', 'percentage', 'daily'].includes(merged.fee_late_fine_type)
+    ? merged.fee_late_fine_type
+    : 'fixed_per_month';
+  merged.fee_late_fine_amount = parseFloat(merged.fee_late_fine_amount ?? 100) || 0;
+  merged.fee_due_day_of_month = Math.min(31, Math.max(1, parseInt(merged.fee_due_day_of_month ?? 10, 10) || 10));
+  merged.fee_grace_period_days = Math.max(0, parseInt(merged.fee_grace_period_days ?? 0, 10) || 0);
+  merged.fee_late_fine_max_cap = Math.max(0, parseFloat(merged.fee_late_fine_max_cap ?? 1000) || 0);
 
   return merged;
 };
@@ -175,6 +203,24 @@ export const SettingsProvider = ({ children }) => {
     [settings]
   );
 
+  const calculateLateFine = useCallback(
+    (overdueMonthsList, monthlyFeeRate, referenceDate) =>
+      baseCalculateLateFine(overdueMonthsList, monthlyFeeRate, settings, referenceDate),
+    [settings]
+  );
+
+  const isMonthOverdue = useCallback(
+    (monthObj, referenceDate) =>
+      baseIsMonthOverdue(monthObj, settings, referenceDate),
+    [settings]
+  );
+
+  const getDaysOverdue = useCallback(
+    (monthObj, referenceDate) =>
+      baseGetDaysOverdue(monthObj, settings, referenceDate),
+    [settings]
+  );
+
   const value = {
     settings,
     loading,
@@ -192,6 +238,9 @@ export const SettingsProvider = ({ children }) => {
     validateTeacherDateOfBirth,
     getMaxStaffDateOfBirth,
     validateStaffDateOfBirth,
+    calculateLateFine,
+    isMonthOverdue,
+    getDaysOverdue,
   };
 
   return (
@@ -222,6 +271,10 @@ export const useSettings = () => {
       validateTeacherDateOfBirth: (dob) => baseValidateTeacherDateOfBirth(dob, DEFAULT_SETTINGS),
       getMaxStaffDateOfBirth: () => baseGetMaxStaffDateOfBirth(DEFAULT_SETTINGS),
       validateStaffDateOfBirth: (dob) => baseValidateStaffDateOfBirth(dob, DEFAULT_SETTINGS),
+      calculateLateFine: (overdueMonths, rate, refDate) =>
+        baseCalculateLateFine(overdueMonths, rate, DEFAULT_SETTINGS, refDate),
+      isMonthOverdue: (m, refDate) => baseIsMonthOverdue(m, DEFAULT_SETTINGS, refDate),
+      getDaysOverdue: (m, refDate) => baseGetDaysOverdue(m, DEFAULT_SETTINGS, refDate),
     };
   }
   return context;

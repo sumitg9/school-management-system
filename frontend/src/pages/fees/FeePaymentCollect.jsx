@@ -57,7 +57,7 @@ const detectDefaultFrequency = (struct) => {
 
 const FeePaymentCollect = () => {
   const navigate = useNavigate();
-  const { formatDate, formatCurrency } = useSettings();
+  const { formatDate, formatCurrency, settings, calculateLateFine, isMonthOverdue } = useSettings();
   const { showValidationError } = useAlert();
   const { user } = useAuth();
 
@@ -331,20 +331,63 @@ const FeePaymentCollect = () => {
     return academicMonths.filter(m => !paidMonthsSet.has(m.key));
   }, [academicMonths, paidMonthsSet]);
 
-  // Ensure selectedMonthKeys NEVER contains already-paid months
-  useEffect(() => {
-    setSelectedMonthKeys(prev => {
-      // Filter out any months that are already paid
-      const filtered = prev.filter(key => !paidMonthsSet.has(key));
-      
-      // If we still have valid unpaid selections, keep them
-      if (filtered.length > 0) return filtered;
+  // Index of current calendar month in the academic session
+  const currentSessionMonthIndex = useMemo(() => {
+    if (!academicMonths || academicMonths.length === 0) return -1;
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const exactIndex = academicMonths.findIndex(m => m.key === currentKey);
+    if (exactIndex !== -1) return exactIndex;
 
-      // Otherwise default to the first unpaid month (if available)
-      const firstUnpaid = academicMonths.find(m => !paidMonthsSet.has(m.key));
-      return firstUnpaid ? [firstUnpaid.key] : [];
-    });
-  }, [paidMonthsSet, academicMonths]);
+    // If current calendar date has passed the academic session end
+    const lastMonth = academicMonths[academicMonths.length - 1];
+    if (
+      lastMonth &&
+      (now.getFullYear() > lastMonth.year ||
+        (now.getFullYear() === lastMonth.year && now.getMonth() >= lastMonth.monthIndex))
+    ) {
+      return academicMonths.length - 1; // All session months have elapsed and are due
+    }
+
+    return -1; // Future session
+  }, [academicMonths]);
+
+  // First unpaid month in the academic session
+  const firstUnpaidIndex = useMemo(() => {
+    return academicMonths.findIndex(m => !paidMonthsSet.has(m.key));
+  }, [academicMonths, paidMonthsSet]);
+
+  // Mandatory minimum due months: from first unpaid month up to current month
+  // E.g. If current month is June and paid up to March, mandatory minimum is [April, May, June]
+  const mandatoryDueMonthKeys = useMemo(() => {
+    if (firstUnpaidIndex === -1 || currentSessionMonthIndex === -1) return [];
+    if (firstUnpaidIndex <= currentSessionMonthIndex) {
+      return academicMonths
+        .slice(firstUnpaidIndex, currentSessionMonthIndex + 1)
+        .filter(m => !paidMonthsSet.has(m.key))
+        .map(m => m.key);
+    }
+    return [];
+  }, [academicMonths, firstUnpaidIndex, currentSessionMonthIndex, paidMonthsSet]);
+
+  // Auto-select default months when a student or payment history is loaded
+  useEffect(() => {
+    if (!selectedStudentId) {
+      setSelectedMonthKeys([]);
+      return;
+    }
+
+    if (mandatoryDueMonthKeys.length > 0) {
+      // Dues from last paid up to current month (e.g. April, May, June)
+      setSelectedMonthKeys(mandatoryDueMonthKeys);
+    } else if (firstUnpaidIndex !== -1) {
+      // Up to date; default to 1 next unpaid advance month
+      setSelectedMonthKeys([academicMonths[firstUnpaidIndex].key]);
+    } else {
+      // All 12 session months are paid
+      setSelectedMonthKeys([]);
+    }
+  }, [selectedStudentId, mandatoryDueMonthKeys, firstUnpaidIndex, academicMonths]);
 
   // 6. Fetch Fee Structures when Academic Year or Class changes
   useEffect(() => {
@@ -406,55 +449,84 @@ const FeePaymentCollect = () => {
     });
   }, [students, studentSearch]);
 
-  // Month selection handlers - Prevents selecting already paid months
-  const handleToggleMonth = (key) => {
-    if (paidMonthsSet.has(key)) {
-      toast.warning('This month has already been paid and cannot be selected again.');
+  // 1-month recurring fee base rate (sum of enabled monthly fee items)
+  const monthlyRecurringRate = useMemo(() => {
+    return feeItems
+      .filter(item => item.enabled && item.frequency === 'monthly')
+      .reduce((sum, item) => sum + (parseFloat(item.base_amount) || 0), 0);
+  }, [feeItems]);
+
+  // Selected months that are overdue according to school late fine rules
+  const selectedOverdueMonths = useMemo(() => {
+    const refDate = paymentDate ? new Date(paymentDate) : new Date();
+    return academicMonths.filter(
+      m => selectedMonthKeys.includes(m.key) && isMonthOverdue(m, refDate)
+    );
+  }, [academicMonths, selectedMonthKeys, paymentDate, isMonthOverdue]);
+
+  // Auto-calculated late fine info
+  const autoLateFineInfo = useMemo(() => {
+    const refDate = paymentDate ? new Date(paymentDate) : new Date();
+    return calculateLateFine(selectedOverdueMonths, monthlyRecurringRate, refDate);
+  }, [selectedOverdueMonths, monthlyRecurringRate, calculateLateFine, paymentDate]);
+
+  // Synchronize globalFine with calculated late fine
+  useEffect(() => {
+    if (autoLateFineInfo.fineAmount > 0) {
+      setGlobalFine(String(autoLateFineInfo.fineAmount));
+    } else {
+      setGlobalFine('0');
+    }
+  }, [autoLateFineInfo.fineAmount]);
+
+  // Month selection handlers: protects paid & mandatory due months, allows sequential advance selection
+  const handleToggleMonth = (clickedKey) => {
+    if (paidMonthsSet.has(clickedKey)) {
+      toast.warning('This month has already been settled and cannot be re-selected for payment.');
       return;
     }
+
+    // Protect mandatory minimum due months
+    if (mandatoryDueMonthKeys.includes(clickedKey)) {
+      const dueNames = academicMonths
+        .filter(m => mandatoryDueMonthKeys.includes(m.key))
+        .map(m => m.shortName)
+        .join(', ');
+      toast.info(
+        `Minimum payment required: ${dueNames} are overdue and must be cleared first.`,
+        { icon: 'ℹ️' }
+      );
+      return;
+    }
+
+    const clickedIdx = academicMonths.findIndex(m => m.key === clickedKey);
+    if (clickedIdx === -1) return;
+
     setSelectedMonthKeys(prev => {
-      if (prev.includes(key)) {
-        return prev.filter(k => k !== key);
+      const isAlreadySelected = prev.includes(clickedKey);
+
+      if (isAlreadySelected) {
+        // Deselect clicked advance month and any advance months after it
+        const remaining = prev.filter(k => {
+          const idx = academicMonths.findIndex(m => m.key === k);
+          return idx < clickedIdx;
+        });
+
+        // Always retain mandatory minimum dues
+        return Array.from(new Set([...mandatoryDueMonthKeys, ...remaining]));
       } else {
-        return [...prev, key];
+        // Selecting an advance month: consecutively select up to clicked month
+        const startIdx = firstUnpaidIndex !== -1 ? firstUnpaidIndex : 0;
+        const newSelection = [];
+        for (let i = startIdx; i <= clickedIdx; i++) {
+          const m = academicMonths[i];
+          if (m && !paidMonthsSet.has(m.key)) {
+            newSelection.push(m.key);
+          }
+        }
+        return newSelection;
       }
     });
-  };
-
-  const handleSelectPresetMonths = (count) => {
-    if (unpaidMonths.length === 0) {
-      toast.info('All session months have already been settled for this student.');
-      setSelectedMonthKeys([]);
-      return;
-    }
-
-    if (count === 1) {
-      // Find current calendar month first if it belongs to session and is unpaid
-      const now = new Date();
-      const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      const isCurInSession = academicMonths.some(m => m.key === curKey);
-
-      if (isCurInSession) {
-        if (paidMonthsSet.has(curKey)) {
-          toast.info('Current month is already paid.');
-          return;
-        }
-        setSelectedMonthKeys([curKey]);
-        return;
-      }
-
-      // If current calendar month is outside this academic year, select the first unpaid session month
-      setSelectedMonthKeys([unpaidMonths[0].key]);
-      return;
-    }
-
-    // Pick next 'count' unpaid months (e.g. 3, 6, or all remaining for 12)
-    const toSelect = unpaidMonths.slice(0, count).map(m => m.key);
-    setSelectedMonthKeys(toSelect);
-  };
-
-  const handleClearMonths = () => {
-    setSelectedMonthKeys([]);
   };
 
   // Selected Months display names
@@ -1000,93 +1072,54 @@ const FeePaymentCollect = () => {
               <div>
                 <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">2</span>
-                  <span>Fee Months & Advance Payment</span>
+                  <span>Session Months & Fee Selection</span>
                 </h2>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Select month(s) to pay. Students can pay 1 month or any number of months in advance.
+                  Select month(s) to settle. Dues up to the current month are pre-selected by default.
                 </p>
               </div>
             </div>
 
-            {/* Quick Preset Buttons */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  ⚡ Quick Advance Presets:
-                </label>
-                {unpaidMonths.length > 0 ? (
-                  <span className="text-[11px] text-blue-700 font-semibold">
-                    {unpaidMonths.length} Unpaid Month{unpaidMonths.length !== 1 ? 's' : ''} Remaining
-                  </span>
-                ) : (
-                  <span className="text-[11px] text-emerald-700 font-bold">
-                    ✓ All Session Months Settled
-                  </span>
-                )}
+            {/* Mandatory Due Months Alert Banner */}
+            {mandatoryDueMonthKeys.length > 0 && (
+              <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 text-amber-950 text-xs flex items-start gap-2.5 shadow-xs">
+                <span className="text-base leading-none">⚠️</span>
+                <div>
+                  <div className="font-bold text-amber-950 flex items-center gap-2">
+                    <span>Minimum Required Payment:</span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-extrabold border border-amber-300">
+                      {mandatoryDueMonthKeys.length} Month{mandatoryDueMonthKeys.length !== 1 ? 's' : ''} Due
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-amber-800 mt-0.5">
+                    Unpaid dues from last paid month up to current month (<strong>{academicMonths.filter(m => mandatoryDueMonthKeys.includes(m.key)).map(m => m.shortName).join(', ')}</strong>) are pre-selected and must be settled first.
+                  </div>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={unpaidMonths.length === 0}
-                  onClick={() => handleSelectPresetMonths(1)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                    selectedMonthKeys.length === 1 && unpaidMonths.length > 0
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                  }`}
-                  title={unpaidMonths.length === 0 ? 'All months paid' : 'Select current month (1 month)'}
-                >
-                  Current Month (1 mo)
-                </button>
-                <button
-                  type="button"
-                  disabled={unpaidMonths.length === 0}
-                  onClick={() => handleSelectPresetMonths(3)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                    selectedMonthKeys.length === Math.min(3, unpaidMonths.length) && unpaidMonths.length > 0
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                  }`}
-                  title={unpaidMonths.length === 0 ? 'All months paid' : 'Select next 3 unpaid months'}
-                >
-                  Quarter (3 mos)
-                </button>
-                <button
-                  type="button"
-                  disabled={unpaidMonths.length === 0}
-                  onClick={() => handleSelectPresetMonths(6)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                    selectedMonthKeys.length === Math.min(6, unpaidMonths.length) && unpaidMonths.length > 0
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                  }`}
-                  title={unpaidMonths.length === 0 ? 'All months paid' : 'Select next 6 unpaid months'}
-                >
-                  Half-Year (6 mos)
-                </button>
-                <button
-                  type="button"
-                  disabled={unpaidMonths.length === 0}
-                  onClick={() => handleSelectPresetMonths(12)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                    selectedMonthKeys.length === unpaidMonths.length && unpaidMonths.length > 0
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                  }`}
-                  title={unpaidMonths.length === 0 ? 'All months paid' : 'Select all remaining unpaid months'}
-                >
-                  Full Year ({unpaidMonths.length} mos)
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearMonths}
-                  className="px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
-                  title="Clear all selected months"
-                >
-                  Clear
-                </button>
+            )}
+
+            {/* Automatic Late Fine Alert Banner */}
+            {autoLateFineInfo.fineAmount > 0 && (
+              <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-xl p-3 text-red-950 text-xs flex items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-lg">🚨</span>
+                  <div>
+                    <div className="font-bold text-red-900 flex items-center gap-1.5">
+                      <span>Late Fine of {formatCurrency(autoLateFineInfo.fineAmount)} Applied</span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800 border border-red-300">
+                        {autoLateFineInfo.overdueCount} Overdue Month{autoLateFineInfo.overdueCount > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-red-700 mt-0.5">
+                      Rule: {autoLateFineInfo.ruleDescription} (Configured in System Settings)
+                    </div>
+                  </div>
+                </div>
+                <span className="text-xs font-mono font-bold text-red-700 bg-white px-2.5 py-1 rounded-lg border border-red-200 shadow-xs shrink-0">
+                  +{formatCurrency(autoLateFineInfo.fineAmount)}
+                </span>
               </div>
-            </div>
+            )}
 
             {/* Banner when all session months are settled */}
             {selectedStudent && unpaidMonths.length === 0 && (
@@ -1101,18 +1134,25 @@ const FeePaymentCollect = () => {
             {/* Individual Months Grid (12 Months of Academic Session) */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                  Session Months ({academicMonths.length}):
-                </label>
-                <div className="text-[11px] text-gray-500">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                    Session Months ({academicMonths.length}):
+                  </label>
+                  <p className="text-[11px] text-gray-500">
+                    Past paid months are disabled. Click any future month to extend advance payment.
+                  </p>
+                </div>
+                <div className="text-[11px] text-gray-500 flex items-center gap-2">
                   <span className="text-emerald-700 font-bold">{paidMonthsSet.size} Paid</span> •{' '}
-                  <span className="text-blue-700 font-bold">{unpaidMonths.length} Unpaid</span>
+                  <span className="text-blue-700 font-bold">{unpaidMonths.length} Unpaid</span> •{' '}
+                  <span className="text-gray-900 font-bold">{selectedMonthKeys.length} Selected</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                 {academicMonths.map((m) => {
                   const isPaid = paidMonthsSet.has(m.key);
+                  const isMandatoryDue = mandatoryDueMonthKeys.includes(m.key);
                   const isSelected = selectedMonthKeys.includes(m.key);
 
                   if (isPaid) {
@@ -1120,7 +1160,7 @@ const FeePaymentCollect = () => {
                       <div
                         key={m.key}
                         className="relative p-2.5 text-left rounded-xl border border-gray-200 bg-gray-100/90 text-gray-400 cursor-not-allowed select-none flex flex-col justify-between opacity-80"
-                        title="This month has already been paid and cannot be re-selected for payment."
+                        title="This month has already been settled and cannot be re-selected for payment."
                       >
                         <div className="flex items-center justify-between w-full">
                           <span className="font-semibold text-gray-500 line-through decoration-emerald-600 decoration-2">
@@ -1138,6 +1178,28 @@ const FeePaymentCollect = () => {
                     );
                   }
 
+                  if (isMandatoryDue) {
+                    return (
+                      <button
+                        key={m.key}
+                        type="button"
+                        onClick={() => handleToggleMonth(m.key)}
+                        className="relative p-2.5 text-left rounded-xl border-2 border-amber-400 bg-amber-50/90 text-amber-950 font-semibold shadow-xs flex flex-col justify-between cursor-pointer ring-2 ring-amber-300/30"
+                        title="Mandatory due month — minimum required payment"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-bold text-amber-950">{m.shortName}</span>
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 text-[10px] font-extrabold border border-amber-300">
+                            ✓ Due
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-amber-800 mt-1 flex items-center gap-1 font-bold">
+                          <span>⚠️ Mandatory</span>
+                        </div>
+                      </button>
+                    );
+                  }
+
                   return (
                     <button
                       key={m.key}
@@ -1145,8 +1207,8 @@ const FeePaymentCollect = () => {
                       onClick={() => handleToggleMonth(m.key)}
                       className={`relative p-2.5 text-left rounded-xl border transition-all text-xs cursor-pointer flex flex-col justify-between ${
                         isSelected
-                          ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-500/20 text-blue-900 font-semibold shadow-xs'
-                          : 'bg-white border-gray-200 hover:border-blue-300 hover:bg-gray-50 text-gray-700'
+                          ? 'bg-blue-50 border-2 border-blue-600 ring-2 ring-blue-500/20 text-blue-950 font-semibold shadow-xs'
+                          : 'bg-white border-gray-200 hover:border-blue-400 hover:bg-gray-50 text-gray-700'
                       }`}
                     >
                       <div className="flex items-center justify-between w-full">
@@ -1159,7 +1221,7 @@ const FeePaymentCollect = () => {
                       </div>
                       <div className="text-[10px] mt-1 font-medium">
                         {isSelected ? (
-                          <span className="text-blue-700 font-bold">Selected</span>
+                          <span className="text-blue-700 font-bold">Advance</span>
                         ) : (
                           <span className="text-gray-400">Unpaid</span>
                         )}
@@ -1431,9 +1493,16 @@ const FeePaymentCollect = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Overall Late Fine / Surcharge (₹)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-gray-700">
+                    Overall Late Fine / Surcharge (₹)
+                  </label>
+                  {autoLateFineInfo.fineAmount > 0 && (
+                    <span className="text-[10px] text-amber-800 font-bold bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200">
+                      Auto: {formatCurrency(autoLateFineInfo.fineAmount)}
+                    </span>
+                  )}
+                </div>
                 <input
                   type="number"
                   min="0"
