@@ -7,12 +7,17 @@ import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
+import StudentAssignmentsView from './StudentAssignmentsView';
 
 const AssignmentList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const { formatDate } = useSettings();
   const { isStudent, hasPermission, filterTeacherClasses } = useAuth();
+
+  if (isStudent()) {
+    return <StudentAssignmentsView />;
+  }
   const [assignments, setAssignments] = useState([]);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);

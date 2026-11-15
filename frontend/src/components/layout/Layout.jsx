@@ -23,7 +23,7 @@ const Layout = ({ children }) => {
     { path: '/exams', icon: '📝', label: isStudent() ? 'My Exams' : 'Exams', permission: 'view-exams' },
     { path: '/fees', icon: '💵', label: isStudent() ? 'My Fees' : 'Fees', permission: 'view-fees' },
     { path: '/fees/payment', icon: '💳', label: 'Fee Payment', permission: 'collect-fees' },
-    { path: '/assignments', icon: '📋', label: 'Assignments', permission: 'view-assignments' },
+    { path: '/assignments', icon: '📋', label: isStudent() ? 'My Assignments' : 'Assignments', permission: 'view-assignments' },
     { path: '/reports', icon: '📈', label: 'Reports', permission: 'view-reports' },
     { path: '/tools/bulk', icon: '🔧', label: 'Bulk Operations', permission: 'manage-tools' },
     { path: '/settings', icon: '⚙️', label: 'Settings', permission: 'manage-settings' },

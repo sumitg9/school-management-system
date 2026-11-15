@@ -10,13 +10,19 @@ const AssignmentDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { formatDate } = useSettings();
-  const { isStudent, hasPermission } = useAuth();
+  const { isStudent, currentStudent, hasPermission } = useAuth();
   const [assignment, setAssignment] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Student Submission state
+  const [submission, setSubmission] = useState(null);
+  const [submissionText, setSubmissionText] = useState('');
+  const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
   useEffect(() => {
     fetchAssignment();
-  }, [id]);
+  }, [id, currentStudent?.id]);
 
   const fetchAssignment = async () => {
     setLoading(true);
@@ -24,12 +30,59 @@ const AssignmentDetail = () => {
       const response = await assignmentAPI.getById(id);
       if (response.success) {
         setAssignment(response.data);
+
+        // If student, also fetch their submission
+        if (isStudent() && currentStudent?.id) {
+          try {
+            const subRes = await assignmentAPI.getStudentSubmissions(currentStudent.id);
+            if (subRes?.data) {
+              const mySub = subRes.data.find(s => String(s.assignment_id) === String(id));
+              if (mySub) {
+                setSubmission(mySub);
+                setSubmissionText(mySub.submission_text || '');
+                setAttachmentUrl(mySub.attachment || '');
+              }
+            }
+          } catch (err) {
+            console.warn('Could not load submission:', err);
+          }
+        }
       }
     } catch (error) {
       toast.error('Failed to fetch assignment details');
       navigate('/assignments');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmitWork = async (e) => {
+    e.preventDefault();
+    if (!currentStudent?.id) return;
+    if (!submissionText.trim() && !attachmentUrl.trim()) {
+      toast.warning('Please enter submission text or attach a file URL.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await assignmentAPI.submit(id, {
+        student_id: currentStudent.id,
+        submission_text: submissionText,
+        attachment: attachmentUrl,
+      });
+
+      if (res?.success) {
+        toast.success('Assignment submitted successfully! 🎉');
+        fetchAssignment();
+      } else {
+        toast.error('Failed to submit assignment');
+      }
+    } catch (err) {
+      console.error('Submission error:', err);
+      toast.error('Error submitting assignment: ' + (err.message || 'Unknown error'));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -54,6 +107,38 @@ const AssignmentDetail = () => {
       <div className="p-6">
         <div className="text-center">
           <p className="text-gray-500">Assignment not found</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Strict class scoping for students: ensure assignment belongs to this student's class
+  const studentClassId = currentStudent?.class_id || currentStudent?.class?.id;
+  const studentSectionId = currentStudent?.section_id || currentStudent?.section?.id;
+
+  const isClassMatch = !studentClassId || String(assignment.class_id) === String(studentClassId);
+  const isSectionMatch = !assignment.section_id || !studentSectionId || String(assignment.section_id) === String(studentSectionId);
+
+  if (isStudent() && (!isClassMatch || !isSectionMatch)) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-sm border border-red-200 p-8 text-center space-y-4">
+          <div className="w-16 h-16 mx-auto bg-red-100 text-red-600 rounded-full flex items-center justify-center text-3xl">
+            🔒
+          </div>
+          <h2 className="text-xl font-bold text-gray-900">Access Restricted</h2>
+          <p className="text-sm text-gray-600 max-w-md mx-auto">
+            You can only access homework assignments assigned to your own class ({currentStudent?.class?.name || 'Your Class'}).
+          </p>
+          <div>
+            <button
+              type="button"
+              onClick={() => navigate('/assignments')}
+              className="btn-primary px-5 py-2 text-xs font-bold rounded-xl cursor-pointer"
+            >
+              ← Back to My Assignments
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -219,6 +304,117 @@ const AssignmentDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* Student Submission Card */}
+      {isStudent() && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mt-6 space-y-5">
+          <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <span>📤</span>
+                <span>{submission ? 'Your Submitted Work' : 'Submit Your Homework'}</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {submission
+                  ? `Turned in on ${formatDate(submission.submitted_at)}`
+                  : `Please submit your answer before the deadline (${formatDate(assignment.due_date)})`}
+              </p>
+            </div>
+            <div>
+              {submission?.status === 'graded' ? (
+                <Badge variant="success">Graded</Badge>
+              ) : submission ? (
+                <Badge variant="primary">Submitted</Badge>
+              ) : (
+                <Badge variant="warning">Not Submitted</Badge>
+              )}
+            </div>
+          </div>
+
+          {/* If Graded: Show Marks & Feedback */}
+          {submission?.status === 'graded' && (
+            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300 rounded-xl p-4.5 space-y-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                🏆 Evaluation Results
+              </span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-black text-emerald-700 font-mono">
+                  {submission.marks_obtained}
+                </span>
+                <span className="text-gray-500 text-sm">/ {assignment.total_marks || 100} Marks</span>
+                <span className="ml-2 text-xs font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full font-mono">
+                  {Math.round(((parseFloat(submission.marks_obtained) || 0) / (assignment.total_marks || 100)) * 100)}%
+                </span>
+              </div>
+              {submission.feedback && (
+                <div className="bg-white/80 border border-emerald-200 rounded-lg p-3 text-xs text-gray-800 mt-2">
+                  <span className="font-bold text-emerald-900 block mb-0.5">Teacher Feedback:</span>
+                  <p className="italic text-gray-700">{submission.feedback}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Submission Form */}
+          <form onSubmit={handleSubmitWork} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Your Answer / Submission Text
+              </label>
+              <textarea
+                rows={5}
+                value={submissionText}
+                onChange={(e) => setSubmissionText(e.target.value)}
+                placeholder="Type or paste your answers, summary, or response here..."
+                className="input-field text-xs font-mono"
+                disabled={submission?.status === 'graded' || submitting}
+                required={!attachmentUrl}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Attachment / Google Drive File Link (Optional)
+              </label>
+              <input
+                type="text"
+                value={attachmentUrl}
+                onChange={(e) => setAttachmentUrl(e.target.value)}
+                placeholder="https://drive.google.com/file/... or link to submitted document"
+                className="input-field text-xs"
+                disabled={submission?.status === 'graded' || submitting}
+              />
+            </div>
+
+            {submission?.status !== 'graded' && (
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="btn-primary px-6 py-2.5 text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Submitting...</span>
+                    </>
+                  ) : submission ? (
+                    <>
+                      <span>🔄</span>
+                      <span>Update My Submission</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🚀</span>
+                      <span>Turn In Assignment</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </form>
+        </div>
+      )}
     </div>
   );
 };

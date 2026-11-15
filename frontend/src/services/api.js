@@ -1918,7 +1918,7 @@ export const feeAPI = {
 export const assignmentAPI = {
   getAll: async (params) => {
     if (!useSupabase) return api.get('/assignments', { params });
-    let query = supabase.from('assignments').select('*, teacher:teachers(first_name, last_name), class:classes(name)', { count: 'exact' });
+    let query = supabase.from('assignments').select('*, teacher:teachers(first_name, last_name), class:classes(name), section:sections(name), subject:subjects(name)', { count: 'exact' });
     if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
     if (params?.class_id) query = query.eq('class_id', params.class_id);
     if (params?.section_id) query = query.eq('section_id', params.section_id);
@@ -1942,7 +1942,7 @@ export const assignmentAPI = {
   },
   getById: async (id) => {
     if (!useSupabase) return api.get(`/assignments/${id}`);
-    const { data, error } = await supabase.from('assignments').select('*, teacher:teachers(first_name, last_name), class:classes(name)').eq('id', id).single();
+    const { data, error } = await supabase.from('assignments').select('*, teacher:teachers(first_name, last_name), class:classes(name), section:sections(name), subject:subjects(name)').eq('id', id).single();
     if (error) throw error;
     return { success: true, data };
   },
@@ -1964,10 +1964,76 @@ export const assignmentAPI = {
     if (error) throw error;
     return { success: true };
   },
-  submit: (id, data) => api.post(`/assignments/${id}/submit`, data),
-  gradeSubmission: (submissionId, data) => api.post(`/assignment-submissions/${submissionId}/grade`, data),
-  getSubmissions: (id) => api.get(`/assignments/${id}/submissions`),
-  getStudentAssignments: (studentId) => api.get(`/assignments/student/${studentId}`),
+  submit: async (id, data) => {
+    if (!useSupabase) return api.post(`/assignments/${id}/submit`, data);
+    const nowStr = new Date().toISOString();
+    const payload = {
+      assignment_id: parseInt(id, 10) || id,
+      student_id: parseInt(data.student_id, 10) || data.student_id,
+      submission_text: data.submission_text || null,
+      attachment: data.attachment || null,
+      submitted_at: nowStr,
+      status: 'submitted',
+    };
+    const { data: res, error } = await supabase
+      .from('assignment_submissions')
+      .upsert(payload, { onConflict: 'assignment_id,student_id' })
+      .select()
+      .single();
+    if (error) throw error;
+    return { success: true, data: res, message: 'Assignment submitted successfully' };
+  },
+  gradeSubmission: async (submissionId, data) => {
+    if (!useSupabase) return api.post(`/assignment-submissions/${submissionId}/grade`, data);
+    const payload = {
+      marks_obtained: parseFloat(data.marks_obtained) || 0,
+      feedback: data.feedback || '',
+      status: 'graded',
+      graded_at: new Date().toISOString(),
+    };
+    const { data: res, error } = await supabase.from('assignment_submissions').update(payload).eq('id', submissionId).select().single();
+    if (error) throw error;
+    return { success: true, data: res };
+  },
+  getSubmissions: async (id) => {
+    if (!useSupabase) return api.get(`/assignments/${id}/submissions`);
+    const { data, error } = await supabase
+      .from('assignment_submissions')
+      .select('*, student:students(first_name, last_name, admission_number, roll_number)')
+      .eq('assignment_id', id);
+    if (error) throw error;
+    return { success: true, data };
+  },
+  getStudentAssignments: async (studentId) => {
+    if (!useSupabase) return api.get(`/assignments/student/${studentId}`);
+    const { data: student, error: sErr } = await supabase.from('students').select('class_id, section_id').eq('id', studentId).single();
+    if (sErr) throw sErr;
+    let query = supabase.from('assignments').select('*, teacher:teachers(first_name, last_name), class:classes(name), section:sections(name), subject:subjects(name)').eq('class_id', student.class_id);
+    if (student.section_id) {
+      query = query.eq('section_id', student.section_id);
+    }
+    const { data: assignments, error: aErr } = await query.order('due_date', { ascending: false });
+    if (aErr) throw aErr;
+    const { data: submissions } = await supabase.from('assignment_submissions').select('*').eq('student_id', studentId);
+    const subMap = {};
+    (submissions || []).forEach(s => { subMap[s.assignment_id] = s; });
+    const formatted = (assignments || []).map(a => {
+      const sub = subMap[a.id] || null;
+      return {
+        assignment: a,
+        submission: sub,
+        is_submitted: sub && ['submitted', 'graded', 'late'].includes(sub.status),
+        is_overdue: !sub && new Date(a.due_date) < new Date(),
+      };
+    });
+    return { success: true, data: formatted };
+  },
+  getStudentSubmissions: async (studentId) => {
+    if (!useSupabase) return api.get(`/assignment-submissions/student/${studentId}`);
+    const { data, error } = await supabase.from('assignment_submissions').select('*').eq('student_id', studentId);
+    if (error) throw error;
+    return { success: true, data: data || [] };
+  },
 };
 
 // ==========================================
