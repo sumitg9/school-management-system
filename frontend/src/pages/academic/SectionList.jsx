@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { sectionAPI, classAPI } from '../../services/api';
+import { sectionAPI, classAPI, teacherAPI } from '../../services/api';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
+import Modal from '../../components/common/Modal';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -13,8 +14,13 @@ const SectionList = () => {
   const { isStudent, hasPermission } = useAuth();
   const [sections, setSections] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
+  const [isAssignTeacherModalOpen, setIsAssignTeacherModalOpen] = useState(false);
+  const [targetSection, setTargetSection] = useState(null);
+  const [selectedTeacherId, setSelectedTeacherId] = useState('');
+  const [assigningTeacher, setAssigningTeacher] = useState(false);
   const [filters, setFilters] = useState({
     page: 1,
     per_page: 20,
@@ -24,8 +30,18 @@ const SectionList = () => {
 
   useEffect(() => {
     fetchClasses();
+    fetchTeachers();
     fetchSections();
   }, [filters]);
+
+  const fetchTeachers = async () => {
+    try {
+      const res = await teacherAPI.getAll({ per_page: 100, status: 'active' });
+      if (res && res.data) {
+        setTeachers(res.data);
+      }
+    } catch (_) {}
+  };
 
   const fetchClasses = async () => {
     try {
@@ -60,6 +76,30 @@ const SectionList = () => {
 
   const handlePageChange = (page) => {
     setFilters(prev => ({ ...prev, page }));
+  };
+
+  const handleOpenAssignTeacher = (section) => {
+    setTargetSection(section);
+    setSelectedTeacherId(section.section_teacher_id || section.section_teacher?.id || '');
+    setIsAssignTeacherModalOpen(true);
+  };
+
+  const handleAssignTeacherSubmit = async (e) => {
+    e.preventDefault();
+    if (!targetSection) return;
+    setAssigningTeacher(true);
+    try {
+      await sectionAPI.assignTeacher(targetSection.id, selectedTeacherId || null);
+      toast.success('Section teacher updated successfully');
+      setIsAssignTeacherModalOpen(false);
+      setTargetSection(null);
+      fetchSections();
+    } catch (error) {
+      toast.error('Failed to assign section teacher');
+      console.error(error);
+    } finally {
+      setAssigningTeacher(false);
+    }
   };
 
   const handleDelete = async (id) => {
@@ -135,6 +175,15 @@ const SectionList = () => {
 
   const actions = (row) => (
     <div className="flex items-center gap-1.5 justify-end">
+      {!isStudent() && hasPermission('edit-classes') && (
+        <button
+          onClick={() => handleOpenAssignTeacher(row)}
+          className="text-indigo-600 hover:text-indigo-900 cursor-pointer p-1 rounded hover:bg-indigo-50"
+          title="Assign Section Teacher"
+        >
+          <span className="text-base" role="img" aria-label="assign teacher">👨‍🏫</span>
+        </button>
+      )}
       {!isStudent() && hasPermission('edit-classes') && (
         <button
           onClick={() => navigate(`/sections/${row.id}/edit`)}
@@ -252,6 +301,59 @@ const SectionList = () => {
         onPageChange={handlePageChange}
         actions={actions}
       />
+
+      {/* Assign Teacher Modal */}
+      <Modal
+        isOpen={isAssignTeacherModalOpen}
+        onClose={() => {
+          setIsAssignTeacherModalOpen(false);
+          setTargetSection(null);
+        }}
+        title={`Assign Teacher - Section ${targetSection?.name || ''}`}
+      >
+        <form onSubmit={handleAssignTeacherSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Select Section Teacher
+            </label>
+            <select
+              value={selectedTeacherId}
+              onChange={(e) => setSelectedTeacherId(e.target.value)}
+              className="input-field"
+            >
+              <option value="">No Teacher Assigned</option>
+              {teachers.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.first_name} {t.last_name} ({t.employee_id || t.email})
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Assign a dedicated teacher responsible for this section's day-to-day classes and attendance.
+            </p>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={() => {
+                setIsAssignTeacherModalOpen(false);
+                setTargetSection(null);
+              }}
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={assigningTeacher}
+              className="btn-primary cursor-pointer disabled:opacity-50"
+            >
+              {assigningTeacher ? 'Saving...' : 'Save Assignment'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

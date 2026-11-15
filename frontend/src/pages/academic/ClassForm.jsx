@@ -139,20 +139,29 @@ const ClassForm = () => {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Class Information */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Class Information</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-gray-100 gap-2">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Class Information</h2>
+              <p className="text-xs text-gray-500">Configure academic class level, assigned class teacher, and room allocations</p>
+            </div>
+            <div className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg border border-blue-100 flex items-center gap-1.5">
+              <span>💡</span>
+              <span>Section-wise teachers can also be assigned in Class Details</span>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Academic Year <span className="text-red-500">*</span>
+                Academic Year
               </label>
               <select
                 name="academic_year_id"
                 value={formData.academic_year_id}
                 onChange={handleChange}
                 className="input-field"
-                required
               >
-                <option value="">Select Academic Year</option>
+                <option value="">Select Academic Year (Optional)</option>
                 {academicYears.map((year) => (
                   <option key={year.id} value={year.id}>
                     {year.name} {year.is_current ? '(Current)' : ''}

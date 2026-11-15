@@ -1886,6 +1886,67 @@ export const teacherAPI = {
 };
 
 // ==========================================
+// Class & Section Metadata Helpers
+// ==========================================
+const getLocalMeta = (key) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : {};
+  } catch (_) {
+    return {};
+  }
+};
+
+const setLocalMeta = (key, id, data) => {
+  try {
+    const all = getLocalMeta(key);
+    all[String(id)] = { ...(all[String(id)] || {}), ...data };
+    localStorage.setItem(key, JSON.stringify(all));
+  } catch (_) {}
+};
+
+const removeLocalMeta = (key, id) => {
+  try {
+    const all = getLocalMeta(key);
+    delete all[String(id)];
+    localStorage.setItem(key, JSON.stringify(all));
+  } catch (_) {}
+};
+
+// Sanitizer for Class database payload (classes table only has name, numeric_name, order, description, status)
+const cleanClassPayload = (data) => {
+  const allowed = ['name', 'numeric_name', 'order', 'description', 'status'];
+  const cleaned = {};
+  allowed.forEach(col => {
+    if (data[col] !== undefined && data[col] !== null) {
+      cleaned[col] = data[col];
+    }
+  });
+  if (data.name && cleaned.numeric_name === undefined) {
+    const num = String(data.name).match(/\d+/);
+    if (num) cleaned.numeric_name = num[0];
+  }
+  return cleaned;
+};
+
+// Sanitizer for Section database payload (sections table only has class_id, name, capacity, current_strength, description, status)
+const cleanSectionPayload = (data) => {
+  const allowed = ['class_id', 'name', 'capacity', 'current_strength', 'description', 'status'];
+  const cleaned = {};
+  allowed.forEach(col => {
+    if (data[col] !== undefined && data[col] !== null) {
+      if (col === 'capacity' || col === 'current_strength') {
+        const parsed = parseInt(data[col], 10);
+        cleaned[col] = isNaN(parsed) ? 40 : parsed;
+      } else {
+        cleaned[col] = data[col];
+      }
+    }
+  });
+  return cleaned;
+};
+
+// ==========================================
 // Class API
 // ==========================================
 export const classAPI = {
@@ -1895,9 +1956,6 @@ export const classAPI = {
 
     if (params?.search) {
       query = query.ilike('name', `%${String(params.search).trim()}%`);
-    }
-    if (params?.academic_year_id) {
-      query = query.eq('academic_year_id', params.academic_year_id);
     }
 
     query = query.order('id', { ascending: false });
@@ -1912,30 +1970,94 @@ export const classAPI = {
 
     const { data, count, error } = await query;
     if (error) throw error;
-    return paginate(data, count, params);
+
+    const classMeta = getLocalMeta('sms_class_meta');
+    const teachersList = await teacherAPI.getAll({ per_page: 100 }).then(r => r.data || []).catch(() => []);
+
+    const enriched = (data || []).map(cls => {
+      const meta = classMeta[String(cls.id)] || {};
+      const classTeacher = meta.class_teacher_id
+        ? teachersList.find(t => String(t.id) === String(meta.class_teacher_id))
+        : null;
+
+      const sectionsList = cls.sections || [];
+      return {
+        ...cls,
+        academic_year_id: meta.academic_year_id || null,
+        room_number: meta.room_number || null,
+        capacity: meta.capacity || (sectionsList.length > 0 ? sectionsList.reduce((acc, s) => acc + (s.capacity || 40), 0) : 40),
+        class_teacher_id: meta.class_teacher_id || null,
+        class_teacher: classTeacher,
+        sections_count: sectionsList.length,
+        students_count: sectionsList.reduce((acc, s) => acc + (s.current_strength || 0), 0),
+      };
+    });
+
+    return paginate(enriched, count, params);
   },
   getById: async (id) => {
     if (!useSupabase) return api.get(`/classes/${id}`);
     const { data, error } = await supabase.from('classes').select('*, sections(*)').eq('id', id).single();
     if (error) throw error;
-    return { success: true, data };
+
+    const classMeta = getLocalMeta('sms_class_meta');
+    const meta = classMeta[String(id)] || {};
+    const teachersList = await teacherAPI.getAll({ per_page: 100 }).then(r => r.data || []).catch(() => []);
+    const classTeacher = meta.class_teacher_id
+      ? teachersList.find(t => String(t.id) === String(meta.class_teacher_id))
+      : null;
+
+    const sectionsList = data.sections || [];
+    const enriched = {
+      ...data,
+      academic_year_id: meta.academic_year_id || null,
+      room_number: meta.room_number || null,
+      capacity: meta.capacity || (sectionsList.length > 0 ? sectionsList.reduce((acc, s) => acc + (s.capacity || 40), 0) : 40),
+      class_teacher_id: meta.class_teacher_id || null,
+      class_teacher: classTeacher,
+      sections_count: sectionsList.length,
+      students_count: sectionsList.reduce((acc, s) => acc + (s.current_strength || 0), 0),
+    };
+
+    return { success: true, data: enriched };
   },
   create: async (data) => {
     if (!useSupabase) return api.post('/classes', data);
-    const { data: res, error } = await supabase.from('classes').insert(data).select().single();
+    const dbPayload = cleanClassPayload(data);
+    const { data: res, error } = await supabase.from('classes').insert(dbPayload).select().single();
     if (error) throw error;
+
+    if (res?.id) {
+      setLocalMeta('sms_class_meta', res.id, {
+        academic_year_id: data.academic_year_id || null,
+        class_teacher_id: data.class_teacher_id || null,
+        room_number: data.room_number || null,
+        capacity: data.capacity || null,
+      });
+    }
+
     return { success: true, data: res };
   },
   update: async (id, data) => {
     if (!useSupabase) return api.put(`/classes/${id}`, data);
-    const { data: res, error } = await supabase.from('classes').update(data).eq('id', id).select().single();
+    const dbPayload = cleanClassPayload(data);
+    const { data: res, error } = await supabase.from('classes').update(dbPayload).eq('id', id).select().single();
     if (error) throw error;
+
+    setLocalMeta('sms_class_meta', id, {
+      academic_year_id: data.academic_year_id || null,
+      class_teacher_id: data.class_teacher_id || null,
+      room_number: data.room_number || null,
+      capacity: data.capacity || null,
+    });
+
     return { success: true, data: res };
   },
   delete: async (id) => {
     if (!useSupabase) return api.delete(`/classes/${id}`);
     const { error } = await supabase.from('classes').delete().eq('id', id);
     if (error) throw error;
+    removeLocalMeta('sms_class_meta', id);
     return { success: true };
   },
   assignSubjects: (id, subjects) => api.post(`/classes/${id}/assign-subjects`, { subjects }),
@@ -1947,8 +2069,7 @@ export const classAPI = {
 export const sectionAPI = {
   getAll: async (params) => {
     if (!useSupabase) return api.get('/sections', { params });
-    let query = supabase.from('sections').select('*, class:classes(name)', { count: 'exact' });
-    if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
+    let query = supabase.from('sections').select('*, class:classes(id, name)', { count: 'exact' });
     if (params?.class_id) query = query.eq('class_id', params.class_id);
     if (params?.search) {
       query = query.ilike('name', `%${String(params.search).trim()}%`);
@@ -1966,31 +2087,99 @@ export const sectionAPI = {
 
     const { data, count, error } = await query;
     if (error) throw error;
-    return paginate(data, count, params);
+
+    const secMeta = getLocalMeta('sms_section_meta');
+    const teachersList = await teacherAPI.getAll({ per_page: 100 }).then(r => r.data || []).catch(() => []);
+
+    const enriched = (data || []).map(sec => {
+      const meta = secMeta[String(sec.id)] || {};
+      const teacherId = meta.section_teacher_id || sec.section_teacher_id;
+      const sectionTeacher = teacherId
+        ? teachersList.find(t => String(t.id) === String(teacherId))
+        : null;
+
+      return {
+        ...sec,
+        room_number: meta.room_number || sec.room_number || null,
+        section_teacher_id: teacherId || null,
+        section_teacher: sectionTeacher,
+        students_count: sec.current_strength || 0,
+      };
+    });
+
+    return paginate(enriched, count, params);
   },
   getById: async (id) => {
     if (!useSupabase) return api.get(`/sections/${id}`);
-    const { data, error } = await supabase.from('sections').select('*, class:classes(name)').eq('id', id).single();
+    const { data, error } = await supabase.from('sections').select('*, class:classes(id, name)').eq('id', id).single();
     if (error) throw error;
-    return { success: true, data };
+
+    const secMeta = getLocalMeta('sms_section_meta');
+    const meta = secMeta[String(id)] || {};
+    const teacherId = meta.section_teacher_id || data.section_teacher_id;
+    const teachersList = await teacherAPI.getAll({ per_page: 100 }).then(r => r.data || []).catch(() => []);
+    const sectionTeacher = teacherId
+      ? teachersList.find(t => String(t.id) === String(teacherId))
+      : null;
+
+    const enriched = {
+      ...data,
+      room_number: meta.room_number || data.room_number || null,
+      section_teacher_id: teacherId || null,
+      section_teacher: sectionTeacher,
+      students_count: data.current_strength || 0,
+    };
+
+    return { success: true, data: enriched };
   },
   create: async (data) => {
     if (!useSupabase) return api.post('/sections', data);
-    const { data: res, error } = await supabase.from('sections').insert(data).select().single();
+    const dbPayload = cleanSectionPayload(data);
+    const { data: res, error } = await supabase.from('sections').insert(dbPayload).select().single();
     if (error) throw error;
+
+    if (res?.id) {
+      setLocalMeta('sms_section_meta', res.id, {
+        section_teacher_id: data.section_teacher_id || null,
+        room_number: data.room_number || null,
+      });
+    }
+
     return { success: true, data: res };
   },
   update: async (id, data) => {
     if (!useSupabase) return api.put(`/sections/${id}`, data);
-    const { data: res, error } = await supabase.from('sections').update(data).eq('id', id).select().single();
+    const dbPayload = cleanSectionPayload(data);
+    const { data: res, error } = await supabase.from('sections').update(dbPayload).eq('id', id).select().single();
     if (error) throw error;
+
+    const currentMeta = getLocalMeta('sms_section_meta')[String(id)] || {};
+    setLocalMeta('sms_section_meta', id, {
+      section_teacher_id: data.section_teacher_id !== undefined ? data.section_teacher_id : (currentMeta.section_teacher_id || null),
+      room_number: data.room_number !== undefined ? data.room_number : (currentMeta.room_number || null),
+    });
+
     return { success: true, data: res };
   },
   delete: async (id) => {
     if (!useSupabase) return api.delete(`/sections/${id}`);
     const { error } = await supabase.from('sections').delete().eq('id', id);
     if (error) throw error;
+    removeLocalMeta('sms_section_meta', id);
     return { success: true };
+  },
+  assignTeacher: async (sectionId, teacherId) => {
+    const currentMeta = getLocalMeta('sms_section_meta')[String(sectionId)] || {};
+    setLocalMeta('sms_section_meta', sectionId, {
+      ...currentMeta,
+      section_teacher_id: teacherId || null,
+    });
+    if (useSupabase) {
+      try {
+        await supabase.from('sections').update({ section_teacher_id: teacherId || null }).eq('id', sectionId);
+      } catch (_) {}
+    }
+    return { success: true, message: 'Section teacher assigned successfully' };
   },
 };
 
