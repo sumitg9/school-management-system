@@ -10,9 +10,9 @@ const SectionForm = () => {
   const { id } = useParams();
   const isEdit = !!id;
   const { showValidationError } = useAlert();
-  const { isStudent } = useAuth();
+  const { isStudent, isTeacher } = useAuth();
 
-  if (isStudent()) {
+  if (isStudent() || isTeacher()) {
     return <Navigate to="/sections" replace />;
   }
 

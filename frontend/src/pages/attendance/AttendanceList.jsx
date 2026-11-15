@@ -14,9 +14,13 @@ const AttendanceList = () => {
   const { formatDate } = useSettings();
   const {
     isStudent,
+    isTeacher,
     currentStudent,
     studentLoading,
     filterTeacherClasses,
+    filterTeacherSections,
+    getTeacherAssignedClassIds,
+    getTeacherAssignedSectionIds,
     hasPermission,
     isAdmin,
   } = useAuth();
@@ -120,7 +124,7 @@ const AttendanceList = () => {
     try {
       const response = await sectionAPI.getAll({ class_id: classId, per_page: 100 });
       if (response.success) {
-        setSections(response.data);
+        setSections(isTeacher() ? filterTeacherSections(response.data || [], classes) : (response.data || []));
       }
     } catch (error) {
       console.error('Error fetching sections:', error);
@@ -144,10 +148,33 @@ const AttendanceList = () => {
         delete queryParams.section_id;
       }
 
+      // Teacher scoping: lock to teacher's assigned classes/sections
+      if (isTeacher()) {
+        const assignedClassIds = Array.from(getTeacherAssignedClassIds(classes) || []);
+        if (assignedClassIds.length > 0) {
+          if (!queryParams.class_id) {
+            queryParams.class_ids = assignedClassIds;
+          }
+        }
+      }
+
       const response = await attendanceAPI.getAll(queryParams);
       if (response.success) {
-        setAttendances(response.data || []);
-        setPagination(response.meta || null);
+        let records = response.data || [];
+        if (isTeacher()) {
+          const classIds = getTeacherAssignedClassIds(classes) || new Set();
+          const secIds = getTeacherAssignedSectionIds(sections, classes) || new Set();
+          records = records.filter(rec => {
+            const cMatch = rec.class_id && classIds.has(String(rec.class_id));
+            const sMatch = rec.section_id && secIds.has(String(rec.section_id));
+            return cMatch || sMatch;
+          });
+        }
+        setAttendances(records);
+        setPagination(response.meta ? {
+          ...response.meta,
+          total: isTeacher() ? records.length : response.meta.total,
+        } : null);
       }
     } catch (error) {
       toast.error('Failed to fetch attendance records');

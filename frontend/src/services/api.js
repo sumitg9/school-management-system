@@ -975,6 +975,20 @@ export const studentAPI = {
 
     if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
     if (params?.class_id) query = query.eq('class_id', params.class_id);
+    if (params?.class_ids && Array.isArray(params.class_ids)) {
+      if (params.class_ids.length > 0) {
+        query = query.in('class_id', params.class_ids);
+      } else {
+        query = query.eq('class_id', -1);
+      }
+    }
+    if (params?.section_ids && Array.isArray(params.section_ids)) {
+      if (params.section_ids.length > 0) {
+        query = query.in('section_id', params.section_ids);
+      } else {
+        query = query.eq('section_id', -1);
+      }
+    }
     if (params?.section_id) {
       const isNumeric = !isNaN(params.section_id) && !isNaN(parseFloat(params.section_id));
       if (isNumeric) {
@@ -1883,6 +1897,69 @@ export const teacherAPI = {
     const { count: total } = await supabase.from('teachers').select('count', { count: 'exact', head: true });
     return { success: true, data: { total: total || 0, active: total || 0, inactive: 0 } };
   },
+
+  getDemoTeacher: async () => {
+    if (!useSupabase) return api.get('/teachers/demo');
+    try {
+      const { data: matchedUsers } = await supabase
+        .from('users')
+        .select('id, email, name')
+        .ilike('email', '%rahul.mehta%')
+        .maybeSingle();
+
+      if (matchedUsers?.id) {
+        const { data: teacher } = await supabase
+          .from('teachers')
+          .select('*, user:users(*)')
+          .eq('user_id', matchedUsers.id)
+          .maybeSingle();
+        if (teacher) {
+          return {
+            success: true,
+            data: {
+              ...teacher,
+              email: teacher.user?.email || matchedUsers.email,
+              name: teacher.user?.name || `${teacher.first_name} ${teacher.last_name}`,
+            },
+          };
+        }
+      }
+
+      const { data: firstTeacher } = await supabase
+        .from('teachers')
+        .select('*, user:users(*)')
+        .limit(1)
+        .maybeSingle();
+
+      if (firstTeacher) {
+        return {
+          success: true,
+          data: {
+            ...firstTeacher,
+            email: firstTeacher.user?.email || firstTeacher.email,
+            name: firstTeacher.user?.name || `${firstTeacher.first_name} ${firstTeacher.last_name}`,
+          },
+        };
+      }
+    } catch (e) {
+      console.warn('getDemoTeacher error:', e);
+    }
+
+    return {
+      success: true,
+      data: {
+        id: 1,
+        user_id: 6,
+        employee_id: 'EMP001',
+        first_name: 'Rahul',
+        last_name: 'Mehta',
+        email: 'rahul.mehta@school.com',
+        department: 'Science',
+        designation: 'Senior Teacher',
+        status: 'active',
+      },
+    };
+  },
 };
 
 // ==========================================
@@ -1910,6 +1987,27 @@ const removeLocalMeta = (key, id) => {
     const all = getLocalMeta(key);
     delete all[String(id)];
     localStorage.setItem(key, JSON.stringify(all));
+  } catch (_) {}
+};
+
+// Automatically ensure initial default assignment for demo teacher if none exists
+const ensureDefaultTeacherAssignments = (classes, teachers) => {
+  try {
+    const classMeta = getLocalMeta('sms_class_meta');
+    const secMeta = getLocalMeta('sms_section_meta');
+    if (Object.keys(classMeta).length === 0 && classes?.length > 0 && teachers?.length > 0) {
+      const primaryTeacher = teachers.find(t => (t.email || '').toLowerCase().includes('rahul.mehta')) || teachers[0];
+      const primaryClass = classes[0];
+      setLocalMeta('sms_class_meta', primaryClass.id, {
+        class_teacher_id: primaryTeacher.id,
+      });
+      if (primaryClass.sections && primaryClass.sections.length > 0) {
+        setLocalMeta('sms_section_meta', primaryClass.sections[0].id, {
+          section_teacher_id: primaryTeacher.id,
+          class_id: primaryClass.id,
+        });
+      }
+    }
   } catch (_) {}
 };
 
@@ -1971,10 +2069,12 @@ export const classAPI = {
     const { data, count, error } = await query;
     if (error) throw error;
 
-    const classMeta = getLocalMeta('sms_class_meta');
     const teachersList = await teacherAPI.getAll({ per_page: 100 }).then(r => r.data || []).catch(() => []);
+    ensureDefaultTeacherAssignments(data || [], teachersList);
+    const classMeta = getLocalMeta('sms_class_meta');
+    const secMeta = getLocalMeta('sms_section_meta');
 
-    const enriched = (data || []).map(cls => {
+    let enriched = (data || []).map(cls => {
       const meta = classMeta[String(cls.id)] || {};
       const classTeacher = meta.class_teacher_id
         ? teachersList.find(t => String(t.id) === String(meta.class_teacher_id))
@@ -1992,6 +2092,18 @@ export const classAPI = {
         students_count: sectionsList.reduce((acc, s) => acc + (s.current_strength || 0), 0),
       };
     });
+
+    if (params?.teacher_id) {
+      const tId = String(params.teacher_id);
+      enriched = enriched.filter(cls => {
+        if (String(cls.class_teacher_id) === tId) return true;
+        const sectionsList = cls.sections || [];
+        return sectionsList.some(s => {
+          const sMeta = secMeta[String(s.id)] || {};
+          return String(sMeta.section_teacher_id || s.section_teacher_id) === tId;
+        });
+      });
+    }
 
     return paginate(enriched, count, params);
   },
@@ -2089,9 +2201,10 @@ export const sectionAPI = {
     if (error) throw error;
 
     const secMeta = getLocalMeta('sms_section_meta');
+    const classMeta = getLocalMeta('sms_class_meta');
     const teachersList = await teacherAPI.getAll({ per_page: 100 }).then(r => r.data || []).catch(() => []);
 
-    const enriched = (data || []).map(sec => {
+    let enriched = (data || []).map(sec => {
       const meta = secMeta[String(sec.id)] || {};
       const teacherId = meta.section_teacher_id || sec.section_teacher_id;
       const sectionTeacher = teacherId
@@ -2106,6 +2219,15 @@ export const sectionAPI = {
         students_count: sec.current_strength || 0,
       };
     });
+
+    if (params?.teacher_id) {
+      const tId = String(params.teacher_id);
+      enriched = enriched.filter(sec => {
+        if (String(sec.section_teacher_id) === tId) return true;
+        const parentMeta = classMeta[String(sec.class_id)] || {};
+        return String(parentMeta.class_teacher_id) === tId;
+      });
+    }
 
     return paginate(enriched, count, params);
   },
@@ -2251,6 +2373,20 @@ export const attendanceAPI = {
     if (params?.end_date) query = query.lte('date', params.end_date);
     if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
     if (params?.class_id) query = query.eq('class_id', params.class_id);
+    if (params?.class_ids && Array.isArray(params.class_ids)) {
+      if (params.class_ids.length > 0) {
+        query = query.in('class_id', params.class_ids);
+      } else {
+        query = query.eq('class_id', -1);
+      }
+    }
+    if (params?.section_ids && Array.isArray(params.section_ids)) {
+      if (params.section_ids.length > 0) {
+        query = query.in('section_id', params.section_ids);
+      } else {
+        query = query.eq('section_id', -1);
+      }
+    }
     if (params?.section_id) query = query.eq('section_id', params.section_id);
     if (params?.status) query = query.eq('status', params.status);
 
@@ -2702,8 +2838,23 @@ export const assignmentAPI = {
     let query = supabase.from('assignments').select('*, teacher:teachers(first_name, last_name), class:classes(name), section:sections(name), subject:subjects(name)', { count: 'exact' });
     if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
     if (params?.class_id) query = query.eq('class_id', params.class_id);
+    if (params?.class_ids && Array.isArray(params.class_ids)) {
+      if (params.class_ids.length > 0) {
+        query = query.in('class_id', params.class_ids);
+      } else {
+        query = query.eq('class_id', -1);
+      }
+    }
+    if (params?.section_ids && Array.isArray(params.section_ids)) {
+      if (params.section_ids.length > 0) {
+        query = query.in('section_id', params.section_ids);
+      } else {
+        query = query.eq('section_id', -1);
+      }
+    }
     if (params?.section_id) query = query.eq('section_id', params.section_id);
     if (params?.subject_id) query = query.eq('subject_id', params.subject_id);
+    if (params?.teacher_id) query = query.eq('teacher_id', params.teacher_id);
     if (params?.search) {
       query = query.ilike('title', `%${String(params.search).trim()}%`);
     }

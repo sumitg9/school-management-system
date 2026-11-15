@@ -10,7 +10,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 const ClassDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { isStudent, hasPermission } = useAuth();
+  const { isStudent, isTeacher, hasPermission, isClassAssignedToTeacher, filterTeacherSections } = useAuth();
   const confirm = useConfirm();
 
   const [classData, setClassData] = useState(null);
@@ -56,6 +56,11 @@ const ClassDetail = () => {
       ]);
 
       if (classRes.success) {
+        if (isTeacher() && !isClassAssignedToTeacher(id, [classRes.data])) {
+          toast.error("You don't have permission to view this class.");
+          navigate('/classes');
+          return;
+        }
         setClassData(classRes.data);
       }
       if (secRes.success && secRes.data) {
@@ -251,9 +256,12 @@ const ClassDetail = () => {
     );
   }
 
-  const canEditClass = !isStudent() && hasPermission('edit-classes');
-  const canCreateSection = !isStudent() && hasPermission('create-classes');
-  const canDeleteSection = !isStudent() && hasPermission('delete-classes');
+  const canEditClass = !isStudent() && !isTeacher() && hasPermission('edit-classes');
+  const canCreateSection = !isStudent() && !isTeacher() && hasPermission('create-classes');
+  const canDeleteSection = !isStudent() && !isTeacher() && hasPermission('delete-classes');
+  const displayedSections = isTeacher()
+    ? filterTeacherSections(sections, classData ? [classData] : [])
+    : sections;
 
   return (
     <div className="p-6 space-y-6">
@@ -401,12 +409,16 @@ const ClassDetail = () => {
             )}
           </div>
 
-          {sections.length === 0 ? (
+          {displayedSections.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
               <span className="text-4xl block mb-2">📂</span>
-              <h4 className="text-base font-bold text-gray-800">No Sections in this Class</h4>
+              <h4 className="text-base font-bold text-gray-800">
+                {isTeacher() ? 'No Assigned Sections Found' : 'No Sections in this Class'}
+              </h4>
               <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
-                Create sections (such as Section A, Section B) to assign students and dedicated class teachers.
+                {isTeacher()
+                  ? 'There are currently no sections in this class assigned to your teaching roster.'
+                  : 'Create sections (such as Section A, Section B) to assign students and dedicated class teachers.'}
               </p>
               {canCreateSection && (
                 <button
@@ -419,7 +431,7 @@ const ClassDetail = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sections.map((sec) => {
+              {displayedSections.map((sec) => {
                 const assignedTeacher = sec.section_teacher;
                 const capacity = sec.capacity || 40;
                 const strength = sec.students_count || sec.current_strength || 0;

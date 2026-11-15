@@ -301,6 +301,16 @@ export const AuthProvider = ({ children }) => {
     loadStudentInfo();
   }, [user, activeRole]);
 
+  // Helper to read localStorage meta safely
+  const getLocalMetaSafe = (key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      return {};
+    }
+  };
+
   // Teacher profile state for teacher role
   const [teacherProfile, setTeacherProfile] = useState(() => {
     const storedUser = localStorage.getItem('user');
@@ -332,30 +342,196 @@ export const AuthProvider = ({ children }) => {
           if (res?.data && res.data.length > 0) {
             const foundTeacher = res.data.find(t => 
               t.email?.toLowerCase() === user.email?.toLowerCase() ||
-              String(t.user_id) === String(user.id)
+              String(t.user_id) === String(user.id) ||
+              String(t.id) === String(user.teacher_id)
             );
             if (foundTeacher) {
               setTeacherProfile(foundTeacher);
+              return;
             }
           }
+        }
+
+        // Demo teacher fallback for teacher role
+        const demoRes = await teacherAPI.getDemoTeacher();
+        if (demoRes?.data) {
+          setTeacherProfile(demoRes.data);
+          return;
         }
       } catch (err) {
         console.warn('Failed to load teacher profile:', err);
       }
+
+      // Hard fallback if everything fails
+      setTeacherProfile({
+        id: user?.teacher_id || user?.id || 1,
+        first_name: user?.name ? user.name.split(' ')[0] : 'Rahul',
+        last_name: user?.name ? user.name.split(' ').slice(1).join(' ') : 'Mehta',
+        email: user?.email || 'rahul.mehta@school.com',
+        employee_id: user?.employee_id || 'EMP001',
+        department: 'Science',
+        status: 'active',
+      });
     };
 
     loadTeacherInfo();
   }, [user, activeRole]);
 
-  // Teacher class filtering helper
+  // Teacher Class & Section Scoping Helpers
+  const getTeacherAssignedClassIds = (classesList = []) => {
+    if (!isTeacher()) return null;
+    const tId = teacherProfile?.id ? String(teacherProfile.id) : null;
+    const tEmail = (teacherProfile?.email || user?.email || '').toLowerCase();
+
+    const classMeta = getLocalMetaSafe('sms_class_meta');
+    const secMeta = getLocalMetaSafe('sms_section_meta');
+
+    const assigned = new Set();
+
+    // Check direct assignments on teacher object if any
+    const explicitClassIds = teacherProfile?.assigned_class_ids || user?.assigned_class_ids;
+    if (Array.isArray(explicitClassIds)) {
+      explicitClassIds.forEach(id => assigned.add(String(id)));
+    }
+
+    // Check class metadata & class objects
+    classesList.forEach(cls => {
+      const cId = String(cls.id);
+      const meta = classMeta[cId] || {};
+      const classTeacherId = meta.class_teacher_id || cls.class_teacher_id || cls.class_teacher?.id;
+
+      if (tId && String(classTeacherId) === tId) {
+        assigned.add(cId);
+      } else if (tEmail && (cls.class_teacher?.email?.toLowerCase() === tEmail)) {
+        assigned.add(cId);
+      }
+
+      // Check if any section belonging to this class is assigned to this teacher
+      const sections = cls.sections || [];
+      const hasTeacherSection = sections.some(sec => {
+        const sMeta = secMeta[String(sec.id)] || {};
+        const sTeacherId = sMeta.section_teacher_id || sec.section_teacher_id || sec.section_teacher?.id;
+        return tId && String(sTeacherId) === tId;
+      });
+      if (hasTeacherSection) {
+        assigned.add(cId);
+      }
+    });
+
+    // Also check sections stored in sms_section_meta
+    Object.keys(secMeta).forEach(sId => {
+      const s = secMeta[sId];
+      if (tId && String(s.section_teacher_id) === tId && s.class_id) {
+        assigned.add(String(s.class_id));
+      }
+    });
+
+    // Also check sms_class_meta directly for any class assigned to this teacher
+    Object.keys(classMeta).forEach(cId => {
+      const cm = classMeta[cId];
+      if (tId && String(cm.class_teacher_id) === tId) {
+        assigned.add(String(cId));
+      }
+    });
+
+    return assigned;
+  };
+
+  const getTeacherAssignedSectionIds = (sectionsList = [], classesList = []) => {
+    if (!isTeacher()) return null;
+    const tId = teacherProfile?.id ? String(teacherProfile.id) : null;
+    const tEmail = (teacherProfile?.email || user?.email || '').toLowerCase();
+
+    const classMeta = getLocalMetaSafe('sms_class_meta');
+    const secMeta = getLocalMetaSafe('sms_section_meta');
+
+    const assigned = new Set();
+
+    // Check direct assignments on teacher object
+    const explicitSecIds = teacherProfile?.assigned_section_ids || user?.assigned_section_ids;
+    if (Array.isArray(explicitSecIds)) {
+      explicitSecIds.forEach(id => assigned.add(String(id)));
+    }
+
+    // A section is assigned if:
+    // 1. Teacher is assigned as section teacher
+    // 2. OR teacher is Class Teacher of this section's parent class
+    const assignedClassIds = getTeacherAssignedClassIds(classesList);
+
+    sectionsList.forEach(sec => {
+      const sId = String(sec.id);
+      const meta = secMeta[sId] || {};
+      const secTeacherId = meta.section_teacher_id || sec.section_teacher_id || sec.section_teacher?.id;
+
+      if (tId && String(secTeacherId) === tId) {
+        assigned.add(sId);
+      } else if (tEmail && sec.section_teacher?.email?.toLowerCase() === tEmail) {
+        assigned.add(sId);
+      } else if (sec.class_id && assignedClassIds && assignedClassIds.has(String(sec.class_id))) {
+        assigned.add(sId);
+      }
+    });
+
+    // Also check secMeta directly
+    Object.keys(secMeta).forEach(sId => {
+      const s = secMeta[sId];
+      if (tId && String(s.section_teacher_id) === tId) {
+        assigned.add(String(sId));
+      }
+    });
+
+    return assigned;
+  };
+
   const filterTeacherClasses = (classesList) => {
     if (!classesList || !Array.isArray(classesList)) return [];
     if (!isTeacher()) return classesList;
-    const assignedIds = user?.teacher?.assigned_class_ids || user?.assigned_class_ids;
-    if (Array.isArray(assignedIds) && assignedIds.length > 0) {
-      return classesList.filter(c => assignedIds.includes(c.id) || assignedIds.includes(String(c.id)));
-    }
-    return classesList;
+    const assignedIds = getTeacherAssignedClassIds(classesList);
+    if (!assignedIds) return classesList;
+    return classesList.filter(c => assignedIds.has(String(c.id)));
+  };
+
+  const filterTeacherSections = (sectionsList, classesList = []) => {
+    if (!sectionsList || !Array.isArray(sectionsList)) return [];
+    if (!isTeacher()) return sectionsList;
+    const assignedIds = getTeacherAssignedSectionIds(sectionsList, classesList);
+    if (!assignedIds) return sectionsList;
+    return sectionsList.filter(s => assignedIds.has(String(s.id)));
+  };
+
+  const filterTeacherStudents = (studentsList, classesList = [], sectionsList = []) => {
+    if (!studentsList || !Array.isArray(studentsList)) return [];
+    if (!isTeacher()) return studentsList;
+    const classIds = getTeacherAssignedClassIds(classesList);
+    const sectionIds = getTeacherAssignedSectionIds(sectionsList, classesList);
+
+    return studentsList.filter(stu => {
+      const matchClass = stu.class_id && classIds && classIds.has(String(stu.class_id));
+      const matchSection = stu.section_id && sectionIds && sectionIds.has(String(stu.section_id));
+      return matchClass || matchSection;
+    });
+  };
+
+  const isClassAssignedToTeacher = (classId, classesList = []) => {
+    if (!isTeacher()) return true;
+    const assigned = getTeacherAssignedClassIds(classesList);
+    return assigned ? assigned.has(String(classId)) : true;
+  };
+
+  const isSectionAssignedToTeacher = (sectionId, sectionsList = [], classesList = []) => {
+    if (!isTeacher()) return true;
+    const assigned = getTeacherAssignedSectionIds(sectionsList, classesList);
+    return assigned ? assigned.has(String(sectionId)) : true;
+  };
+
+  const isStudentAssignedToTeacher = (student, classesList = [], sectionsList = []) => {
+    if (!isTeacher()) return true;
+    if (!student) return false;
+    const classIds = getTeacherAssignedClassIds(classesList);
+    const sectionIds = getTeacherAssignedSectionIds(sectionsList, classesList);
+    const matchClass = student.class_id && classIds && classIds.has(String(student.class_id));
+    const matchSection = student.section_id && sectionIds && sectionIds.has(String(student.section_id));
+    return Boolean(matchClass || matchSection);
   };
 
   const value = {
@@ -383,6 +559,13 @@ export const AuthProvider = ({ children }) => {
     canEdit,
     canDelete,
     filterTeacherClasses,
+    filterTeacherSections,
+    filterTeacherStudents,
+    getTeacherAssignedClassIds,
+    getTeacherAssignedSectionIds,
+    isClassAssignedToTeacher,
+    isSectionAssignedToTeacher,
+    isStudentAssignedToTeacher,
     currentStudent: studentProfile,
     studentProfile,
     studentLoading,

@@ -13,10 +13,10 @@ const TeacherForm = () => {
   const isEdit = !!id;
   const { showValidationError } = useAlert();
   const { settings } = useSettings();
-  const { isStudent } = useAuth();
+  const { isStudent, isTeacher } = useAuth();
 
-  if (isStudent()) {
-    return <Navigate to="/teachers" replace />;
+  if (isStudent() || isTeacher()) {
+    return <Navigate to="/" replace />;
   }
 
   const [loading, setLoading] = useState(false);

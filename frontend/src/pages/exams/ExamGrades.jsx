@@ -10,7 +10,7 @@ const ExamGrades = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { showValidationError } = useAlert();
-  const { isStudent } = useAuth();
+  const { isStudent, isTeacher, filterTeacherClasses, filterTeacherSections } = useAuth();
 
   if (isStudent()) {
     return <Navigate to="/exams" replace />;
@@ -68,7 +68,7 @@ const ExamGrades = () => {
     try {
       const response = await classAPI.getAll({ per_page: 100 });
       if (response.success) {
-        setClasses(response.data);
+        setClasses(isTeacher() ? filterTeacherClasses(response.data || []) : (response.data || []));
       }
     } catch (error) {
       console.error('Error fetching classes:', error);
@@ -79,7 +79,7 @@ const ExamGrades = () => {
     try {
       const response = await sectionAPI.getAll({ class_id: classId, per_page: 100 });
       if (response.success) {
-        setSections(response.data);
+        setSections(isTeacher() ? filterTeacherSections(response.data || [], classes) : (response.data || []));
       }
     } catch (error) {
       console.error('Error fetching sections:', error);

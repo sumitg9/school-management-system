@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 const StudentList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const { isStudent, hasPermission } = useAuth();
+  const { isStudent, isTeacher, hasPermission, filterTeacherClasses, filterTeacherSections, filterTeacherStudents } = useAuth();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
@@ -53,7 +53,8 @@ const StudentList = () => {
     try {
       const response = await classAPI.getAll({ per_page: 'all' });
       if (response.success) {
-        setClasses(response.data || []);
+        const raw = response.data || [];
+        setClasses(isTeacher() ? filterTeacherClasses(raw) : raw);
       }
     } catch (error) {
       console.error('Failed to fetch classes:', error);
@@ -64,7 +65,8 @@ const StudentList = () => {
     try {
       const response = await sectionAPI.getAll({ per_page: 'all' });
       if (response.success) {
-        setAllSections(response.data || []);
+        const raw = response.data || [];
+        setAllSections(isTeacher() ? filterTeacherSections(raw, classes) : raw);
       }
     } catch (error) {
       console.error('Failed to fetch all sections:', error);
@@ -96,8 +98,13 @@ const StudentList = () => {
     try {
       const response = await studentAPI.getAll(filters);
       if (response.success) {
-        setStudents(response.data);
-        setPagination(response.meta);
+        const raw = response.data || [];
+        const scoped = isTeacher() ? filterTeacherStudents(raw, classes, allSections) : raw;
+        setStudents(scoped);
+        setPagination(response.meta ? {
+          ...response.meta,
+          total: isTeacher() ? scoped.length : response.meta.total,
+        } : null);
       }
     } catch (error) {
       toast.error('Failed to fetch students');
@@ -300,6 +307,17 @@ Ananya,Patel,ananya.patel@example.com,+91 98765 11002,ADM2026002,2026-04-01,1,1,
 
   return (
     <div className="p-6">
+      {/* Teacher Scoped Student Notice */}
+      {isTeacher() && (
+        <div className="mb-4 p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3 text-xs text-blue-900 shadow-2xs">
+          <span className="text-xl">👨‍🏫</span>
+          <div>
+            <span className="font-bold block">Assigned Students Faculty View</span>
+            <span>Displaying students enrolled in your assigned classes and sections ({students.length} students).</span>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -309,23 +327,27 @@ Ananya,Patel,ananya.patel@example.com,+91 98765 11002,ADM2026002,2026-04-01,1,1,
           </div>
           {!isStudent() && (
             <div className="flex flex-wrap items-center gap-2.5">
-              <button
-                onClick={handleDownloadTemplate}
-                className="px-3.5 py-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium flex items-center space-x-1.5 shadow-sm transition cursor-pointer"
-                title="Download CSV Template for student import"
-              >
-                <span>📥</span>
-                <span>Download Template</span>
-              </button>
-              <button
-                onClick={() => navigate('/tools/bulk')}
-                className="px-3.5 py-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium flex items-center space-x-1.5 shadow-sm transition cursor-pointer"
-                title="Import students in bulk"
-              >
-                <span>📤</span>
-                <span>Import Students</span>
-              </button>
-              {hasPermission('create-students') && (
+              {hasPermission('manage-tools') && (
+                <>
+                  <button
+                    onClick={handleDownloadTemplate}
+                    className="px-3.5 py-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium flex items-center space-x-1.5 shadow-sm transition cursor-pointer"
+                    title="Download CSV Template for student import"
+                  >
+                    <span>📥</span>
+                    <span>Download Template</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/tools/bulk')}
+                    className="px-3.5 py-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-lg text-sm font-medium flex items-center space-x-1.5 shadow-sm transition cursor-pointer"
+                    title="Import students in bulk"
+                  >
+                    <span>📤</span>
+                    <span>Import Students</span>
+                  </button>
+                </>
+              )}
+              {!isTeacher() && hasPermission('create-students') && (
                 <button
                   onClick={() => navigate('/students/create')}
                   className="btn-primary flex items-center space-x-2 cursor-pointer"

@@ -10,7 +10,7 @@ const AssignmentForm = () => {
   const { id } = useParams();
   const isEditMode = Boolean(id);
   const { showValidationError } = useAlert();
-  const { isStudent } = useAuth();
+  const { isStudent, isTeacher, currentTeacher, filterTeacherClasses, filterTeacherSections } = useAuth();
 
   if (isStudent()) {
     return <Navigate to="/assignments" replace />;
@@ -49,7 +49,7 @@ const AssignmentForm = () => {
     try {
       const response = await classAPI.getAll({ per_page: 100 });
       if (response.success) {
-        setClasses(response.data);
+        setClasses(isTeacher() ? filterTeacherClasses(response.data || []) : (response.data || []));
       }
     } catch (error) {
       console.error('Error fetching classes:', error);
@@ -60,7 +60,7 @@ const AssignmentForm = () => {
     try {
       const response = await sectionAPI.getAll({ class_id: classId, per_page: 100 });
       if (response.success) {
-        setSections(response.data);
+        setSections(isTeacher() ? filterTeacherSections(response.data || [], classes) : (response.data || []));
       }
     } catch (error) {
       console.error('Error fetching sections:', error);
@@ -111,11 +111,15 @@ const AssignmentForm = () => {
     setLoading(true);
 
     try {
+      const payload = {
+        ...formData,
+        teacher_id: formData.teacher_id || currentTeacher?.id || null,
+      };
       if (isEditMode) {
-        await assignmentAPI.update(id, formData);
+        await assignmentAPI.update(id, payload);
         toast.success('Assignment updated successfully');
       } else {
-        await assignmentAPI.create(formData);
+        await assignmentAPI.create(payload);
         toast.success('Assignment created successfully');
       }
       navigate('/assignments');

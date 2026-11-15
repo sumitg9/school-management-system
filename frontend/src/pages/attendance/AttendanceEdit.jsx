@@ -9,7 +9,7 @@ const AttendanceEdit = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { showValidationError } = useAlert();
-  const { isStudent } = useAuth();
+  const { isStudent, isTeacher, isClassAssignedToTeacher, isSectionAssignedToTeacher } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     status: 'present',
@@ -30,6 +30,16 @@ const AttendanceEdit = () => {
     try {
       const response = await attendanceAPI.getById(id);
       if (response.success) {
+        if (isTeacher()) {
+          const rec = response.data;
+          const classOk = rec.class_id ? isClassAssignedToTeacher(rec.class_id) : false;
+          const secOk = rec.section_id ? isSectionAssignedToTeacher(rec.section_id) : false;
+          if (!classOk && !secOk) {
+            toast.error("You don't have permission to edit attendance for this class/section.");
+            navigate('/attendance');
+            return;
+          }
+        }
         setAttendanceData(response.data);
         setFormData({
           status: response.data.status,

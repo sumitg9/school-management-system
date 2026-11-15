@@ -10,7 +10,16 @@ const AssignmentDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { formatDate } = useSettings();
-  const { isStudent, currentStudent, hasPermission } = useAuth();
+  const {
+    isStudent,
+    isTeacher,
+    currentTeacher,
+    user,
+    isClassAssignedToTeacher,
+    isSectionAssignedToTeacher,
+    currentStudent,
+    hasPermission,
+  } = useAuth();
   const [assignment, setAssignment] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,6 +38,19 @@ const AssignmentDetail = () => {
     try {
       const response = await assignmentAPI.getById(id);
       if (response.success) {
+        if (isTeacher()) {
+          const a = response.data;
+          const tId = currentTeacher?.id ? String(currentTeacher.id) : null;
+          const uId = user?.id ? String(user.id) : null;
+          const byMe = (tId && String(a.teacher_id) === tId) || (uId && String(a.created_by) === uId);
+          const classOk = a.class_id ? isClassAssignedToTeacher(a.class_id) : false;
+          const secOk = a.section_id ? isSectionAssignedToTeacher(a.section_id) : false;
+          if (!byMe && !classOk && !secOk) {
+            toast.error("You don't have permission to view this assignment.");
+            navigate('/assignments');
+            return;
+          }
+        }
         setAssignment(response.data);
 
         // If student, also fetch their submission

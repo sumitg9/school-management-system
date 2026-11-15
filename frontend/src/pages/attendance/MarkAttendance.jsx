@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 const MarkAttendance = () => {
   const navigate = useNavigate();
   const { showValidationError } = useAlert();
-  const { filterTeacherClasses, isStudent } = useAuth();
+  const { filterTeacherClasses, filterTeacherSections, isStudent, isTeacher } = useAuth();
   const [loading, setLoading] = useState(false);
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
@@ -62,7 +62,7 @@ const MarkAttendance = () => {
     try {
       const response = await sectionAPI.getAll({ class_id: classId, per_page: 100 });
       if (response.success) {
-        setSections(response.data);
+        setSections(isTeacher() ? filterTeacherSections(response.data || [], classes) : (response.data || []));
       }
     } catch (error) {
       console.error('Error fetching sections:', error);

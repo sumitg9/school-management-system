@@ -33,7 +33,10 @@ const ClassList = () => {
         const rawList = response.data || [];
         const scopedList = filterTeacherClasses(rawList);
         setClasses(scopedList);
-        setPagination(response.meta);
+        setPagination({
+          ...(response.meta || {}),
+          total: isTeacher() ? scopedList.length : response.meta?.total,
+        });
       }
     } catch (error) {
       toast.error('Failed to fetch classes');

@@ -13,7 +13,7 @@ const AssignmentList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const { formatDate } = useSettings();
-  const { isStudent, hasPermission, filterTeacherClasses } = useAuth();
+  const { isStudent, isTeacher, user, currentTeacher, hasPermission, filterTeacherClasses, filterTeacherSections, getTeacherAssignedClassIds, getTeacherAssignedSectionIds } = useAuth();
 
   if (isStudent()) {
     return <StudentAssignmentsView />;
@@ -70,7 +70,7 @@ const AssignmentList = () => {
     try {
       const response = await classAPI.getAll({ per_page: 100 });
       if (response.success) {
-        setClasses(response.data);
+        setClasses(isTeacher() ? filterTeacherClasses(response.data || []) : (response.data || []));
       }
     } catch (error) {
       console.error('Error fetching classes:', error);
@@ -81,7 +81,7 @@ const AssignmentList = () => {
     try {
       const response = await sectionAPI.getAll({ class_id: classId, per_page: 100 });
       if (response.success) {
-        setSections(response.data);
+        setSections(isTeacher() ? filterTeacherSections(response.data || [], classes) : (response.data || []));
       }
     } catch (error) {
       console.error('Error fetching sections:', error);
@@ -104,8 +104,25 @@ const AssignmentList = () => {
     try {
       const response = await assignmentAPI.getAll(filters);
       if (response.success) {
-        setAssignments(response.data);
-        setPagination(response.meta);
+        let list = response.data || [];
+        if (isTeacher()) {
+          const classIds = getTeacherAssignedClassIds(classes) || new Set();
+          const secIds = getTeacherAssignedSectionIds(sections, classes) || new Set();
+          const tId = currentTeacher?.id ? String(currentTeacher.id) : null;
+          const uId = user?.id ? String(user.id) : null;
+
+          list = list.filter(a => {
+            const byTeacher = (tId && String(a.teacher_id) === tId) || (uId && String(a.created_by) === uId);
+            const forClass = a.class_id && classIds.has(String(a.class_id));
+            const forSection = a.section_id && secIds.has(String(a.section_id));
+            return byTeacher || forClass || forSection;
+          });
+        }
+        setAssignments(list);
+        setPagination(response.meta ? {
+          ...response.meta,
+          total: isTeacher() ? list.length : response.meta.total,
+        } : null);
       }
     } catch (error) {
       toast.error('Failed to fetch assignments');
@@ -252,6 +269,17 @@ const AssignmentList = () => {
 
   return (
     <div className="p-6">
+      {/* Teacher Scoped Notice */}
+      {isTeacher() && (
+        <div className="mb-4 p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3 text-xs text-blue-900 shadow-2xs">
+          <span className="text-xl">👨‍🏫</span>
+          <div>
+            <span className="font-bold block">Assigned Classes Assignments</span>
+            <span>Displaying homework and assignments for your assigned classes and sections ({assignments.length} assignments).</span>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">

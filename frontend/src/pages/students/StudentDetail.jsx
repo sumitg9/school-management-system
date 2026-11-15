@@ -10,7 +10,7 @@ const StudentDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { formatDate, formatDateTime, formatCurrency } = useSettings();
-  const { isStudent, hasPermission } = useAuth();
+  const { isStudent, isTeacher, hasPermission, isStudentAssignedToTeacher } = useAuth();
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('profile');
@@ -24,6 +24,11 @@ const StudentDetail = () => {
     try {
       const response = await studentAPI.getById(id);
       if (response.success) {
+        if (isTeacher() && !isStudentAssignedToTeacher(response.data)) {
+          toast.error("You don't have permission to view this student.");
+          navigate('/students');
+          return;
+        }
         setStudent(response.data);
       }
     } catch (error) {
@@ -50,7 +55,7 @@ const StudentDetail = () => {
     { id: 'profile', name: 'Profile', icon: '👤' },
     { id: 'academic', name: 'Academic', icon: '📚' },
     { id: 'attendance', name: 'Attendance', icon: '📊' },
-    { id: 'fees', name: 'Fees', icon: '💰' },
+    ...((!isTeacher() && hasPermission('view-fees')) ? [{ id: 'fees', name: 'Fees', icon: '💰' }] : []),
   ];
 
   return (

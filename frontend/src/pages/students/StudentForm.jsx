@@ -13,9 +13,9 @@ const StudentForm = () => {
   const isEdit = !!id;
   const { showValidationError } = useAlert();
   const { settings } = useSettings();
-  const { isStudent } = useAuth();
+  const { isStudent, isTeacher } = useAuth();
 
-  if (isStudent()) {
+  if (isStudent() || isTeacher()) {
     return <Navigate to="/students" replace />;
   }
 

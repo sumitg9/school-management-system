@@ -28,7 +28,15 @@ LiveClock.displayName = 'LiveClock';
 const EnhancedDashboard = () => {
   const navigate = useNavigate();
   const { formatDateTime } = useSettings();
-  const { isStudent, hasPermission } = useAuth();
+  const {
+    isStudent,
+    isTeacher,
+    hasPermission,
+    filterTeacherClasses,
+    filterTeacherSections,
+    filterTeacherStudents,
+    currentTeacher,
+  } = useAuth();
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
@@ -59,6 +67,70 @@ const EnhancedDashboard = () => {
     }
 
     try {
+      if (isTeacher()) {
+        const [classesRes, sectionsRes, studentsRes, attendanceRes, assignmentsRes, examsRes] = await Promise.allSettled([
+          classAPI.getAll({ per_page: 100 }),
+          sectionAPI.getAll({ per_page: 100 }),
+          studentAPI.getAll({ per_page: 'all' }),
+          attendanceAPI.getAll({ per_page: 100, date: new Date().toISOString().split('T')[0] }),
+          assignmentAPI.getAll({ per_page: 100 }),
+          examAPI.getAll({ per_page: 100 }),
+        ]);
+
+        const rawClasses = classesRes.status === 'fulfilled' ? classesRes.value?.data || [] : [];
+        const rawSections = sectionsRes.status === 'fulfilled' ? sectionsRes.value?.data || [] : [];
+        const rawStudents = studentsRes.status === 'fulfilled' ? studentsRes.value?.data || [] : [];
+        const rawAttendance = attendanceRes.status === 'fulfilled' ? attendanceRes.value?.data || [] : [];
+        const rawAssignments = assignmentsRes.status === 'fulfilled' ? assignmentsRes.value?.data || [] : [];
+        const rawExams = examsRes.status === 'fulfilled' ? examsRes.value?.data || [] : [];
+
+        const myClasses = filterTeacherClasses(rawClasses);
+        const mySections = filterTeacherSections(rawSections, rawClasses);
+        const myStudents = filterTeacherStudents(rawStudents, rawClasses, mySections);
+
+        const myClassIds = new Set(myClasses.map(c => String(c.id)));
+        const mySecIds = new Set(mySections.map(s => String(s.id)));
+
+        const myAttendance = rawAttendance.filter(a => 
+          (a.class_id && myClassIds.has(String(a.class_id))) ||
+          (a.section_id && mySecIds.has(String(a.section_id)))
+        );
+
+        const presentCount = myAttendance.filter(a => a.status === 'present').length;
+        const attPercent = myAttendance.length > 0 ? Math.round((presentCount / myAttendance.length) * 100) : 100;
+
+        const myAssignments = rawAssignments.filter(a => 
+          (currentTeacher?.id && String(a.teacher_id) === String(currentTeacher.id)) ||
+          (a.class_id && myClassIds.has(String(a.class_id)))
+        );
+
+        setStats({
+          students: { total: myStudents.length, active: myStudents.length, inactive: 0 },
+          teachers: { total: mySections.length, active: mySections.length, inactive: 0 },
+          classes: { total: myClasses.length },
+          attendance: {
+            today: myAttendance.length,
+            present: presentCount,
+            absent: Math.max(0, myAttendance.length - presentCount),
+            percentage: attPercent,
+          },
+          exams: {
+            upcoming: rawExams.length,
+            ongoing: 0,
+            completed: 0,
+          },
+          fees: { total: 0, paid: 0, pending: 0, overdue: 0 },
+          assignments: {
+            total: myAssignments.length,
+            active: myAssignments.filter(a => !a.due_date || new Date(a.due_date) >= new Date()).length,
+            overdue: myAssignments.filter(a => a.due_date && new Date(a.due_date) < new Date()).length,
+          },
+        });
+        setInitialLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       // Fetch all statistics in parallel using allSettled to ensure resilient loading
       const results = await Promise.allSettled([
         studentAPI.getAll({ per_page: 1 }),
@@ -225,11 +297,13 @@ const EnhancedDashboard = () => {
         <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => navigate('/students')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Total Students</p>
+              <p className="text-sm text-gray-500">{isTeacher() ? 'My Students' : 'Total Students'}</p>
               <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
                 {stats.students.total}
               </p>
-              <p className="text-sm text-green-600 mt-1">↑ {stats.students.active} Active</p>
+              <p className="text-sm text-green-600 mt-1">
+                {isTeacher() ? 'In assigned classes' : `↑ ${stats.students.active} Active`}
+              </p>
             </div>
             <div className="h-16 w-16 bg-blue-100 rounded-lg flex items-center justify-center">
               <span className="text-3xl">👨‍🎓</span>
@@ -237,31 +311,48 @@ const EnhancedDashboard = () => {
           </div>
         </div>
 
-        {/* Teachers */}
-        <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => navigate('/teachers')}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Teachers</p>
-              <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
-                {stats.teachers.total}
-              </p>
-              <p className="text-sm text-green-600 mt-1">↑ {stats.teachers.active} Active</p>
-            </div>
-            <div className="h-16 w-16 bg-green-100 rounded-lg flex items-center justify-center">
-              <span className="text-3xl">👨‍🏫</span>
+        {/* Teachers / Sections */}
+        {isTeacher() ? (
+          <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => navigate('/sections')}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">My Sections</p>
+                <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
+                  {stats.teachers.total}
+                </p>
+                <p className="text-sm text-indigo-600 mt-1">Assigned sections</p>
+              </div>
+              <div className="h-16 w-16 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <span className="text-3xl">📋</span>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => navigate('/teachers')}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Total Teachers</p>
+                <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
+                  {stats.teachers.total}
+                </p>
+                <p className="text-sm text-green-600 mt-1">↑ {stats.teachers.active} Active</p>
+              </div>
+              <div className="h-16 w-16 bg-green-100 rounded-lg flex items-center justify-center">
+                <span className="text-3xl">👨‍🏫</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Classes */}
         <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => navigate('/classes')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Total Classes</p>
+              <p className="text-sm text-gray-500">{isTeacher() ? 'My Classes' : 'Total Classes'}</p>
               <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
                 {stats.classes.total}
               </p>
-              <p className="text-sm text-gray-600 mt-1">All Sections</p>
+              <p className="text-sm text-gray-600 mt-1">{isTeacher() ? 'Assigned classes' : 'All Sections'}</p>
             </div>
             <div className="h-16 w-16 bg-purple-100 rounded-lg flex items-center justify-center">
               <span className="text-3xl">📚</span>
@@ -273,11 +364,11 @@ const EnhancedDashboard = () => {
         <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => navigate('/attendance')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Attendance Today</p>
+              <p className="text-sm text-gray-500">{isTeacher() ? 'Class Attendance' : 'Attendance Today'}</p>
               <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
                 {stats.attendance.percentage}%
               </p>
-              <p className="text-sm text-gray-600 mt-1">{stats.attendance.today} Records</p>
+              <p className="text-sm text-gray-600 mt-1">{stats.attendance.today} Records today</p>
             </div>
             <div className="h-16 w-16 bg-orange-100 rounded-lg flex items-center justify-center">
               <span className="text-3xl">📊</span>
@@ -316,33 +407,65 @@ const EnhancedDashboard = () => {
           </button>
         </div>
 
-        {/* Fees */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Fee Collection</h3>
-            <span className="text-2xl">💰</span>
+        {/* Fees or Quick Actions for Teacher */}
+        {isTeacher() ? (
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Teacher Actions</h3>
+              <span className="text-2xl">⚡</span>
+            </div>
+            <div className="space-y-2.5">
+              <button
+                onClick={() => navigate('/attendance/mark')}
+                className="w-full text-left px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer"
+              >
+                <span>📝 Mark Today's Attendance</span>
+                <span>→</span>
+              </button>
+              <button
+                onClick={() => navigate('/assignments/create')}
+                className="w-full text-left px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-800 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer"
+              >
+                <span>📋 Post New Assignment</span>
+                <span>→</span>
+              </button>
+              <button
+                onClick={() => navigate('/students')}
+                className="w-full text-left px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer"
+              >
+                <span>👨‍🎓 View My Students</span>
+                <span>→</span>
+              </button>
+            </div>
           </div>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Total</span>
-              <Badge variant="primary">{stats.fees.total}</Badge>
+        ) : (
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Fee Collection</h3>
+              <span className="text-2xl">💰</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Paid</span>
-              <Badge variant="success">{stats.fees.paid}</Badge>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total</span>
+                <Badge variant="primary">{stats.fees.total}</Badge>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Paid</span>
+                <Badge variant="success">{stats.fees.paid}</Badge>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Pending</span>
+                <Badge variant="warning">{stats.fees.pending}</Badge>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Pending</span>
-              <Badge variant="warning">{stats.fees.pending}</Badge>
-            </div>
+            <button
+              onClick={() => navigate('/fees')}
+              className="mt-4 w-full text-center text-sm text-blue-600 hover:text-blue-800"
+            >
+              View All Fees →
+            </button>
           </div>
-          <button
-            onClick={() => navigate('/fees')}
-            className="mt-4 w-full text-center text-sm text-blue-600 hover:text-blue-800"
-          >
-            View All Fees →
-          </button>
-        </div>
+        )}
 
         {/* Assignments */}
         <div className="bg-white rounded-lg shadow p-6">

@@ -11,7 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 const SectionList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const { isStudent, hasPermission } = useAuth();
+  const { isStudent, isTeacher, hasPermission, filterTeacherClasses, filterTeacherSections } = useAuth();
   const [sections, setSections] = useState([]);
   const [classes, setClasses] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -47,7 +47,7 @@ const SectionList = () => {
     try {
       const response = await classAPI.getAll({ per_page: 100 });
       if (response.success) {
-        setClasses(response.data);
+        setClasses(filterTeacherClasses(response.data || []));
       }
     } catch (error) {
       console.error('Error fetching classes:', error);
@@ -59,8 +59,13 @@ const SectionList = () => {
     try {
       const response = await sectionAPI.getAll(filters);
       if (response.success) {
-        setSections(response.data);
-        setPagination(response.meta);
+        const rawList = response.data || [];
+        const scopedList = isTeacher() ? filterTeacherSections(rawList, classes) : rawList;
+        setSections(scopedList);
+        setPagination(response.meta ? {
+          ...response.meta,
+          total: isTeacher() ? scopedList.length : response.meta.total,
+        } : null);
       }
     } catch (error) {
       toast.error('Failed to fetch sections');
@@ -175,7 +180,7 @@ const SectionList = () => {
 
   const actions = (row) => (
     <div className="flex items-center gap-1.5 justify-end">
-      {!isStudent() && hasPermission('edit-classes') && (
+      {!isStudent() && !isTeacher() && hasPermission('edit-classes') && (
         <button
           onClick={() => handleOpenAssignTeacher(row)}
           className="text-indigo-600 hover:text-indigo-900 cursor-pointer p-1 rounded hover:bg-indigo-50"
@@ -184,7 +189,7 @@ const SectionList = () => {
           <span className="text-base" role="img" aria-label="assign teacher">👨‍🏫</span>
         </button>
       )}
-      {!isStudent() && hasPermission('edit-classes') && (
+      {!isStudent() && !isTeacher() && hasPermission('edit-classes') && (
         <button
           onClick={() => navigate(`/sections/${row.id}/edit`)}
           className="text-green-600 hover:text-green-900 cursor-pointer"
@@ -195,7 +200,7 @@ const SectionList = () => {
           </svg>
         </button>
       )}
-      {!isStudent() && hasPermission('delete-classes') && (
+      {!isStudent() && !isTeacher() && hasPermission('delete-classes') && (
         <button
           onClick={() => handleDelete(row.id)}
           className="text-red-600 hover:text-red-900 cursor-pointer"
@@ -211,6 +216,17 @@ const SectionList = () => {
 
   return (
     <div className="p-6">
+      {/* Teacher Scoped Notice */}
+      {isTeacher() && (
+        <div className="mb-4 p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3 text-xs text-blue-900 shadow-2xs">
+          <span className="text-xl">👨‍🏫</span>
+          <div>
+            <span className="font-bold block">Assigned Sections Faculty View</span>
+            <span>Displaying sections where you are assigned as Section Teacher or Head Class Teacher.</span>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
@@ -233,7 +249,7 @@ const SectionList = () => {
               <span>📚</span>
               <span>Subjects</span>
             </button>
-            {!isStudent() && hasPermission('create-classes') && (
+            {!isStudent() && !isTeacher() && hasPermission('create-classes') && (
               <button
                 onClick={() => navigate('/sections/create')}
                 className="btn-primary flex items-center space-x-2 cursor-pointer"

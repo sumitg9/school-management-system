@@ -10,9 +10,9 @@ const ExamForm = () => {
   const { id } = useParams();
   const isEditMode = Boolean(id);
   const { showValidationError } = useAlert();
-  const { isStudent } = useAuth();
+  const { isStudent, isTeacher } = useAuth();
 
-  if (isStudent()) {
+  if (isStudent() || isTeacher()) {
     return <Navigate to="/exams" replace />;
   }
   const [loading, setLoading] = useState(false);
