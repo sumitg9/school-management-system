@@ -539,6 +539,26 @@ const FeePaymentCollect = () => {
   const calculatedBreakdown = useMemo(() => {
     const monthsCount = selectedMonthKeys.length;
 
+    // If no month is selected, total amount is strictly 0
+    if (monthsCount === 0) {
+      const zeroItems = feeItems.map(item => ({
+        ...item,
+        multiplier: 0,
+        periodLabel: '0 Months',
+        subtotal: 0,
+        total: 0,
+      }));
+      return {
+        items: zeroItems,
+        grossTotal: 0,
+        itemsDiscountTotal: 0,
+        itemsFineTotal: 0,
+        totalDiscount: 0,
+        totalFine: 0,
+        netPayable: 0,
+      };
+    }
+
     let grossTotal = 0;
     let itemsDiscountTotal = 0;
     let itemsFineTotal = 0;
@@ -548,7 +568,7 @@ const FeePaymentCollect = () => {
       let periodLabel = 'One-Time';
 
       if (item.frequency === 'monthly') {
-        multiplier = Math.max(1, monthsCount);
+        multiplier = monthsCount;
         periodLabel = `${multiplier} Month${multiplier > 1 ? 's' : ''}`;
       } else if (item.frequency === 'quarterly') {
         multiplier = Math.max(1, Math.ceil(monthsCount / 3));
@@ -1430,7 +1450,9 @@ const FeePaymentCollect = () => {
             <div className="bg-gradient-to-r from-gray-900 via-indigo-950 to-blue-950 text-white rounded-2xl p-5 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="space-y-1 text-center sm:text-left">
                 <p className="text-xs font-semibold uppercase tracking-wider text-blue-200">
-                  Total Settlement for {selectedMonthKeys.length} Month{selectedMonthKeys.length !== 1 ? 's' : ''} Advance
+                  {selectedMonthKeys.length > 0
+                    ? `Total Settlement for ${selectedMonthKeys.length} Month${selectedMonthKeys.length !== 1 ? 's' : ''} Advance`
+                    : 'No Month Selected (0 Months)'}
                 </p>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-gray-300">
                   <span>Gross Total: <strong className="text-white">{formatCurrency(calculatedBreakdown.grossTotal)}</strong></span>
