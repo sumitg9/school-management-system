@@ -4892,4 +4892,727 @@ export const eventsAPI = {
   },
 };
 
+// ==========================================
+// Human Resource Management System (HRMS) API
+// ==========================================
+const HRMS_STAFF_KEY = 'sms_hrms_staff';
+const HRMS_LEAVES_KEY = 'sms_hrms_leaves';
+const HRMS_ATTENDANCE_KEY = 'sms_hrms_attendance';
+const HRMS_PAYROLL_KEY = 'sms_hrms_payroll';
+
+const DEFAULT_HRMS_STAFF = [
+  {
+    id: 'EMP-101',
+    name: 'Rajesh Kumar',
+    email: 'teacher@school.com',
+    phone: '+91 98765 00003',
+    department: 'Science & STEM',
+    designation: 'Senior PGT Physics & Science Lead',
+    role: 'teacher',
+    qualification: 'M.Sc Physics, B.Ed (Gold Medalist)',
+    joiningDate: '2020-07-15',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 54000,
+    allowances: { da: 10800, hra: 13500, conveyance: 3500 },
+    deductions: { pf: 6480, esi: 818, tax: 2800 },
+    bankDetails: { bankName: 'HDFC Bank', accountNumber: '5010048291024', ifsc: 'HDFC0001420' },
+    leaveBalance: {
+      casual: { total: 12, used: 3, remaining: 9 },
+      medical: { total: 10, used: 2, remaining: 8 },
+      earned: { total: 15, used: 4, remaining: 11 },
+    },
+    performanceScore: 94,
+    shift: 'General (08:00 AM - 03:30 PM)',
+  },
+  {
+    id: 'EMP-102',
+    name: 'Vikram Malhotra',
+    email: 'vikram.malhotra@school.com',
+    phone: '+91 98765 11002',
+    department: 'Mathematics',
+    designation: 'TGT Mathematics & Department Head',
+    role: 'teacher',
+    qualification: 'M.Sc Mathematics, B.Ed',
+    joiningDate: '2019-04-10',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 58000,
+    allowances: { da: 11600, hra: 14500, conveyance: 3500 },
+    deductions: { pf: 6960, esi: 876, tax: 3200 },
+    bankDetails: { bankName: 'State Bank of India', accountNumber: '30495829104', ifsc: 'SBIN0004210' },
+    leaveBalance: {
+      casual: { total: 12, used: 4, remaining: 8 },
+      medical: { total: 10, used: 1, remaining: 9 },
+      earned: { total: 15, used: 5, remaining: 10 },
+    },
+    performanceScore: 96,
+    shift: 'General (08:00 AM - 03:30 PM)',
+  },
+  {
+    id: 'EMP-103',
+    name: 'Anjali Gupta',
+    email: 'anjali.gupta@school.com',
+    phone: '+91 98765 11003',
+    department: 'Languages & Literature',
+    designation: 'Head of English Dept & Debate Mentor',
+    role: 'teacher',
+    qualification: 'M.A. English Literature, M.Phil',
+    joiningDate: '2021-08-01',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 51000,
+    allowances: { da: 10200, hra: 12750, conveyance: 3500 },
+    deductions: { pf: 6120, esi: 775, tax: 2400 },
+    bankDetails: { bankName: 'ICICI Bank', accountNumber: '002938475910', ifsc: 'ICIC0000029' },
+    leaveBalance: {
+      casual: { total: 12, used: 2, remaining: 10 },
+      medical: { total: 10, used: 3, remaining: 7 },
+      earned: { total: 15, used: 2, remaining: 13 },
+    },
+    performanceScore: 92,
+    shift: 'General (08:00 AM - 03:30 PM)',
+  },
+  {
+    id: 'EMP-104',
+    name: 'Amit Patel',
+    email: 'amit.patel@school.com',
+    phone: '+91 98765 11004',
+    department: 'Physical Education & Sports',
+    designation: 'Director of Physical Education & Athletics',
+    role: 'teacher',
+    qualification: 'M.P.Ed, NIS Certified Athletics Coach',
+    joiningDate: '2022-01-10',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 46000,
+    allowances: { da: 9200, hra: 11500, conveyance: 4000 },
+    deductions: { pf: 5520, esi: 707, tax: 1800 },
+    bankDetails: { bankName: 'Axis Bank', accountNumber: '918029384756', ifsc: 'UTIB0000180' },
+    leaveBalance: {
+      casual: { total: 12, used: 1, remaining: 11 },
+      medical: { total: 10, used: 0, remaining: 10 },
+      earned: { total: 15, used: 3, remaining: 12 },
+    },
+    performanceScore: 95,
+    shift: 'Sports (07:30 AM - 03:00 PM)',
+  },
+  {
+    id: 'EMP-105',
+    name: 'Dr. Sunita Rao',
+    email: 'principal@school.com',
+    phone: '+91 98765 00001',
+    department: 'Administration',
+    designation: 'Principal & Academic Dean',
+    role: 'admin',
+    qualification: 'Ph.D Education Leadership, M.Sc, M.Ed',
+    joiningDate: '2018-05-01',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 85000,
+    allowances: { da: 17000, hra: 21250, conveyance: 6000 },
+    deductions: { pf: 10200, esi: 0, tax: 8500 },
+    bankDetails: { bankName: 'HDFC Bank', accountNumber: '5010029384756', ifsc: 'HDFC0001420' },
+    leaveBalance: {
+      casual: { total: 15, used: 3, remaining: 12 },
+      medical: { total: 15, used: 1, remaining: 14 },
+      earned: { total: 20, used: 5, remaining: 15 },
+    },
+    performanceScore: 99,
+    shift: 'Executive (08:30 AM - 04:30 PM)',
+  },
+  {
+    id: 'EMP-106',
+    name: 'Rajesh Sharma',
+    email: 'admin@school.com',
+    phone: '+91 98765 00002',
+    department: 'Administration',
+    designation: 'School Administrator & Operations Manager',
+    role: 'admin',
+    qualification: 'MBA Human Resources & Educational Administration',
+    joiningDate: '2019-02-15',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 62000,
+    allowances: { da: 12400, hra: 15500, conveyance: 4500 },
+    deductions: { pf: 7440, esi: 944, tax: 3800 },
+    bankDetails: { bankName: 'Kotak Mahindra Bank', accountNumber: '2938475610', ifsc: 'KKBK0000293' },
+    leaveBalance: {
+      casual: { total: 12, used: 2, remaining: 10 },
+      medical: { total: 10, used: 1, remaining: 9 },
+      earned: { total: 15, used: 3, remaining: 12 },
+    },
+    performanceScore: 97,
+    shift: 'General (08:00 AM - 04:00 PM)',
+  },
+  {
+    id: 'EMP-107',
+    name: 'Meenakshi Sundaram',
+    email: 'accounts@school.com',
+    phone: '+91 98765 11007',
+    department: 'Finance & Accounts',
+    designation: 'Chief Accounts Officer & Bursar',
+    role: 'finance',
+    qualification: 'M.Com, Chartered Accountant (Inter)',
+    joiningDate: '2020-09-01',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 55000,
+    allowances: { da: 11000, hra: 13750, conveyance: 3500 },
+    deductions: { pf: 6600, esi: 832, tax: 2900 },
+    bankDetails: { bankName: 'Punjab National Bank', accountNumber: '109283746501', ifsc: 'PUNB0109200' },
+    leaveBalance: {
+      casual: { total: 12, used: 3, remaining: 9 },
+      medical: { total: 10, used: 0, remaining: 10 },
+      earned: { total: 15, used: 4, remaining: 11 },
+    },
+    performanceScore: 93,
+    shift: 'General (09:00 AM - 05:00 PM)',
+  },
+  {
+    id: 'EMP-108',
+    name: 'Rohan Kulkarni',
+    email: 'it.admin@school.com',
+    phone: '+91 98765 11008',
+    department: 'IT & Facilities',
+    designation: 'Senior Network & Systems Engineer',
+    role: 'staff',
+    qualification: 'B.Tech Computer Science, CCNA',
+    joiningDate: '2021-11-15',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 48000,
+    allowances: { da: 9600, hra: 12000, conveyance: 3500 },
+    deductions: { pf: 5760, esi: 731, tax: 2100 },
+    bankDetails: { bankName: 'Canara Bank', accountNumber: '849302918273', ifsc: 'CNRB0008493' },
+    leaveBalance: {
+      casual: { total: 12, used: 4, remaining: 8 },
+      medical: { total: 10, used: 2, remaining: 8 },
+      earned: { total: 15, used: 1, remaining: 14 },
+    },
+    performanceScore: 91,
+    shift: 'General (08:00 AM - 04:00 PM)',
+  },
+  {
+    id: 'EMP-109',
+    name: 'Kavita Deshmukh',
+    email: 'library@school.com',
+    phone: '+91 98765 11009',
+    department: 'Library & Media',
+    designation: 'Head Librarian & Archivist',
+    role: 'staff',
+    qualification: 'M.Lib.Sc, B.A. History',
+    joiningDate: '2022-06-20',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 42000,
+    allowances: { da: 8400, hra: 10500, conveyance: 3000 },
+    deductions: { pf: 5040, esi: 639, tax: 1500 },
+    bankDetails: { bankName: 'Union Bank of India', accountNumber: '584930291827', ifsc: 'UBIN0584930' },
+    leaveBalance: {
+      casual: { total: 12, used: 3, remaining: 9 },
+      medical: { total: 10, used: 1, remaining: 9 },
+      earned: { total: 15, used: 2, remaining: 13 },
+    },
+    performanceScore: 89,
+    shift: 'Library (08:30 AM - 04:00 PM)',
+  },
+  {
+    id: 'EMP-110',
+    name: 'Baldev Singh',
+    email: 'transport@school.com',
+    phone: '+91 98765 11010',
+    department: 'Facility & Transport',
+    designation: 'Fleet & Bus Logistics Supervisor',
+    role: 'staff',
+    qualification: 'Diploma Automobile & Fleet Management',
+    joiningDate: '2019-10-05',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 38000,
+    allowances: { da: 7600, hra: 9500, conveyance: 4000 },
+    deductions: { pf: 4560, esi: 591, tax: 1100 },
+    bankDetails: { bankName: 'State Bank of India', accountNumber: '20394857291', ifsc: 'SBIN0001234' },
+    leaveBalance: {
+      casual: { total: 12, used: 2, remaining: 10 },
+      medical: { total: 10, used: 0, remaining: 10 },
+      earned: { total: 15, used: 4, remaining: 11 },
+    },
+    performanceScore: 90,
+    shift: 'Fleet (06:30 AM - 02:30 PM)',
+  },
+];
+
+const DEFAULT_HRMS_LEAVES = [
+  {
+    id: 'leave-101',
+    employeeId: 'EMP-101',
+    employeeName: 'Rajesh Kumar',
+    department: 'Science & STEM',
+    leaveType: 'Casual Leave (CL)',
+    startDate: '2026-11-20',
+    endDate: '2026-11-21',
+    daysCount: 2,
+    reason: 'Attending the National Science Teachers Symposium and AI Pedagogy Seminar in New Delhi.',
+    status: 'pending',
+    appliedAt: '2026-11-15T09:30:00.000Z',
+    reviewedBy: null,
+    reviewedAt: null,
+    reviewNotes: null,
+  },
+  {
+    id: 'leave-102',
+    employeeId: 'EMP-103',
+    employeeName: 'Anjali Gupta',
+    department: 'Languages & Literature',
+    leaveType: 'Sick / Medical Leave (SL)',
+    startDate: '2026-11-17',
+    endDate: '2026-11-17',
+    daysCount: 1,
+    reason: 'Medical consultation and seasonal viral fever recovery as advised by doctor.',
+    status: 'approved',
+    appliedAt: '2026-11-14T11:00:00.000Z',
+    reviewedBy: 'Rajesh Sharma',
+    reviewedAt: '2026-11-14T14:30:00.000Z',
+    reviewNotes: 'Approved. Syllabus substitution assigned to Mrs. Renu Saxena.',
+  },
+  {
+    id: 'leave-103',
+    employeeId: 'EMP-104',
+    employeeName: 'Amit Patel',
+    department: 'Physical Education & Sports',
+    leaveType: 'Duty Leave (DL)',
+    startDate: '2026-11-23',
+    endDate: '2026-11-25',
+    daysCount: 3,
+    reason: 'Accompanying senior track and field relay squad to CBSE Zonal Athletics Championship.',
+    status: 'approved',
+    appliedAt: '2026-11-12T10:15:00.000Z',
+    reviewedBy: 'Dr. Sunita Rao',
+    reviewedAt: '2026-11-12T15:00:00.000Z',
+    reviewNotes: 'Official Duty Leave granted. Best wishes to the school team.',
+  },
+  {
+    id: 'leave-104',
+    employeeId: 'EMP-108',
+    employeeName: 'Rohan Kulkarni',
+    department: 'IT & Facilities',
+    leaveType: 'Casual Leave (CL)',
+    startDate: '2026-11-12',
+    endDate: '2026-11-12',
+    daysCount: 1,
+    reason: 'Personal family engagement and bank document processing.',
+    status: 'approved',
+    appliedAt: '2026-11-10T16:00:00.000Z',
+    reviewedBy: 'Rajesh Sharma',
+    reviewedAt: '2026-11-11T09:00:00.000Z',
+    reviewNotes: 'Approved.',
+  },
+  {
+    id: 'leave-105',
+    employeeId: 'EMP-109',
+    employeeName: 'Kavita Deshmukh',
+    department: 'Library & Media',
+    leaveType: 'Earned Leave (EL)',
+    startDate: '2026-11-26',
+    endDate: '2026-11-27',
+    daysCount: 2,
+    reason: 'Family outstation pilgrimage travel over the Guru Nanak Jayanti weekend.',
+    status: 'pending',
+    appliedAt: '2026-11-15T14:20:00.000Z',
+    reviewedBy: null,
+    reviewedAt: null,
+    reviewNotes: null,
+  },
+];
+
+// Helper to compute payroll entry
+const computeStaffPayroll = (staff, month = 11, year = 2026, status = 'paid') => {
+  const basic = staff.basicSalary || 50000;
+  const da = Math.round(basic * 0.20);
+  const hra = Math.round(basic * 0.25);
+  const conveyance = staff.allowances?.conveyance || 3500;
+  const gross = basic + da + hra + conveyance;
+
+  const pf = Math.round(basic * 0.12);
+  const esi = basic < 50000 ? Math.round(gross * 0.0075) : 0;
+  const tax = basic > 60000 ? 4500 : (basic > 50000 ? 2800 : 1800);
+  const totalDeductions = pf + esi + tax;
+  const net = gross - totalDeductions;
+
+  return {
+    id: `pay-${year}-${month}-${staff.id}`,
+    month,
+    year,
+    employeeId: staff.id,
+    employeeName: staff.name,
+    designation: staff.designation,
+    department: staff.department,
+    bankDetails: staff.bankDetails,
+    workingDays: 26,
+    presentDays: 24,
+    paidLeaves: 2,
+    lossOfPayDays: 0,
+    basicPay: basic,
+    da,
+    hra,
+    conveyance,
+    grossSalary: gross,
+    pfDeduction: pf,
+    esiDeduction: esi,
+    taxDeduction: tax,
+    totalDeductions,
+    netSalary: net,
+    status,
+    disbursedAt: `${year}-${String(month).padStart(2, '0')}-02T10:00:00.000Z`,
+    transactionRef: `TXN-CMS-${year}${month}-${staff.id.replace('EMP-', '')}`,
+    paymentMethod: 'Direct NEFT/RTGS Bank Transfer',
+  };
+};
+
+const buildDefaultPayroll = () => {
+  const list = [];
+  // Build payroll for Oct 2026 (all paid)
+  DEFAULT_HRMS_STAFF.forEach(staff => {
+    list.push(computeStaffPayroll(staff, 10, 2026, 'paid'));
+  });
+  // Build payroll for Nov 2026 (current month - processed/paid)
+  DEFAULT_HRMS_STAFF.forEach(staff => {
+    list.push(computeStaffPayroll(staff, 11, 2026, 'paid'));
+  });
+  return list;
+};
+
+// Storage Getters & Setters
+const getStoredHrmsStaff = () => {
+  try {
+    const raw = localStorage.getItem(HRMS_STAFF_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to parse HRMS staff', e);
+  }
+  try {
+    localStorage.setItem(HRMS_STAFF_KEY, JSON.stringify(DEFAULT_HRMS_STAFF));
+  } catch (_) {}
+  return DEFAULT_HRMS_STAFF;
+};
+
+const saveStoredHrmsStaff = (data) => {
+  try {
+    localStorage.setItem(HRMS_STAFF_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error('Failed to save HRMS staff', e);
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('sms:hrms-updated'));
+  } catch (_) {}
+};
+
+const getStoredHrmsLeaves = () => {
+  try {
+    const raw = localStorage.getItem(HRMS_LEAVES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to parse HRMS leaves', e);
+  }
+  try {
+    localStorage.setItem(HRMS_LEAVES_KEY, JSON.stringify(DEFAULT_HRMS_LEAVES));
+  } catch (_) {}
+  return DEFAULT_HRMS_LEAVES;
+};
+
+const saveStoredHrmsLeaves = (data) => {
+  try {
+    localStorage.setItem(HRMS_LEAVES_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error('Failed to save HRMS leaves', e);
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('sms:hrms-updated'));
+  } catch (_) {}
+};
+
+const getStoredHrmsPayroll = () => {
+  try {
+    const raw = localStorage.getItem(HRMS_PAYROLL_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to parse HRMS payroll', e);
+  }
+  const defaults = buildDefaultPayroll();
+  try {
+    localStorage.setItem(HRMS_PAYROLL_KEY, JSON.stringify(defaults));
+  } catch (_) {}
+  return defaults;
+};
+
+const saveStoredHrmsPayroll = (data) => {
+  try {
+    localStorage.setItem(HRMS_PAYROLL_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.error('Failed to save HRMS payroll', e);
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('sms:hrms-updated'));
+  } catch (_) {}
+};
+
+export const hrmsAPI = {
+  // Staff Directory
+  getStaff: async (params = {}) => {
+    let list = getStoredHrmsStaff();
+    const { department, role, status, search } = params;
+
+    if (department && department !== 'all') {
+      list = list.filter(s => (s.department || '').toLowerCase() === department.toLowerCase());
+    }
+    if (role && role !== 'all') {
+      list = list.filter(s => (s.role || '').toLowerCase() === role.toLowerCase());
+    }
+    if (status && status !== 'all') {
+      list = list.filter(s => (s.status || '').toLowerCase() === status.toLowerCase());
+    }
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(s =>
+        (s.name || '').toLowerCase().includes(q) ||
+        (s.email || '').toLowerCase().includes(q) ||
+        (s.department || '').toLowerCase().includes(q) ||
+        (s.designation || '').toLowerCase().includes(q) ||
+        (s.id || '').toLowerCase().includes(q)
+      );
+    }
+
+    return { success: true, data: list, total: list.length };
+  },
+
+  getStaffById: async (id) => {
+    const list = getStoredHrmsStaff();
+    const staff = list.find(s => s.id === id);
+    if (!staff) throw new Error('Staff member not found');
+    return { success: true, data: staff };
+  },
+
+  createStaff: async (data) => {
+    const list = getStoredHrmsStaff();
+    const newId = `EMP-${100 + list.length + 1}`;
+    const newStaff = {
+      id: newId,
+      name: data.name?.trim(),
+      email: data.email?.trim(),
+      phone: data.phone?.trim() || '+91 98765 00000',
+      department: data.department || 'Science & STEM',
+      designation: data.designation?.trim() || 'Faculty Member',
+      role: data.role || 'teacher',
+      qualification: data.qualification?.trim() || 'Post Graduate, B.Ed',
+      joiningDate: data.joiningDate || new Date().toISOString().split('T')[0],
+      employmentType: data.employmentType || 'Full-Time',
+      status: data.status || 'active',
+      basicSalary: parseFloat(data.basicSalary) || 45000,
+      allowances: {
+        da: Math.round((parseFloat(data.basicSalary) || 45000) * 0.20),
+        hra: Math.round((parseFloat(data.basicSalary) || 45000) * 0.25),
+        conveyance: 3500,
+      },
+      deductions: {
+        pf: Math.round((parseFloat(data.basicSalary) || 45000) * 0.12),
+        esi: 650,
+        tax: 2000,
+      },
+      bankDetails: {
+        bankName: data.bankName || 'HDFC Bank',
+        accountNumber: data.accountNumber || '50100' + Math.floor(10000000 + Math.random() * 90000000),
+        ifsc: data.ifsc || 'HDFC0001420',
+      },
+      leaveBalance: {
+        casual: { total: 12, used: 0, remaining: 12 },
+        medical: { total: 10, used: 0, remaining: 10 },
+        earned: { total: 15, used: 0, remaining: 15 },
+      },
+      performanceScore: 90,
+      shift: data.shift || 'General (08:00 AM - 03:30 PM)',
+    };
+
+    list.unshift(newStaff);
+    saveStoredHrmsStaff(list);
+    return { success: true, data: newStaff };
+  },
+
+  updateStaff: async (id, data) => {
+    const list = getStoredHrmsStaff();
+    const idx = list.findIndex(s => s.id === id);
+    if (idx === -1) throw new Error('Staff not found');
+    list[idx] = { ...list[idx], ...data, id: list[idx].id };
+    saveStoredHrmsStaff(list);
+    return { success: true, data: list[idx] };
+  },
+
+  deleteStaff: async (id) => {
+    const list = getStoredHrmsStaff();
+    const next = list.filter(s => s.id !== id);
+    saveStoredHrmsStaff(next);
+    return { success: true, id };
+  },
+
+  // Leave Management
+  getLeaves: async (params = {}) => {
+    let leaves = getStoredHrmsLeaves();
+    const { status, employeeId, department } = params;
+
+    if (status && status !== 'all') {
+      leaves = leaves.filter(l => (l.status || '').toLowerCase() === status.toLowerCase());
+    }
+    if (employeeId) {
+      leaves = leaves.filter(l => l.employeeId === employeeId);
+    }
+    if (department && department !== 'all') {
+      leaves = leaves.filter(l => (l.department || '').toLowerCase() === department.toLowerCase());
+    }
+
+    leaves.sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
+    return { success: true, data: leaves, total: leaves.length };
+  },
+
+  applyLeave: async (data) => {
+    const leaves = getStoredHrmsLeaves();
+    const staffList = getStoredHrmsStaff();
+    const staff = staffList.find(s => s.id === data.employeeId) || staffList[0];
+
+    const newLeave = {
+      id: `leave-${Date.now()}`,
+      employeeId: staff.id,
+      employeeName: staff.name,
+      department: staff.department,
+      leaveType: data.leaveType || 'Casual Leave (CL)',
+      startDate: data.startDate,
+      endDate: data.endDate || data.startDate,
+      daysCount: parseInt(data.daysCount, 10) || 1,
+      reason: data.reason?.trim() || '',
+      status: 'pending',
+      appliedAt: new Date().toISOString(),
+      reviewedBy: null,
+      reviewedAt: null,
+      reviewNotes: null,
+    };
+
+    leaves.unshift(newLeave);
+    saveStoredHrmsLeaves(leaves);
+    return { success: true, data: newLeave };
+  },
+
+  updateLeaveStatus: async (leaveId, { status, reviewedBy, reviewNotes }) => {
+    const leaves = getStoredHrmsLeaves();
+    const idx = leaves.findIndex(l => l.id === leaveId);
+    if (idx === -1) throw new Error('Leave application not found');
+
+    leaves[idx] = {
+      ...leaves[idx],
+      status,
+      reviewedBy: reviewedBy || 'Administrator',
+      reviewedAt: new Date().toISOString(),
+      reviewNotes: reviewNotes || (status === 'approved' ? 'Leave Approved' : 'Leave Rejected'),
+    };
+
+    saveStoredHrmsLeaves(leaves);
+    return { success: true, data: leaves[idx] };
+  },
+
+  // Daily Staff Attendance
+  getDailyAttendance: async (dateStr) => {
+    const date = dateStr || new Date().toISOString().split('T')[0];
+    const raw = localStorage.getItem(`${HRMS_ATTENDANCE_KEY}_${date}`);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return { success: true, date, data: parsed };
+      } catch (_) {}
+    }
+
+    // Default auto-attendance for that date based on staff list
+    const staff = getStoredHrmsStaff();
+    const initialRecords = staff.map((s, idx) => ({
+      employeeId: s.id,
+      employeeName: s.name,
+      department: s.department,
+      designation: s.designation,
+      status: idx === 2 ? 'on-leave' : (idx === 7 ? 'late' : 'present'),
+      checkIn: idx === 2 ? '-' : (idx === 7 ? '08:45 AM' : '07:55 AM'),
+      checkOut: idx === 2 ? '-' : '03:45 PM',
+      shift: s.shift,
+    }));
+
+    try {
+      localStorage.setItem(`${HRMS_ATTENDANCE_KEY}_${date}`, JSON.stringify(initialRecords));
+    } catch (_) {}
+
+    return { success: true, date, data: initialRecords };
+  },
+
+  saveDailyAttendance: async (dateStr, records) => {
+    const date = dateStr || new Date().toISOString().split('T')[0];
+    localStorage.setItem(`${HRMS_ATTENDANCE_KEY}_${date}`, JSON.stringify(records));
+    window.dispatchEvent(new CustomEvent('sms:hrms-updated'));
+    return { success: true, date, data: records };
+  },
+
+  // Payroll Management
+  getPayroll: async (params = {}) => {
+    let list = getStoredHrmsPayroll();
+    const { month, year, status, employeeId, search } = params;
+
+    if (month) {
+      list = list.filter(p => parseInt(p.month, 10) === parseInt(month, 10));
+    }
+    if (year) {
+      list = list.filter(p => parseInt(p.year, 10) === parseInt(year, 10));
+    }
+    if (status && status !== 'all') {
+      list = list.filter(p => (p.status || '').toLowerCase() === status.toLowerCase());
+    }
+    if (employeeId) {
+      list = list.filter(p => p.employeeId === employeeId);
+    }
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(p =>
+        (p.employeeName || '').toLowerCase().includes(q) ||
+        (p.department || '').toLowerCase().includes(q) ||
+        (p.employeeId || '').toLowerCase().includes(q) ||
+        (p.transactionRef || '').toLowerCase().includes(q)
+      );
+    }
+
+    return { success: true, data: list, total: list.length };
+  },
+
+  updatePayrollStatus: async (payrollId, status) => {
+    const list = getStoredHrmsPayroll();
+    const idx = list.findIndex(p => p.id === payrollId);
+    if (idx === -1) throw new Error('Payroll record not found');
+    list[idx].status = status;
+    if (status === 'paid' && !list[idx].disbursedAt) {
+      list[idx].disbursedAt = new Date().toISOString();
+      list[idx].transactionRef = `TXN-CMS-${Date.now()}`;
+    }
+    saveStoredHrmsPayroll(list);
+    return { success: true, data: list[idx] };
+  },
+
+  resetDefaults: async () => {
+    saveStoredHrmsStaff(DEFAULT_HRMS_STAFF);
+    saveStoredHrmsLeaves(DEFAULT_HRMS_LEAVES);
+    saveStoredHrmsPayroll(buildDefaultPayroll());
+    return { success: true, message: 'HRMS reset to institutional demo data' };
+  },
+};
+
 export default api;

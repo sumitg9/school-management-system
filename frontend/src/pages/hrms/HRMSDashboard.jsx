@@ -1,0 +1,1467 @@
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { hrmsAPI } from '../../services/api';
+
+const DEPARTMENTS = [
+  'All Departments',
+  'Science & STEM',
+  'Mathematics',
+  'Languages & Literature',
+  'Physical Education & Sports',
+  'Administration',
+  'Finance & Accounts',
+  'IT & Facilities',
+  'Library & Media',
+  'Facility & Transport',
+];
+
+const LEAVE_TYPES = [
+  'Casual Leave (CL)',
+  'Sick / Medical Leave (SL)',
+  'Earned Leave (EL)',
+  'Duty Leave (DL)',
+  'Maternity / Paternity Leave',
+];
+
+const numberToWords = (num) => {
+  const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  const n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+  if (!n) return '';
+  let str = '';
+  str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + ' Crore ' : '';
+  str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + ' Lakh ' : '';
+  str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + ' Thousand ' : '';
+  str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + ' Hundred ' : '';
+  str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) + ' ' : '';
+  return str.trim() ? str.trim() + ' Rupees Only' : 'Zero Rupees';
+};
+
+export default function HRMSDashboard() {
+  const { user, activeRole, hasPermission } = useAuth();
+  const currentRole = activeRole || user?.roles?.[0] || user?.role || 'admin';
+  const canManage = hasPermission('manage-hrms') || currentRole === 'admin' || currentRole === 'super-admin' || currentRole === 'finance';
+
+  // Navigation tab
+  const [activeTab, setActiveTab] = useState('directory'); // 'directory' | 'leaves' | 'attendance' | 'payroll' | 'departments'
+
+  // Data states
+  const [staffList, setStaffList] = useState([]);
+  const [leavesList, setLeavesList] = useState([]);
+  const [payrollList, setPayrollList] = useState([]);
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [loading, setLoading] = useState(true);
+
+  // Filters
+  const [search, setSearch] = useState('');
+  const [selectedDept, setSelectedDept] = useState('All Departments');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [leaveStatusFilter, setLeaveStatusFilter] = useState('all');
+  const [payrollMonth, setPayrollMonth] = useState('11');
+  const [payrollYear, setPayrollYear] = useState('2026');
+
+  // Modals
+  const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [selectedStaffDetail, setSelectedStaffDetail] = useState(null);
+  const [selectedPayslip, setSelectedPayslip] = useState(null);
+  const [toastMsg, setToastMsg] = useState(null);
+
+  // Staff Form
+  const [staffForm, setStaffForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    department: 'Science & STEM',
+    designation: '',
+    role: 'teacher',
+    qualification: '',
+    joiningDate: new Date().toISOString().split('T')[0],
+    employmentType: 'Full-Time',
+    basicSalary: 50000,
+    shift: 'General (08:00 AM - 03:30 PM)',
+    bankName: 'HDFC Bank',
+    accountNumber: '',
+    ifsc: 'HDFC0001420',
+  });
+
+  // Leave Form
+  const [leaveForm, setLeaveForm] = useState({
+    employeeId: '',
+    leaveType: 'Casual Leave (CL)',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+    daysCount: 1,
+    reason: '',
+  });
+
+  const showToast = (msg) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3500);
+  };
+
+  // Loaders
+  const loadStaff = async () => {
+    try {
+      setLoading(true);
+      const res = await hrmsAPI.getStaff({
+        department: selectedDept === 'All Departments' ? undefined : selectedDept,
+        status: selectedStatus === 'all' ? undefined : selectedStatus,
+        search,
+      });
+      if (res && res.success) {
+        setStaffList(res.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading staff:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadLeaves = async () => {
+    try {
+      const res = await hrmsAPI.getLeaves({
+        status: leaveStatusFilter === 'all' ? undefined : leaveStatusFilter,
+      });
+      if (res && res.success) {
+        setLeavesList(res.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading leaves:', err);
+    }
+  };
+
+  const loadAttendance = async (dateStr) => {
+    try {
+      const res = await hrmsAPI.getDailyAttendance(dateStr);
+      if (res && res.success) {
+        setAttendanceData(res.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading attendance:', err);
+    }
+  };
+
+  const loadPayroll = async () => {
+    try {
+      const res = await hrmsAPI.getPayroll({
+        month: payrollMonth,
+        year: payrollYear,
+      });
+      if (res && res.success) {
+        setPayrollList(res.data || []);
+      }
+    } catch (err) {
+      console.error('Error loading payroll:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadStaff();
+    loadLeaves();
+    loadAttendance(attendanceDate);
+    loadPayroll();
+
+    const handleHrmsUpdated = () => {
+      loadStaff();
+      loadLeaves();
+      loadAttendance(attendanceDate);
+      loadPayroll();
+    };
+
+    window.addEventListener('sms:hrms-updated', handleHrmsUpdated);
+    return () => window.removeEventListener('sms:hrms-updated', handleHrmsUpdated);
+  }, [selectedDept, selectedStatus, search, leaveStatusFilter, payrollMonth, payrollYear, attendanceDate]);
+
+  // Handle Add Staff
+  const handleCreateStaff = async (e) => {
+    e.preventDefault();
+    if (!staffForm.name.trim() || !staffForm.email.trim()) {
+      alert('Please provide name and email address.');
+      return;
+    }
+    try {
+      await hrmsAPI.createStaff(staffForm);
+      showToast(`Staff member ${staffForm.name} onboarded successfully.`);
+      setShowAddStaffModal(false);
+      loadStaff();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to onboard staff.');
+    }
+  };
+
+  // Handle Apply Leave
+  const handleApplyLeave = async (e) => {
+    e.preventDefault();
+    if (!leaveForm.reason.trim()) {
+      alert('Please specify the reason for leave.');
+      return;
+    }
+    try {
+      const targetEmpId = leaveForm.employeeId || staffList[0]?.id;
+      await hrmsAPI.applyLeave({ ...leaveForm, employeeId: targetEmpId });
+      showToast('Leave application submitted for approval.');
+      setShowLeaveModal(false);
+      setLeaveForm({
+        employeeId: '',
+        leaveType: 'Casual Leave (CL)',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0],
+        daysCount: 1,
+        reason: '',
+      });
+      loadLeaves();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to submit leave.');
+    }
+  };
+
+  // Leave Approval Action
+  const handleReviewLeave = async (leaveId, status) => {
+    const reviewerNotes = status === 'approved' ? 'Approved by Academic Council' : 'Not feasible due to exam invigilation schedule';
+    try {
+      await hrmsAPI.updateLeaveStatus(leaveId, {
+        status,
+        reviewedBy: user?.name || 'Administrator',
+        reviewNotes: reviewerNotes,
+      });
+      showToast(`Leave application marked as ${status}.`);
+      loadLeaves();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Attendance Toggle
+  const handleAttendanceChange = (empId, newStatus) => {
+    setAttendanceData((prev) =>
+      prev.map((item) =>
+        item.employeeId === empId
+          ? {
+              ...item,
+              status: newStatus,
+              checkIn: newStatus === 'absent' || newStatus === 'on-leave' ? '-' : (item.checkIn === '-' ? '08:00 AM' : item.checkIn),
+              checkOut: newStatus === 'absent' || newStatus === 'on-leave' ? '-' : (item.checkOut === '-' ? '03:30 PM' : item.checkOut),
+            }
+          : item
+      )
+    );
+  };
+
+  const handleSaveAttendance = async () => {
+    try {
+      await hrmsAPI.saveDailyAttendance(attendanceDate, attendanceData);
+      showToast(`Staff attendance for ${attendanceDate} saved successfully.`);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMarkAllPresent = () => {
+    setAttendanceData((prev) =>
+      prev.map((item) => ({
+        ...item,
+        status: 'present',
+        checkIn: item.checkIn === '-' ? '07:55 AM' : item.checkIn,
+        checkOut: '03:30 PM',
+      }))
+    );
+    showToast('All staff marked Present for today.');
+  };
+
+  // Payroll Action
+  const handleDisbursePayroll = async (payrollId) => {
+    try {
+      await hrmsAPI.updatePayrollStatus(payrollId, 'paid');
+      showToast('Salary payment disbursed and recorded.');
+      loadPayroll();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleResetDefaults = async () => {
+    if (window.confirm('Reset all HRMS records (staff, leaves, payroll) to demo defaults?')) {
+      await hrmsAPI.resetDefaults();
+      showToast('HRMS system reset to standard school demo data.');
+      loadStaff();
+      loadLeaves();
+      loadAttendance(attendanceDate);
+      loadPayroll();
+    }
+  };
+
+  // Metrics
+  const totalStaff = staffList.length;
+  const presentCount = attendanceData.filter((a) => a.status === 'present').length;
+  const attendanceRate = attendanceData.length > 0 ? Math.round((presentCount / attendanceData.length) * 100) : 95;
+  const pendingLeaves = leavesList.filter((l) => l.status === 'pending').length;
+  const totalPayrollAmount = payrollList.reduce((acc, p) => acc + (p.netSalary || 0), 0);
+
+  return (
+    <div className="px-[15px] py-6 w-full space-y-6 pb-12">
+      {/* Toast Feedback */}
+      {toastMsg && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-5 right-5 z-50 bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center space-x-3 text-sm animate-in fade-in slide-in-from-bottom-2 duration-200 border border-gray-700"
+        >
+          <span>ℹ️</span>
+          <span>{toastMsg}</span>
+        </div>
+      )}
+
+      {/* Main Header Banner */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-6 rounded-2xl shadow-xl">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-3">
+            <span className="text-3xl">👔</span>
+            <h1 className="text-2xl font-black tracking-tight">Human Resource Management System (HRMS)</h1>
+          </div>
+          <p className="text-sm text-blue-200">
+            Faculty & staff directory, leave administration, daily staff attendance, payroll register, and payslips.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          {canManage && (
+            <button
+              onClick={() => setShowAddStaffModal(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-md transition flex items-center space-x-1.5 focus:outline-hidden focus:ring-2 focus:ring-emerald-400"
+            >
+              <span>➕</span>
+              <span>Onboard Staff</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowLeaveModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-md transition flex items-center space-x-1.5"
+          >
+            <span>📝</span>
+            <span>Apply for Leave</span>
+          </button>
+
+          <button
+            onClick={handleResetDefaults}
+            className="bg-white/10 hover:bg-white/20 text-blue-200 text-xs font-medium px-3 py-2 rounded-xl backdrop-blur-xs transition"
+            title="Reset HRMS demo data"
+          >
+            🔄 Reset Demo Data
+          </button>
+        </div>
+      </div>
+
+      {/* HR Executive Metrics Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
+          <div className="w-11 h-11 bg-blue-100 rounded-lg flex items-center justify-center text-xl text-blue-700 flex-shrink-0">
+            👥
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Headcount</p>
+            <p className="text-xl font-black text-gray-900">{totalStaff} Staff</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
+          <div className="w-11 h-11 bg-emerald-100 rounded-lg flex items-center justify-center text-xl text-emerald-700 flex-shrink-0">
+            🕒
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Today's Attendance</p>
+            <p className="text-xl font-black text-emerald-700">{attendanceRate}% Present</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
+          <div className="w-11 h-11 bg-amber-100 rounded-lg flex items-center justify-center text-xl text-amber-700 flex-shrink-0">
+            ⏳
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pending Leaves</p>
+            <p className="text-xl font-black text-amber-600">{pendingLeaves} Requests</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
+          <div className="w-11 h-11 bg-purple-100 rounded-lg flex items-center justify-center text-xl text-purple-700 flex-shrink-0">
+            💵
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Monthly Payroll</p>
+            <p className="text-xl font-black text-purple-700">₹{(totalPayrollAmount / 100000).toFixed(2)} Lakhs</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Module Tabs Header */}
+      <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-xs flex flex-wrap items-center gap-1.5 text-xs font-bold">
+        {[
+          { id: 'directory', label: 'Faculty & Staff Directory', icon: '👥' },
+          { id: 'leaves', label: `Leave Management (${pendingLeaves})`, icon: '📝' },
+          { id: 'attendance', label: 'Staff Attendance Register', icon: '🕒' },
+          { id: 'payroll', label: 'Payroll & Salary Slips', icon: '💵' },
+          { id: 'departments', label: 'Department Org Structure', icon: '🏢' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2.5 rounded-xl transition flex items-center space-x-2 ${
+              activeTab === tab.id
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <span>{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* TAB 1: FACULTY & STAFF DIRECTORY */}
+      {activeTab === 'directory' && (
+        <div className="space-y-4">
+          {/* Filters Bar */}
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <div className="relative w-full sm:w-80">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 text-sm">
+                🔍
+              </span>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search staff by name, emp id, designation..."
+                className="w-full pl-9 pr-8 py-2 text-xs border border-gray-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600 text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+              <select
+                value={selectedDept}
+                onChange={(e) => setSelectedDept(e.target.value)}
+                className="text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              >
+                {DEPARTMENTS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="on-leave">On Leave</option>
+                <option value="resigned">Resigned</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Staff Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {staffList.map((staff) => (
+              <div
+                key={staff.id}
+                className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs hover:shadow-md transition space-y-3 flex flex-col justify-between"
+              >
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-11 h-11 bg-gradient-to-tr from-blue-700 to-indigo-700 text-white rounded-xl flex items-center justify-center font-bold text-base shadow-xs">
+                        {staff.name.charAt(0)}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-900 leading-tight">
+                          {staff.name}
+                        </h3>
+                        <p className="text-[11px] text-gray-500 font-medium">
+                          {staff.designation}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-bold">
+                      {staff.id}
+                    </span>
+                  </div>
+
+                  <div className="text-xs space-y-1 text-gray-600 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <p className="flex justify-between">
+                      <span className="text-gray-400">Department:</span>
+                      <strong className="text-gray-800">{staff.department}</strong>
+                    </p>
+                    <p className="flex justify-between">
+                      <span className="text-gray-400">Qualification:</span>
+                      <span className="text-gray-700 truncate max-w-[170px]" title={staff.qualification}>
+                        {staff.qualification}
+                      </span>
+                    </p>
+                    <p className="flex justify-between">
+                      <span className="text-gray-400">Joining Date:</span>
+                      <span className="text-gray-700">{staff.joiningDate}</span>
+                    </p>
+                    <p className="flex justify-between">
+                      <span className="text-gray-400">Shift:</span>
+                      <span className="text-gray-700 truncate max-w-[180px]">{staff.shift}</span>
+                    </p>
+                  </div>
+
+                  {/* Leave Balances Chips */}
+                  <div className="flex items-center justify-between text-[11px] px-1 pt-1">
+                    <span className="text-gray-500">Leaves Left:</span>
+                    <div className="flex space-x-1.5">
+                      <span className="bg-emerald-50 text-emerald-800 px-1.5 py-0.2 rounded border border-emerald-100 font-semibold" title="Casual Leaves Remaining">
+                        CL: {staff.leaveBalance?.casual?.remaining}
+                      </span>
+                      <span className="bg-blue-50 text-blue-800 px-1.5 py-0.2 rounded border border-blue-100 font-semibold" title="Medical Leaves Remaining">
+                        SL: {staff.leaveBalance?.medical?.remaining}
+                      </span>
+                      <span className="bg-purple-50 text-purple-800 px-1.5 py-0.2 rounded border border-purple-100 font-semibold" title="Earned Leaves Remaining">
+                        EL: {staff.leaveBalance?.earned?.remaining}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-700">
+                    Basic: ₹{staff.basicSalary?.toLocaleString('en-IN')}
+                  </span>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setSelectedStaffDetail(staff)}
+                      className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold px-2.5 py-1.5 rounded-lg transition"
+                    >
+                      View Profile
+                    </button>
+                    {canManage && (
+                      <button
+                        onClick={() => {
+                          const userPayslip = payrollList.find(p => p.employeeId === staff.id);
+                          if (userPayslip) setSelectedPayslip(userPayslip);
+                          else showToast('No payroll generated for this member yet.');
+                        }}
+                        className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-2.5 py-1.5 rounded-lg border border-blue-200 transition"
+                      >
+                        Payslip
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: LEAVE MANAGEMENT & APPROVAL WORKFLOW */}
+      {activeTab === 'leaves' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
+            <div className="flex items-center space-x-2 text-xs font-medium text-gray-600">
+              <span className="font-bold text-gray-500">Filter Status:</span>
+              {['all', 'pending', 'approved', 'rejected'].map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setLeaveStatusFilter(st)}
+                  className={`capitalize px-3 py-1.5 rounded-lg border transition ${
+                    leaveStatusFilter === st
+                      ? 'bg-blue-600 text-white border-blue-600 font-bold'
+                      : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowLeaveModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition flex items-center space-x-1"
+            >
+              <span>➕</span>
+              <span>Submit Leave Request</span>
+            </button>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-gray-600 divide-y divide-gray-200">
+                <thead className="bg-gray-50 text-gray-700 font-bold uppercase tracking-wider text-[11px]">
+                  <tr>
+                    <th className="px-4 py-3">Applicant & Dept</th>
+                    <th className="px-4 py-3">Leave Type</th>
+                    <th className="px-4 py-3">Duration & Dates</th>
+                    <th className="px-4 py-3">Reason / Justification</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Actions / Workflow</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {leavesList.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                        No leave records found matching filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    leavesList.map((leave) => (
+                      <tr key={leave.id} className="hover:bg-gray-50/60 transition">
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-gray-900">{leave.employeeName}</p>
+                          <p className="text-[11px] text-gray-400">{leave.department}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="font-semibold text-gray-800 bg-gray-100 px-2 py-0.5 rounded">
+                            {leave.leaveType}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-gray-900">
+                            {leave.startDate} to {leave.endDate}
+                          </p>
+                          <p className="text-[11px] text-blue-600 font-medium">
+                            {leave.daysCount} day{leave.daysCount > 1 ? 's' : ''}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 max-w-xs">
+                          <p className="line-clamp-2 text-gray-700">{leave.reason}</p>
+                          {leave.reviewNotes && (
+                            <p className="text-[11px] text-gray-400 mt-0.5 italic">
+                              Remarks: {leave.reviewNotes}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                              leave.status === 'approved'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                : leave.status === 'rejected'
+                                ? 'bg-red-100 text-red-800 border border-red-200'
+                                : 'bg-amber-100 text-amber-800 border border-amber-200 animate-pulse'
+                            }`}
+                          >
+                            {leave.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {canManage && leave.status === 'pending' ? (
+                            <div className="flex items-center justify-end space-x-2">
+                              <button
+                                onClick={() => handleReviewLeave(leave.id, 'approved')}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-lg text-xs shadow-xs transition"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleReviewLeave(leave.id, 'rejected')}
+                                className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-2.5 py-1 rounded-lg text-xs border border-rose-200 transition"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-gray-400">
+                              {leave.reviewedBy ? `Reviewed by ${leave.reviewedBy}` : 'Completed'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: STAFF DAILY ATTENDANCE REGISTER */}
+      {activeTab === 'attendance' && (
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center space-x-3 w-full sm:w-auto">
+              <span className="text-xs font-bold text-gray-600">Attendance Date:</span>
+              <input
+                type="date"
+                value={attendanceDate}
+                onChange={(e) => setAttendanceDate(e.target.value)}
+                className="text-xs border border-gray-300 rounded-lg p-2 font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              />
+            </div>
+
+            {canManage && (
+              <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                <button
+                  onClick={handleMarkAllPresent}
+                  className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold px-3 py-2 rounded-xl border border-emerald-200 transition"
+                >
+                  ✓ Mark All Present
+                </button>
+                <button
+                  onClick={handleSaveAttendance}
+                  className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl shadow-xs transition"
+                >
+                  Save Daily Register
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-gray-600 divide-y divide-gray-200">
+                <thead className="bg-gray-50 text-gray-700 font-bold uppercase tracking-wider text-[11px]">
+                  <tr>
+                    <th className="px-4 py-3">Staff Name & ID</th>
+                    <th className="px-4 py-3">Department & Designation</th>
+                    <th className="px-4 py-3">Shift Timing</th>
+                    <th className="px-4 py-3">Check-In / Out</th>
+                    <th className="px-4 py-3 text-center">Status Toggle</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {attendanceData.map((record) => (
+                    <tr key={record.employeeId} className="hover:bg-gray-50/60 transition">
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-gray-900">{record.employeeName}</p>
+                        <p className="text-[10px] text-gray-400">{record.employeeId}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-gray-800">{record.department}</p>
+                        <p className="text-[11px] text-gray-500">{record.designation}</p>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{record.shift}</td>
+                      <td className="px-4 py-3">
+                        <span className="font-medium text-gray-800">{record.checkIn}</span> -{' '}
+                        <span className="font-medium text-gray-800">{record.checkOut}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="inline-flex bg-gray-100 p-0.5 rounded-lg text-[11px]">
+                          {['present', 'late', 'absent', 'on-leave'].map((st) => (
+                            <button
+                              key={st}
+                              disabled={!canManage}
+                              onClick={() => handleAttendanceChange(record.employeeId, st)}
+                              className={`px-2.5 py-1 rounded-md capitalize font-semibold transition ${
+                                record.status === st
+                                  ? st === 'present'
+                                    ? 'bg-emerald-600 text-white shadow-2xs'
+                                    : st === 'late'
+                                    ? 'bg-amber-600 text-white shadow-2xs'
+                                    : st === 'absent'
+                                    ? 'bg-red-600 text-white shadow-2xs'
+                                    : 'bg-blue-600 text-white shadow-2xs'
+                                  : 'text-gray-600 hover:text-gray-900'
+                              } ${!canManage ? 'cursor-default opacity-80' : ''}`}
+                            >
+                              {st}
+                            </button>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: PAYROLL & SALARY SLIPS */}
+      {activeTab === 'payroll' && (
+        <div className="space-y-4">
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center space-x-3 w-full sm:w-auto">
+              <span className="text-xs font-bold text-gray-600">Payroll Period:</span>
+              <select
+                value={payrollMonth}
+                onChange={(e) => setPayrollMonth(e.target.value)}
+                className="text-xs border border-gray-300 rounded-lg p-2 font-bold text-gray-800"
+              >
+                <option value="10">October 2026</option>
+                <option value="11">November 2026</option>
+                <option value="12">December 2026</option>
+              </select>
+              <select
+                value={payrollYear}
+                onChange={(e) => setPayrollYear(e.target.value)}
+                className="text-xs border border-gray-300 rounded-lg p-2 font-bold text-gray-800"
+              >
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+              </select>
+            </div>
+
+            <div className="text-xs text-gray-500 font-semibold">
+              Showing {payrollList.length} staff compensation records
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-gray-600 divide-y divide-gray-200">
+                <thead className="bg-gray-50 text-gray-700 font-bold uppercase tracking-wider text-[11px]">
+                  <tr>
+                    <th className="px-4 py-3">Employee & ID</th>
+                    <th className="px-4 py-3">Basic Pay</th>
+                    <th className="px-4 py-3">DA + HRA + Allowances</th>
+                    <th className="px-4 py-3">Gross Salary</th>
+                    <th className="px-4 py-3">Deductions (PF+Tax)</th>
+                    <th className="px-4 py-3">Net Take-Home</th>
+                    <th className="px-4 py-3">Disbursement</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {payrollList.map((p) => (
+                    <tr key={p.id} className="hover:bg-gray-50/60 transition">
+                      <td className="px-4 py-3">
+                        <p className="font-bold text-gray-900">{p.employeeName}</p>
+                        <p className="text-[10px] text-gray-400">{p.employeeId} • {p.department}</p>
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-gray-800">
+                        ₹{p.basicPay?.toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-4 py-3">
+                        ₹{(p.da + p.hra + p.conveyance)?.toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-blue-700">
+                        ₹{p.grossSalary?.toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-4 py-3 text-rose-600 font-medium">
+                        -₹{p.totalDeductions?.toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-4 py-3 font-black text-emerald-700 text-sm">
+                        ₹{p.netSalary?.toLocaleString('en-IN')}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            p.status === 'paid'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : 'bg-amber-100 text-amber-800 border border-amber-200 animate-pulse'
+                          }`}
+                        >
+                          {p.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            onClick={() => setSelectedPayslip(p)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1 rounded-lg text-xs shadow-xs transition"
+                          >
+                            📄 Payslip
+                          </button>
+                          {canManage && p.status !== 'paid' && (
+                            <button
+                              onClick={() => handleDisbursePayroll(p.id)}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-lg text-xs shadow-xs transition"
+                            >
+                              Disburse
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: DEPARTMENTS & FACULTY STRUCTURE */}
+      {activeTab === 'departments' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[
+            { name: 'Science & STEM', hod: 'Rajesh Kumar', count: 8, budget: '₹4.8L/mo', icon: '🔬', desc: 'Physics, Chemistry, Biology, and Advanced Robotics Labs.' },
+            { name: 'Mathematics', hod: 'Vikram Malhotra', count: 6, budget: '₹3.6L/mo', icon: '📐', desc: 'Junior & Senior Mathematics, Olympiad Training Cell.' },
+            { name: 'Languages & Literature', hod: 'Anjali Gupta', count: 7, budget: '₹3.9L/mo', icon: '📚', desc: 'English, Hindi, Sanskrit, and Foreign Languages.' },
+            { name: 'Physical Education & Sports', hod: 'Amit Patel', count: 4, budget: '₹2.1L/mo', icon: '🏃', desc: 'Athletics, Basketball, Swimming, and Yoga.' },
+            { name: 'Administration', hod: 'Dr. Sunita Rao', count: 5, budget: '₹3.8L/mo', icon: '🏛️', desc: 'Principal office, admissions, compliance, and institutional records.' },
+            { name: 'Finance & Accounts', hod: 'Meenakshi Sundaram', count: 3, budget: '₹1.9L/mo', icon: '💳', desc: 'Fee collection, payroll disbursement, audit, and budgeting.' },
+            { name: 'IT & Facilities', hod: 'Rohan Kulkarni', count: 4, budget: '₹2.2L/mo', icon: '💻', desc: 'Campus networking, server room, smart classrooms, biometric units.' },
+            { name: 'Library & Media', hod: 'Kavita Deshmukh', count: 3, budget: '₹1.4L/mo', icon: '📖', desc: 'Central digital repository, book loans, reading halls.' },
+            { name: 'Facility & Transport', hod: 'Baldev Singh', count: 8, budget: '₹3.2L/mo', icon: '🚌', desc: '14 School buses, safety escorts, campus security, and upkeep.' },
+          ].map((d) => (
+            <div key={d.name} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs hover:shadow-md transition space-y-3">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-blue-50 text-blue-700 rounded-xl flex items-center justify-center text-2xl border border-blue-100 flex-shrink-0">
+                  {d.icon}
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 leading-tight">{d.name}</h3>
+                  <p className="text-xs text-gray-500">HOD: <strong className="text-gray-700">{d.hod}</strong></p>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-600 leading-relaxed">{d.desc}</p>
+
+              <div className="pt-2 border-t border-gray-100 flex justify-between text-xs font-semibold">
+                <span className="text-gray-500">Faculty Count: <strong className="text-gray-800">{d.count} Members</strong></span>
+                <span className="text-emerald-700">{d.budget}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ONBOARD STAFF MODAL */}
+      {showAddStaffModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="onboard-modal-title"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setShowAddStaffModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-xl max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 bg-gradient-to-r from-blue-900 to-indigo-900 text-white flex items-center justify-between sticky top-0 z-10">
+              <div className="flex items-center space-x-2">
+                <span className="text-xl">👔</span>
+                <h2 id="onboard-modal-title" className="text-base font-bold">
+                  Onboard Faculty or Staff Member
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowAddStaffModal(false)}
+                className="text-white/70 hover:text-white text-lg font-bold p-1"
+                aria-label="Close dialog"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateStaff} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={staffForm.name}
+                    onChange={(e) => setStaffForm({ ...staffForm, name: e.target.value })}
+                    placeholder="e.g. Dr. Ramesh Chander"
+                    className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Official Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={staffForm.email}
+                    onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })}
+                    placeholder="e.g. ramesh.c@school.com"
+                    className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Department</label>
+                  <select
+                    value={staffForm.department}
+                    onChange={(e) => setStaffForm({ ...staffForm, department: e.target.value })}
+                    className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  >
+                    {DEPARTMENTS.filter(d => d !== 'All Departments').map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Designation</label>
+                  <input
+                    type="text"
+                    required
+                    value={staffForm.designation}
+                    onChange={(e) => setStaffForm({ ...staffForm, designation: e.target.value })}
+                    placeholder="e.g. TGT Chemistry & Lab Head"
+                    className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Basic Monthly Pay (₹)</label>
+                  <input
+                    type="number"
+                    value={staffForm.basicSalary}
+                    onChange={(e) => setStaffForm({ ...staffForm, basicSalary: e.target.value })}
+                    className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Joining Date</label>
+                  <input
+                    type="date"
+                    value={staffForm.joiningDate}
+                    onChange={(e) => setStaffForm({ ...staffForm, joiningDate: e.target.value })}
+                    className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Qualification</label>
+                  <input
+                    type="text"
+                    value={staffForm.qualification}
+                    onChange={(e) => setStaffForm({ ...staffForm, qualification: e.target.value })}
+                    placeholder="e.g. M.Sc, B.Ed"
+                    className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Employment Type</label>
+                  <select
+                    value={staffForm.employmentType}
+                    onChange={(e) => setStaffForm({ ...staffForm, employmentType: e.target.value })}
+                    className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  >
+                    <option value="Full-Time">Full-Time Permanent</option>
+                    <option value="Part-Time">Part-Time Faculty</option>
+                    <option value="Probation">Probationary (1 Year)</option>
+                    <option value="Contract">Fixed Term Contract</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-3 flex justify-end space-x-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddStaffModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md transition"
+                >
+                  Confirm & Onboard
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* APPLY LEAVE MODAL */}
+      {showLeaveModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="leave-modal-title"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setShowLeaveModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 bg-gradient-to-r from-blue-900 to-indigo-900 text-white flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="text-xl">📝</span>
+                <h2 id="leave-modal-title" className="text-base font-bold">
+                  Submit Staff Leave Application
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowLeaveModal(false)}
+                className="text-white/70 hover:text-white text-lg font-bold p-1"
+                aria-label="Close dialog"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleApplyLeave} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Applying Staff Member</label>
+                <select
+                  value={leaveForm.employeeId}
+                  onChange={(e) => setLeaveForm({ ...leaveForm, employeeId: e.target.value })}
+                  className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden font-semibold"
+                >
+                  {staffList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.designation} - {s.department})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Leave Type</label>
+                <select
+                  value={leaveForm.leaveType}
+                  onChange={(e) => setLeaveForm({ ...leaveForm, leaveType: e.target.value })}
+                  className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                >
+                  {LEAVE_TYPES.map((lt) => (
+                    <option key={lt} value={lt}>{lt}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={leaveForm.startDate}
+                    onChange={(e) => setLeaveForm({ ...leaveForm, startDate: e.target.value, endDate: e.target.value })}
+                    className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">End Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={leaveForm.endDate}
+                    onChange={(e) => setLeaveForm({ ...leaveForm, endDate: e.target.value })}
+                    className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Reason / Purpose *</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={leaveForm.reason}
+                  onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })}
+                  placeholder="Detail the circumstances, syllabus coverage arrangement, or medical condition..."
+                  className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden leading-relaxed"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end space-x-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowLeaveModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md transition"
+                >
+                  Submit Application
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* STAFF DETAILS PROFILE MODAL */}
+      {selectedStaffDetail && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="profile-modal-title"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setSelectedStaffDetail(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <h2 id="profile-modal-title" className="text-sm font-bold text-gray-900">
+                Staff Profile: {selectedStaffDetail.name} ({selectedStaffDetail.id})
+              </h2>
+              <button
+                onClick={() => setSelectedStaffDetail(null)}
+                className="text-gray-400 hover:text-gray-700 font-bold p-1"
+                aria-label="Close dialog"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              <div className="flex items-center space-x-3.5 bg-blue-50/70 p-4 rounded-xl border border-blue-100">
+                <div className="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center text-lg font-bold">
+                  {selectedStaffDetail.name.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">{selectedStaffDetail.name}</h3>
+                  <p className="text-gray-600 font-medium">{selectedStaffDetail.designation} • {selectedStaffDetail.department}</p>
+                  <p className="text-gray-400 text-[11px]">{selectedStaffDetail.email} | {selectedStaffDetail.phone}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <div>
+                  <span className="text-gray-400">Qualification: </span>
+                  <strong className="text-gray-800">{selectedStaffDetail.qualification}</strong>
+                </div>
+                <div>
+                  <span className="text-gray-400">Joining Date: </span>
+                  <strong className="text-gray-800">{selectedStaffDetail.joiningDate}</strong>
+                </div>
+                <div>
+                  <span className="text-gray-400">Employment Type: </span>
+                  <strong className="text-gray-800">{selectedStaffDetail.employmentType}</strong>
+                </div>
+                <div>
+                  <span className="text-gray-400">Shift Hours: </span>
+                  <strong className="text-gray-800">{selectedStaffDetail.shift}</strong>
+                </div>
+                <div>
+                  <span className="text-gray-400">Bank Account: </span>
+                  <strong className="text-gray-800">{selectedStaffDetail.bankDetails?.bankName} ({selectedStaffDetail.bankDetails?.accountNumber})</strong>
+                </div>
+                <div>
+                  <span className="text-gray-400">IFSC Code: </span>
+                  <strong className="text-gray-800">{selectedStaffDetail.bankDetails?.ifsc}</strong>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <h4 className="font-bold text-gray-700 uppercase tracking-wider text-[11px]">
+                  Annual Leave Balances (2026-2027)
+                </h4>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-emerald-50 p-2.5 rounded-lg border border-emerald-100">
+                    <p className="text-gray-500 text-[10px]">Casual Leave</p>
+                    <p className="text-base font-black text-emerald-700">
+                      {selectedStaffDetail.leaveBalance?.casual?.remaining} / {selectedStaffDetail.leaveBalance?.casual?.total}
+                    </p>
+                  </div>
+                  <div className="bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                    <p className="text-gray-500 text-[10px]">Medical Leave</p>
+                    <p className="text-base font-black text-blue-700">
+                      {selectedStaffDetail.leaveBalance?.medical?.remaining} / {selectedStaffDetail.leaveBalance?.medical?.total}
+                    </p>
+                  </div>
+                  <div className="bg-purple-50 p-2.5 rounded-lg border border-purple-100">
+                    <p className="text-gray-500 text-[10px]">Earned Leave</p>
+                    <p className="text-base font-black text-purple-700">
+                      {selectedStaffDetail.leaveBalance?.earned?.remaining} / {selectedStaffDetail.leaveBalance?.earned?.total}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 flex justify-end space-x-2 border-t border-gray-100">
+                <button
+                  onClick={() => setSelectedStaffDetail(null)}
+                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OFFICIAL SALARY SLIP (PRINTABLE MODAL) */}
+      {selectedPayslip && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="payslip-modal-title"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setSelectedPayslip(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl max-h-[95vh] overflow-y-auto animate-in zoom-in-95 duration-150 print:m-0 print:shadow-none print:w-full print:border-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Toolbar */}
+            <div className="px-6 py-3.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between print:hidden">
+              <span className="text-xs font-bold text-gray-600">Computerized Salary Voucher</span>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => window.print()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs shadow-xs transition flex items-center space-x-1"
+                >
+                  <span>🖨️</span>
+                  <span>Print Payslip</span>
+                </button>
+                <button
+                  onClick={() => setSelectedPayslip(null)}
+                  className="text-gray-400 hover:text-gray-700 font-bold p-1 text-sm"
+                  aria-label="Close dialog"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Official School Payslip Content */}
+            <div className="p-8 space-y-6 text-xs text-gray-800">
+              {/* Institution Header */}
+              <div className="text-center border-b-2 border-blue-900 pb-4 space-y-1">
+                <div className="flex justify-center items-center space-x-2">
+                  <span className="text-2xl">🎓</span>
+                  <h1 className="text-lg font-black tracking-tight text-blue-950 uppercase">
+                    Twinkling Toddlers Senior Secondary School
+                  </h1>
+                </div>
+                <p className="text-[11px] text-gray-500 font-medium">
+                  Affiliated to Central Board of Secondary Education • Deshbandhu Para, Siliguri, WB
+                </p>
+                <p className="text-xs font-bold text-gray-800 pt-1 tracking-wide uppercase">
+                  Pay Slip for the Month of {['October', 'November', 'December'][parseInt(selectedPayslip.month, 10) - 10] || 'November'} {selectedPayslip.year}
+                </p>
+              </div>
+
+              {/* Employee & Bank Info */}
+              <div className="grid grid-cols-2 gap-4 bg-gray-50/80 p-4 rounded-xl border border-gray-200">
+                <div className="space-y-1">
+                  <p><span className="text-gray-400">Employee ID:</span> <strong className="text-gray-900">{selectedPayslip.employeeId}</strong></p>
+                  <p><span className="text-gray-400">Employee Name:</span> <strong className="text-gray-900">{selectedPayslip.employeeName}</strong></p>
+                  <p><span className="text-gray-400">Designation:</span> {selectedPayslip.designation}</p>
+                  <p><span className="text-gray-400">Department:</span> {selectedPayslip.department}</p>
+                </div>
+                <div className="space-y-1">
+                  <p><span className="text-gray-400">Bank Name:</span> {selectedPayslip.bankDetails?.bankName}</p>
+                  <p><span className="text-gray-400">Account No:</span> {selectedPayslip.bankDetails?.accountNumber}</p>
+                  <p><span className="text-gray-400">Transaction Ref:</span> {selectedPayslip.transactionRef}</p>
+                  <p><span className="text-gray-400">Working Days:</span> {selectedPayslip.workingDays} (Paid Leaves: {selectedPayslip.paidLeaves})</p>
+                </div>
+              </div>
+
+              {/* Two Column Earnings vs Deductions Table */}
+              <div className="grid grid-cols-2 divide-x divide-gray-200 border border-gray-200 rounded-xl overflow-hidden">
+                {/* Earnings */}
+                <div>
+                  <div className="bg-emerald-50 px-4 py-2 border-b border-gray-200 font-bold text-emerald-900">
+                    Earnings (Allowances)
+                  </div>
+                  <div className="p-4 space-y-2">
+                    <p className="flex justify-between">
+                      <span>Basic Pay:</span>
+                      <strong className="text-gray-900">₹{selectedPayslip.basicPay?.toLocaleString('en-IN')}</strong>
+                    </p>
+                    <p className="flex justify-between">
+                      <span>Dearness Allowance (DA 20%):</span>
+                      <span className="text-gray-700">₹{selectedPayslip.da?.toLocaleString('en-IN')}</span>
+                    </p>
+                    <p className="flex justify-between">
+                      <span>House Rent Allowance (HRA 25%):</span>
+                      <span className="text-gray-700">₹{selectedPayslip.hra?.toLocaleString('en-IN')}</span>
+                    </p>
+                    <p className="flex justify-between">
+                      <span>Conveyance & Transport Allowance:</span>
+                      <span className="text-gray-700">₹{selectedPayslip.conveyance?.toLocaleString('en-IN')}</span>
+                    </p>
+                    <div className="pt-2 border-t border-gray-200 flex justify-between font-bold text-blue-900">
+                      <span>Gross Earnings:</span>
+                      <span>₹{selectedPayslip.grossSalary?.toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Deductions */}
+                <div>
+                  <div className="bg-rose-50 px-4 py-2 border-b border-gray-200 font-bold text-rose-900">
+                    Statutory & Tax Deductions
+                  </div>
+                  <div className="p-4 space-y-2">
+                    <p className="flex justify-between">
+                      <span>Provident Fund (EPF 12%):</span>
+                      <span className="text-rose-700">₹{selectedPayslip.pfDeduction?.toLocaleString('en-IN')}</span>
+                    </p>
+                    <p className="flex justify-between">
+                      <span>ESI Health Contribution:</span>
+                      <span className="text-rose-700">₹{selectedPayslip.esiDeduction?.toLocaleString('en-IN')}</span>
+                    </p>
+                    <p className="flex justify-between">
+                      <span>Professional Tax / TDS:</span>
+                      <span className="text-rose-700">₹{selectedPayslip.taxDeduction?.toLocaleString('en-IN')}</span>
+                    </p>
+                    <p className="flex justify-between text-transparent select-none">
+                      <span>Spacer</span>
+                      <span>-</span>
+                    </p>
+                    <div className="pt-2 border-t border-gray-200 flex justify-between font-bold text-rose-900">
+                      <span>Total Deductions:</span>
+                      <span>-₹{selectedPayslip.totalDeductions?.toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Net Take Home Bar */}
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-4 rounded-xl flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Net Salary Payable</p>
+                  <p className="text-xs text-emerald-700 italic">
+                    Amount in words: {numberToWords(selectedPayslip.netSalary)}
+                  </p>
+                </div>
+                <div className="text-2xl font-black text-emerald-900">
+                  ₹{selectedPayslip.netSalary?.toLocaleString('en-IN')}
+                </div>
+              </div>
+
+              {/* Official Seal and Signature */}
+              <div className="pt-8 flex justify-between items-end text-center text-[11px] text-gray-500">
+                <div className="space-y-1">
+                  <p className="font-bold text-gray-800">Meenakshi Sundaram</p>
+                  <p className="border-t border-gray-300 pt-1 px-4">Chief Accounts Officer</p>
+                </div>
+
+                <div className="w-20 h-20 rounded-full border-2 border-blue-900/40 flex items-center justify-center text-[10px] font-bold text-blue-900/60 uppercase rotate-[-12deg]">
+                  School Seal
+                </div>
+
+                <div className="space-y-1">
+                  <p className="font-bold text-gray-800">Dr. Sunita Rao</p>
+                  <p className="border-t border-gray-300 pt-1 px-4">Principal & Academic Dean</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

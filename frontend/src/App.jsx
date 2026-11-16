@@ -54,6 +54,7 @@ import Gallery from './pages/gallery/Gallery';
 import Communication from './pages/communication/Communication';
 import NotificationCenter from './pages/notifications/NotificationCenter';
 import EventManagement from './pages/events/EventManagement';
+import HRMSDashboard from './pages/hrms/HRMSDashboard';
 import PermissionRoute from './components/common/PermissionRoute';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
@@ -135,6 +136,7 @@ function AppRoutes() {
                     <Route path="/communication" element={<PermissionRoute permission="view-communication"><Communication /></PermissionRoute>} />
                     <Route path="/events" element={<PermissionRoute permission="view-events"><EventManagement /></PermissionRoute>} />
                     <Route path="/calendar" element={<Navigate to="/events" replace />} />
+                    <Route path="/hrms" element={<PermissionRoute permission="view-hrms"><HRMSDashboard /></PermissionRoute>} />
                     <Route path="/notifications" element={<NotificationCenter />} />
                     <Route path="/users" element={<PermissionRoute permission="manage-users"><UserList /></PermissionRoute>} />
                     <Route path="/settings" element={<PermissionRoute permission="manage-settings"><Settings /></PermissionRoute>} />

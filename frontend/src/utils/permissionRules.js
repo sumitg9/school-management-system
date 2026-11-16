@@ -230,6 +230,16 @@ export const PERMISSION_MODULES = [
       { id: 'manage-events', label: 'Manage Events', description: 'Create, schedule, edit, and delete school events and calendar entries' },
     ],
   },
+  {
+    id: 'hrms',
+    name: 'Human Resources (HRMS)',
+    icon: '👔',
+    description: 'Faculty and staff directory, leave management, staff attendance, payroll processing, and salary slips',
+    permissions: [
+      { id: 'view-hrms', label: 'View HRMS & Staff', description: 'Browse staff directory, personal leave status, and payslips' },
+      { id: 'manage-hrms', label: 'Manage HRMS & Payroll', description: 'Manage staff profiles, approve/reject leaves, mark staff attendance, and process payroll' },
+    ],
+  },
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS = {
@@ -249,6 +259,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-gallery', 'manage-gallery',
     'view-communication', 'manage-communication',
     'view-events', 'manage-events',
+    'view-hrms', 'manage-hrms',
   ],
   'admin': [
     'view-dashboard',
@@ -265,6 +276,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-gallery', 'manage-gallery',
     'view-communication', 'manage-communication',
     'view-events', 'manage-events',
+    'view-hrms', 'manage-hrms',
   ],
   'teacher': [
     'view-dashboard',
@@ -277,6 +289,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-gallery',
     'view-communication', 'manage-communication',
     'view-events', 'manage-events',
+    'view-hrms',
   ],
   'student': [
     'view-dashboard',
@@ -305,6 +318,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-reports', 'generate-reports',
     'view-gallery',
     'view-events',
+    'view-hrms', 'manage-hrms',
   ],
   'back-office': [
     'view-dashboard',
@@ -316,6 +330,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'manage-tools',
     'view-gallery',
     'view-events', 'manage-events',
+    'view-hrms',
   ],
   'general': [
     'view-dashboard',
@@ -323,6 +338,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-classes',
     'view-gallery',
     'view-events',
+    'view-hrms',
   ],
 };
 

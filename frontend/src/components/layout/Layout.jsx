@@ -87,6 +87,7 @@ const Layout = ({ children }) => {
       label: 'Administration',
       icon: '⚙️',
       items: [
+        { path: '/hrms', icon: '👔', label: 'HRMS & Staff', permission: 'view-hrms' },
         { path: '/reports', icon: '📈', label: 'Reports & Analytics', permission: 'view-reports' },
         { path: '/tools/bulk', icon: '🔧', label: 'Bulk Operations', permission: 'manage-tools' },
         { path: '/users', icon: '👥', label: 'Users Management', permission: 'manage-users' },
