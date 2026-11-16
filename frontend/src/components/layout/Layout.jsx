@@ -15,6 +15,7 @@ const Layout = ({ children }) => {
     switchActiveRole,
     resetActiveRole,
     isAdmin,
+    isTeacher,
     isStudent,
     isParent,
     parentChildren,
