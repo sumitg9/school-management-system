@@ -9,7 +9,8 @@ import {
   PERMISSION_MODULES,
   DEFAULT_ROLE_PERMISSIONS,
   mergeRolePermissions,
-  isRestrictedForStudent
+  isRestrictedForStudent,
+  hasRolePermission
 } from '../../utils/permissionRules';
 
 const UserPermissionsTable = () => {
