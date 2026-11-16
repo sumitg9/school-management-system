@@ -282,6 +282,7 @@ const EnhancedDashboard = () => {
     { name: 'Create Exam', icon: '📝', color: 'red', path: '/exams/create', permission: 'create-exams' },
     { name: 'Add Fee', icon: '💰', color: 'emerald', path: '/fees/create', permission: 'create-fees' },
     { name: 'Create Assignment', icon: '📚', color: 'purple', path: '/assignments/create', permission: 'create-assignments' },
+    { name: 'Parent Messages', icon: '💬', color: 'indigo', path: '/communication', permission: 'view-communication' },
   ];
 
   const studentQuickActions = [
@@ -297,6 +298,7 @@ const EnhancedDashboard = () => {
     { name: "Child's Fees", icon: '💰', color: 'emerald', path: '/fees' },
     { name: "Child's Assignments", icon: '📚', color: 'purple', path: '/assignments' },
     { name: 'Examinations', icon: '📝', color: 'red', path: '/exams' },
+    { name: 'Message Teachers', icon: '💬', color: 'indigo', path: '/communication' },
   ];
 
   const quickActions = isParent()

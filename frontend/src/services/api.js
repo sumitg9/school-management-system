@@ -3411,4 +3411,503 @@ export const galleryAPI = {
   },
 };
 
+// ==========================================
+// Teacher-Parent Communication API
+// ==========================================
+const DEFAULT_COMM_THREADS = [
+  {
+    id: 'thread-1',
+    student_id: 1,
+    student_name: 'Aarav Sharma',
+    student_class: 'Class 7-A',
+    roll_number: '12',
+    parent_email: 'suresh.sharma@gmail.com',
+    parent_name: 'Suresh Sharma',
+    parent_phone: '9876543210',
+    teacher_email: 'rajesh.kumar@school.com',
+    teacher_name: 'Rajesh Kumar',
+    teacher_subject: 'Mathematics',
+    subject: 'Mathematics Term 2 Progress & Algebra Assessment',
+    category: 'Academic',
+    priority: 'normal',
+    status: 'active',
+    created_at: '2026-02-14T09:30:00.000Z',
+    last_message_at: '2026-02-15T11:45:00.000Z',
+    last_message_preview: 'NCERT exemplar practice problems will help him solidify conceptual speed for the upcoming finals.',
+    unread_for_teacher: 0,
+    unread_for_parent: 0,
+  },
+  {
+    id: 'thread-2',
+    student_id: 2,
+    student_name: 'Diya Sharma',
+    student_class: 'Class 10-A',
+    roll_number: '5',
+    parent_email: 'suresh.sharma@gmail.com',
+    parent_name: 'Suresh Sharma',
+    parent_phone: '9876543210',
+    teacher_email: 'priya.sharma@school.com',
+    teacher_name: 'Priya Sharma',
+    teacher_subject: 'Science & Biology',
+    subject: 'Parent-Teacher Meeting: Inter-School Science Fair Prototype',
+    category: 'PTM Request',
+    priority: 'important',
+    status: 'active',
+    created_at: '2026-02-15T14:00:00.000Z',
+    last_message_at: '2026-02-16T08:30:00.000Z',
+    last_message_preview: 'Appointment confirmed for Friday at 3:30 PM in Room 204 (Senior Science Block).',
+    unread_for_teacher: 0,
+    unread_for_parent: 1,
+  },
+  {
+    id: 'thread-3',
+    student_id: 1,
+    student_name: 'Aarav Sharma',
+    student_class: 'Class 7-A',
+    roll_number: '12',
+    parent_email: 'suresh.sharma@gmail.com',
+    parent_name: 'Suresh Sharma',
+    parent_phone: '9876543210',
+    teacher_email: 'amit.patel@school.com',
+    teacher_name: 'Amit Patel',
+    teacher_subject: 'Physical Education & Sports',
+    subject: 'Selection for Inter-House Track & Field Relay Team',
+    category: 'General',
+    priority: 'normal',
+    status: 'resolved',
+    created_at: '2026-02-12T10:15:00.000Z',
+    last_message_at: '2026-02-13T16:20:00.000Z',
+    last_message_preview: 'Aarav has been provided with the training schedule and uniform kit requirements.',
+    unread_for_teacher: 0,
+    unread_for_parent: 0,
+  },
+  {
+    id: 'thread-4',
+    student_id: 2,
+    student_name: 'Diya Sharma',
+    student_class: 'Class 10-A',
+    roll_number: '5',
+    parent_email: 'suresh.sharma@gmail.com',
+    parent_name: 'Suresh Sharma',
+    parent_phone: '9876543210',
+    teacher_email: 'anjali.gupta@school.com',
+    teacher_name: 'Anjali Gupta',
+    teacher_subject: 'English Literature',
+    subject: 'Zonal Debate Championship Preparation',
+    category: 'Academic',
+    priority: 'normal',
+    status: 'active',
+    created_at: '2026-02-11T12:00:00.000Z',
+    last_message_at: '2026-02-14T17:00:00.000Z',
+    last_message_preview: 'Diya has drafted persuasive arguments for the impromptu round. Very impressive articulation!',
+    unread_for_teacher: 0,
+    unread_for_parent: 0,
+  },
+  {
+    id: 'thread-5',
+    student_id: 3,
+    student_name: 'Rohan Verma',
+    student_class: 'Class 8-B',
+    roll_number: '18',
+    parent_email: 'manish.verma@gmail.com',
+    parent_name: 'Manish Verma',
+    parent_phone: '9812345678',
+    teacher_email: 'rajesh.kumar@school.com',
+    teacher_name: 'Rajesh Kumar',
+    teacher_subject: 'Mathematics',
+    subject: 'Homework Submission & Punctuality Follow-up',
+    category: 'Homework',
+    priority: 'important',
+    status: 'active',
+    created_at: '2026-02-13T09:00:00.000Z',
+    last_message_at: '2026-02-14T10:30:00.000Z',
+    last_message_preview: 'Thank you for following up, we will ensure Rohan submits chapter 6 exercises on Monday.',
+    unread_for_teacher: 1,
+    unread_for_parent: 0,
+  },
+];
+
+const DEFAULT_COMM_MESSAGES = [
+  {
+    id: 'msg-1-1',
+    thread_id: 'thread-1',
+    sender_id: 'rajesh.kumar@school.com',
+    sender_name: 'Rajesh Kumar',
+    sender_role: 'teacher',
+    content: 'Dear Mr. Sharma, I am writing to share that Aarav scored 88/100 in our recent algebra assessment. He has shown solid progress with linear equations and quadratic word problems.',
+    created_at: '2026-02-14T09:30:00.000Z',
+    read: true,
+  },
+  {
+    id: 'msg-1-2',
+    thread_id: 'thread-1',
+    sender_id: 'suresh.sharma@gmail.com',
+    sender_name: 'Suresh Sharma',
+    sender_role: 'parent',
+    content: 'Thank you so much Mr. Kumar! We have been following the practice worksheets at home as well. Does he need any supplementary reference book for geometry proofs?',
+    created_at: '2026-02-14T14:10:00.000Z',
+    read: true,
+  },
+  {
+    id: 'msg-1-3',
+    thread_id: 'thread-1',
+    sender_id: 'rajesh.kumar@school.com',
+    sender_name: 'Rajesh Kumar',
+    sender_role: 'teacher',
+    content: 'The school LMS practice problems and NCERT exemplar will help him solidify conceptual speed for the upcoming finals. I have also uploaded solved revision notes on the assignments tab.',
+    created_at: '2026-02-15T11:45:00.000Z',
+    read: true,
+  },
+  {
+    id: 'msg-2-1',
+    thread_id: 'thread-2',
+    sender_id: 'priya.sharma@school.com',
+    sender_name: 'Priya Sharma',
+    sender_role: 'teacher',
+    content: 'Dear Mr. Suresh Sharma, Diya is doing exceptionally well in Biology practical experiments. We would like to schedule a 15-minute PTM slot to discuss her inter-school science fair project prototype.',
+    created_at: '2026-02-15T14:00:00.000Z',
+    read: true,
+  },
+  {
+    id: 'msg-2-2',
+    thread_id: 'thread-2',
+    sender_id: 'priya.sharma@school.com',
+    sender_name: 'Priya Sharma',
+    sender_role: 'teacher',
+    content: 'Proposed appointment for PTM discussion.',
+    meeting_request: {
+      date: '2026-02-20',
+      time: '03:30 PM',
+      mode: 'In-Person (Room 204)',
+      agenda: 'Inter-School Science Fair Demonstration Review',
+      status: 'confirmed',
+    },
+    created_at: '2026-02-15T14:02:00.000Z',
+    read: true,
+  },
+  {
+    id: 'msg-2-3',
+    thread_id: 'thread-2',
+    sender_id: 'suresh.sharma@gmail.com',
+    sender_name: 'Suresh Sharma',
+    sender_role: 'parent',
+    content: 'Good afternoon ma\'am. Friday at 3:30 PM is confirmed. I will be present at Room 204. Thank you for supporting Diya\'s enthusiasm for science!',
+    created_at: '2026-02-16T08:30:00.000Z',
+    read: false,
+  },
+  {
+    id: 'msg-3-1',
+    thread_id: 'thread-3',
+    sender_id: 'amit.patel@school.com',
+    sender_name: 'Amit Patel',
+    sender_role: 'teacher',
+    content: 'Dear Mr. Sharma, Aarav has been chosen for the Senior Boys Yellow House 4x100m relay sprint team. Morning training is scheduled from 7:00 AM to 7:45 AM every Tuesday and Thursday.',
+    created_at: '2026-02-12T10:15:00.000Z',
+    read: true,
+  },
+  {
+    id: 'msg-3-2',
+    thread_id: 'thread-3',
+    sender_id: 'suresh.sharma@gmail.com',
+    sender_name: 'Suresh Sharma',
+    sender_role: 'parent',
+    content: 'Wonderful to hear! Aarav will be punctual for morning practice. Please let us know if special track spikes are required.',
+    created_at: '2026-02-12T18:00:00.000Z',
+    read: true,
+  },
+  {
+    id: 'msg-3-3',
+    thread_id: 'thread-3',
+    sender_id: 'amit.patel@school.com',
+    sender_name: 'Amit Patel',
+    sender_role: 'teacher',
+    content: 'Aarav has been provided with the training schedule and uniform kit requirements. Standard running shoes are perfect.',
+    created_at: '2026-02-13T16:20:00.000Z',
+    read: true,
+  },
+  {
+    id: 'msg-4-1',
+    thread_id: 'thread-4',
+    sender_id: 'anjali.gupta@school.com',
+    sender_name: 'Anjali Gupta',
+    sender_role: 'teacher',
+    content: 'Good afternoon Mr. Sharma. Diya participated in the preliminary debate trials on climate governance today. She delivered an outstanding rebuttal and qualified for the inter-school finals.',
+    created_at: '2026-02-11T12:00:00.000Z',
+    read: true,
+  },
+  {
+    id: 'msg-4-2',
+    thread_id: 'thread-4',
+    sender_id: 'suresh.sharma@gmail.com',
+    sender_name: 'Suresh Sharma',
+    sender_role: 'parent',
+    content: 'Thank you for the wonderful update, Anjali ma\'am. Diya was practicing her speech diligently last evening.',
+    created_at: '2026-02-11T19:30:00.000Z',
+    read: true,
+  },
+  {
+    id: 'msg-4-3',
+    thread_id: 'thread-4',
+    sender_id: 'anjali.gupta@school.com',
+    sender_name: 'Anjali Gupta',
+    sender_role: 'teacher',
+    content: 'Diya has drafted persuasive arguments for the impromptu round. Very impressive articulation!',
+    created_at: '2026-02-14T17:00:00.000Z',
+    read: true,
+  },
+  {
+    id: 'msg-5-1',
+    thread_id: 'thread-5',
+    sender_id: 'rajesh.kumar@school.com',
+    sender_name: 'Rajesh Kumar',
+    sender_role: 'teacher',
+    content: 'Dear Mr. Verma, this is a gentle reminder that Rohan has missed submitting two homework assignments for geometry this week. Please check his planner.',
+    created_at: '2026-02-13T09:00:00.000Z',
+    read: true,
+  },
+  {
+    id: 'msg-5-2',
+    thread_id: 'thread-5',
+    sender_id: 'manish.verma@gmail.com',
+    sender_name: 'Manish Verma',
+    sender_role: 'parent',
+    content: 'Thank you for following up, we will ensure Rohan submits chapter 6 exercises on Monday.',
+    created_at: '2026-02-14T10:30:00.000Z',
+    read: false,
+  },
+];
+
+const getStoredCommThreads = () => {
+  try {
+    const raw = localStorage.getItem('sms_comm_threads');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to parse stored comm threads', e);
+  }
+  try {
+    localStorage.setItem('sms_comm_threads', JSON.stringify(DEFAULT_COMM_THREADS));
+  } catch (_) {}
+  return DEFAULT_COMM_THREADS;
+};
+
+const saveStoredCommThreads = (threads) => {
+  try {
+    localStorage.setItem('sms_comm_threads', JSON.stringify(threads));
+  } catch (e) {
+    console.error('Failed to save comm threads', e);
+  }
+};
+
+const getStoredCommMessages = () => {
+  try {
+    const raw = localStorage.getItem('sms_comm_messages');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to parse stored comm messages', e);
+  }
+  try {
+    localStorage.setItem('sms_comm_messages', JSON.stringify(DEFAULT_COMM_MESSAGES));
+  } catch (_) {}
+  return DEFAULT_COMM_MESSAGES;
+};
+
+const saveStoredCommMessages = (messages) => {
+  try {
+    localStorage.setItem('sms_comm_messages', JSON.stringify(messages));
+  } catch (e) {
+    console.error('Failed to save comm messages', e);
+  }
+};
+
+export const communicationAPI = {
+  getThreads: async (params = {}) => {
+    let threads = getStoredCommThreads();
+    const { userRole, userEmail, childId, childName, category, status, search } = params;
+
+    // Scope based on user role
+    if (userRole === 'parent') {
+      const parentEmailLower = (userEmail || '').toLowerCase();
+      threads = threads.filter(t => {
+        const emailMatches = (t.parent_email || '').toLowerCase() === parentEmailLower;
+        // If parent has active child selected, prioritize matching that child
+        const childMatches = childName
+          ? (t.student_name || '').toLowerCase().includes(childName.toLowerCase())
+          : true;
+        return emailMatches && childMatches;
+      });
+    } else if (userRole === 'teacher') {
+      const teacherEmailLower = (userEmail || '').toLowerCase();
+      threads = threads.filter(t => {
+        return (t.teacher_email || '').toLowerCase() === teacherEmailLower;
+      });
+    }
+
+    if (category && category !== 'all' && category !== 'All') {
+      threads = threads.filter(t => (t.category || '').toLowerCase() === category.toLowerCase());
+    }
+
+    if (status && status !== 'all' && status !== 'All') {
+      threads = threads.filter(t => (t.status || 'active').toLowerCase() === status.toLowerCase());
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      threads = threads.filter(t => {
+        return (
+          t.subject?.toLowerCase().includes(q) ||
+          t.student_name?.toLowerCase().includes(q) ||
+          t.teacher_name?.toLowerCase().includes(q) ||
+          t.parent_name?.toLowerCase().includes(q) ||
+          t.last_message_preview?.toLowerCase().includes(q)
+        );
+      });
+    }
+
+    // Sort by last_message_at newest first
+    threads = [...threads].sort((a, b) => new Date(b.last_message_at || b.created_at) - new Date(a.last_message_at || a.created_at));
+
+    return { success: true, data: threads, total: threads.length };
+  },
+
+  getThreadMessages: async (threadId) => {
+    const messages = getStoredCommMessages();
+    const threadMsgs = messages.filter(m => String(m.thread_id) === String(threadId));
+    threadMsgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    return { success: true, data: threadMsgs };
+  },
+
+  createThread: async (threadData) => {
+    const threads = getStoredCommThreads();
+    const messages = getStoredCommMessages();
+    const threadId = `thread-${Date.now()}`;
+    const now = new Date().toISOString();
+
+    const newThread = {
+      id: threadId,
+      student_id: threadData.student_id || null,
+      student_name: threadData.student_name || 'Student',
+      student_class: threadData.student_class || 'Class',
+      roll_number: threadData.roll_number || '',
+      parent_email: threadData.parent_email || '',
+      parent_name: threadData.parent_name || 'Parent',
+      parent_phone: threadData.parent_phone || '',
+      teacher_email: threadData.teacher_email || '',
+      teacher_name: threadData.teacher_name || 'Teacher',
+      teacher_subject: threadData.teacher_subject || 'Faculty',
+      subject: threadData.subject?.trim() || 'New Discussion',
+      category: threadData.category || 'General',
+      priority: threadData.priority || 'normal',
+      status: 'active',
+      created_at: now,
+      last_message_at: now,
+      last_message_preview: threadData.initial_message?.trim() || 'Conversation started',
+      unread_for_teacher: threadData.sender_role === 'parent' ? 1 : 0,
+      unread_for_parent: threadData.sender_role === 'teacher' ? 1 : 0,
+    };
+
+    const initialMessage = {
+      id: `msg-${Date.now()}`,
+      thread_id: threadId,
+      sender_id: threadData.sender_id || '',
+      sender_name: threadData.sender_name || 'Sender',
+      sender_role: threadData.sender_role || 'teacher',
+      content: threadData.initial_message?.trim() || 'Conversation started',
+      created_at: now,
+      read: false,
+    };
+
+    saveStoredCommThreads([newThread, ...threads]);
+    saveStoredCommMessages([...messages, initialMessage]);
+
+    return { success: true, data: newThread, message: 'Conversation started successfully!' };
+  },
+
+  sendMessage: async (threadId, messageData) => {
+    const threads = getStoredCommThreads();
+    const messages = getStoredCommMessages();
+    const now = new Date().toISOString();
+
+    const threadIndex = threads.findIndex(t => String(t.id) === String(threadId));
+    if (threadIndex === -1) {
+      throw new Error('Conversation thread not found');
+    }
+
+    const newMessage = {
+      id: `msg-${Date.now()}`,
+      thread_id: threadId,
+      sender_id: messageData.sender_id,
+      sender_name: messageData.sender_name,
+      sender_role: messageData.sender_role,
+      content: messageData.content?.trim() || '',
+      meeting_request: messageData.meeting_request || null,
+      created_at: now,
+      read: false,
+    };
+
+    // Update thread metadata
+    const thread = threads[threadIndex];
+    thread.last_message_at = now;
+    thread.last_message_preview = messageData.content?.trim() || (messageData.meeting_request ? 'Meeting invitation proposed' : 'New message');
+    if (messageData.sender_role === 'teacher') {
+      thread.unread_for_parent = (thread.unread_for_parent || 0) + 1;
+    } else if (messageData.sender_role === 'parent') {
+      thread.unread_for_teacher = (thread.unread_for_teacher || 0) + 1;
+    }
+
+    threads[threadIndex] = { ...thread };
+    saveStoredCommThreads(threads);
+    saveStoredCommMessages([...messages, newMessage]);
+
+    return { success: true, data: newMessage };
+  },
+
+  markThreadRead: async (threadId, readerRole) => {
+    const threads = getStoredCommThreads();
+    const threadIndex = threads.findIndex(t => String(t.id) === String(threadId));
+    if (threadIndex !== -1) {
+      if (readerRole === 'parent') {
+        threads[threadIndex].unread_for_parent = 0;
+      } else if (readerRole === 'teacher') {
+        threads[threadIndex].unread_for_teacher = 0;
+      }
+      saveStoredCommThreads(threads);
+    }
+    return { success: true };
+  },
+
+  updateThreadStatus: async (threadId, newStatus) => {
+    const threads = getStoredCommThreads();
+    const threadIndex = threads.findIndex(t => String(t.id) === String(threadId));
+    if (threadIndex !== -1) {
+      threads[threadIndex].status = newStatus;
+      saveStoredCommThreads(threads);
+      return { success: true, data: threads[threadIndex] };
+    }
+    throw new Error('Thread not found');
+  },
+
+  respondMeeting: async (threadId, messageId, status) => {
+    const messages = getStoredCommMessages();
+    const msgIndex = messages.findIndex(m => String(m.id) === String(messageId));
+    if (msgIndex !== -1 && messages[msgIndex].meeting_request) {
+      messages[msgIndex].meeting_request.status = status;
+      saveStoredCommMessages(messages);
+      return { success: true, data: messages[msgIndex] };
+    }
+    return { success: false };
+  },
+
+  resetDefaults: async () => {
+    saveStoredCommThreads(DEFAULT_COMM_THREADS);
+    saveStoredCommMessages(DEFAULT_COMM_MESSAGES);
+    return { success: true, message: 'Teacher-Parent communication reset to sample discussions' };
+  },
+};
+
 export default api;

@@ -210,6 +210,16 @@ export const PERMISSION_MODULES = [
       { id: 'manage-gallery', label: 'Manage Gallery', description: 'Upload, edit, and delete photos and album collections' },
     ],
   },
+  {
+    id: 'communication',
+    name: 'Teacher-Parent Communication',
+    icon: '💬',
+    description: 'Direct messaging, student academic progress updates, and meeting requests between teachers and parents',
+    permissions: [
+      { id: 'view-communication', label: 'View Messages', description: 'Browse conversation threads and read messages' },
+      { id: 'manage-communication', label: 'Send & Manage Messages', description: 'Initiate conversations, send replies, and schedule PTMs' },
+    ],
+  },
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS = {
@@ -227,6 +237,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'manage-settings', 'manage-permissions',
     'view-users', 'manage-users',
     'view-gallery', 'manage-gallery',
+    'view-communication', 'manage-communication',
   ],
   'admin': [
     'view-dashboard',
@@ -241,6 +252,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'manage-tools',
     'manage-settings', 'manage-permissions',
     'view-gallery', 'manage-gallery',
+    'view-communication', 'manage-communication',
   ],
   'teacher': [
     'view-dashboard',
@@ -251,6 +263,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-assignments', 'create-assignments', 'grade-assignments',
     'view-reports',
     'view-gallery',
+    'view-communication', 'manage-communication',
   ],
   'student': [
     'view-dashboard',
@@ -268,6 +281,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-fees',
     'view-assignments',
     'view-gallery',
+    'view-communication', 'manage-communication',
   ],
   'finance': [
     'view-dashboard',
