@@ -407,7 +407,7 @@ const Settings = () => {
   const isAdmin = user?.roles?.some(r => r === 'admin' || r === 'super-admin');
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-8">
+    <div className="p-6 w-full space-y-8">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between border-b pb-5">
         <div>
