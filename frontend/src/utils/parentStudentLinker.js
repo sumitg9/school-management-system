@@ -253,3 +253,4 @@ export const findLinkedStudentsForParent = (parentUser, allStudents = [], explic
   linked.sort((a, b) => (a.class_id || 0) - (b.class_id || 0));
   return linked;
 };
+
