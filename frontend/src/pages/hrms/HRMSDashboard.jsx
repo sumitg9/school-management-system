@@ -67,7 +67,101 @@ export default function HRMSDashboard() {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [selectedStaffDetail, setSelectedStaffDetail] = useState(null);
   const [selectedPayslip, setSelectedPayslip] = useState(null);
+  const [selectedCompensationStaff, setSelectedCompensationStaff] = useState(null);
   const [toastMsg, setToastMsg] = useState(null);
+
+  // Compensation Form
+  const [compensationForm, setCompensationForm] = useState({
+    basicSalary: 50000,
+    da: 10000,
+    hra: 12500,
+    conveyance: 3500,
+    pf: 6000,
+    esi: 0,
+    tax: 2500,
+    bankName: 'HDFC Bank',
+    accountNumber: '',
+    ifsc: 'HDFC0001420',
+  });
+
+  const handleOpenCompensationModal = (staff) => {
+    const basic = staff.basicSalary || 50000;
+    const da = staff.allowances?.da !== undefined ? staff.allowances.da : Math.round(basic * 0.20);
+    const hra = staff.allowances?.hra !== undefined ? staff.allowances.hra : Math.round(basic * 0.25);
+    const conveyance = staff.allowances?.conveyance !== undefined ? staff.allowances.conveyance : 3500;
+    const pf = staff.deductions?.pf !== undefined ? staff.deductions.pf : Math.round(basic * 0.12);
+    const esi = staff.deductions?.esi !== undefined ? staff.deductions.esi : 0;
+    const tax = staff.deductions?.tax !== undefined ? staff.deductions.tax : 2500;
+
+    setSelectedCompensationStaff(staff);
+    setCompensationForm({
+      basicSalary: basic,
+      da,
+      hra,
+      conveyance,
+      pf,
+      esi,
+      tax,
+      bankName: staff.bankDetails?.bankName || 'HDFC Bank',
+      accountNumber: staff.bankDetails?.accountNumber || '',
+      ifsc: staff.bankDetails?.ifsc || 'HDFC0001420',
+    });
+  };
+
+  const handleAutoCalculateRates = (basicAmount) => {
+    const basic = parseFloat(basicAmount) || 0;
+    const da = Math.round(basic * 0.20);
+    const hra = Math.round(basic * 0.25);
+    const conveyance = 3500;
+    const gross = basic + da + hra + conveyance;
+    const pf = Math.round(basic * 0.12);
+    const esi = basic < 50000 ? Math.round(gross * 0.0075) : 0;
+    const tax = basic > 60000 ? 4500 : (basic > 50000 ? 2800 : 1800);
+
+    setCompensationForm((prev) => ({
+      ...prev,
+      basicSalary: basic,
+      da,
+      hra,
+      conveyance,
+      pf,
+      esi,
+      tax,
+    }));
+  };
+
+  const handleSaveCompensation = async (e) => {
+    e.preventDefault();
+    if (!selectedCompensationStaff) return;
+    try {
+      await hrmsAPI.updateCompensation(selectedCompensationStaff.id, {
+        basicSalary: compensationForm.basicSalary,
+        allowances: {
+          da: compensationForm.da,
+          hra: compensationForm.hra,
+          conveyance: compensationForm.conveyance,
+        },
+        deductions: {
+          pf: compensationForm.pf,
+          esi: compensationForm.esi,
+          tax: compensationForm.tax,
+        },
+        bankDetails: {
+          bankName: compensationForm.bankName,
+          accountNumber: compensationForm.accountNumber,
+          ifsc: compensationForm.ifsc,
+        },
+      });
+
+      showToast(`Salary structure & compensation updated for ${selectedCompensationStaff.name}.`);
+      setSelectedCompensationStaff(null);
+      loadStaff();
+      loadPayroll();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update compensation.');
+    }
+  };
 
   // Staff Form
   const [staffForm, setStaffForm] = useState({
@@ -546,13 +640,23 @@ export default function HRMSDashboard() {
                   <span className="text-xs font-bold text-emerald-700">
                     Basic: ₹{staff.basicSalary?.toLocaleString('en-IN')}
                   </span>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1.5">
                     <button
                       onClick={() => setSelectedStaffDetail(staff)}
-                      className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold px-2.5 py-1.5 rounded-lg transition"
+                      className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold px-2 py-1.5 rounded-lg transition"
                     >
-                      View Profile
+                      Profile
                     </button>
+                    {canManage && (
+                      <button
+                        onClick={() => handleOpenCompensationModal(staff)}
+                        className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold px-2 py-1.5 rounded-lg border border-emerald-200 transition flex items-center space-x-1"
+                        title="Manage Basic Pay, DA, HRA, and Deductions"
+                      >
+                        <span>💰</span>
+                        <span>Salary & Pay</span>
+                      </button>
+                    )}
                     {canManage && (
                       <button
                         onClick={() => {
@@ -560,7 +664,7 @@ export default function HRMSDashboard() {
                           if (userPayslip) setSelectedPayslip(userPayslip);
                           else showToast('No payroll generated for this member yet.');
                         }}
-                        className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-2.5 py-1.5 rounded-lg border border-blue-200 transition"
+                        className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-2 py-1.5 rounded-lg border border-blue-200 transition"
                       >
                         Payslip
                       </button>
@@ -868,13 +972,25 @@ export default function HRMSDashboard() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end space-x-2">
+                        <div className="flex items-center justify-end space-x-1.5">
                           <button
                             onClick={() => setSelectedPayslip(p)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1 rounded-lg text-xs shadow-xs transition"
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1 rounded-lg text-xs shadow-xs transition"
                           >
                             📄 Payslip
                           </button>
+                          {canManage && (
+                            <button
+                              onClick={() => {
+                                const targetStaff = staffList.find(s => s.id === p.employeeId);
+                                if (targetStaff) handleOpenCompensationModal(targetStaff);
+                              }}
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold px-2 py-1 rounded-lg text-xs border border-emerald-200 transition"
+                              title="Edit Basic, DA, HRA, PF & Deductions"
+                            >
+                              ⚙️ Salary
+                            </button>
+                          )}
                           {canManage && p.status !== 'paid' && (
                             <button
                               onClick={() => handleDisbursePayroll(p.id)}
@@ -1300,6 +1416,255 @@ export default function HRMSDashboard() {
         </div>
       )}
 
+      {/* MANAGE COMPENSATION & SALARY STRUCTURE MODAL */}
+      {selectedCompensationStaff && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="comp-modal-title"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setSelectedCompensationStaff(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 bg-gradient-to-r from-emerald-800 to-teal-900 text-white flex items-center justify-between sticky top-0 z-10">
+              <div>
+                <h2 id="comp-modal-title" className="text-base font-bold flex items-center space-x-2">
+                  <span>💰</span>
+                  <span>Manage Salary Structure: {selectedCompensationStaff.name}</span>
+                </h2>
+                <p className="text-xs text-emerald-200">
+                  {selectedCompensationStaff.id} • {selectedCompensationStaff.designation} ({selectedCompensationStaff.department})
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedCompensationStaff(null)}
+                className="text-white/70 hover:text-white text-lg font-bold p-1"
+                aria-label="Close dialog"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCompensation} className="p-6 space-y-5">
+              {/* Auto Calculator Quick Pill */}
+              <div className="bg-emerald-50/80 border border-emerald-200 p-3.5 rounded-xl flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-emerald-900">Standard 7th Pay Commission Calculator</h4>
+                  <p className="text-[11px] text-emerald-700">Auto-sets DA to 20%, HRA to 25%, and EPF to 12% of Basic Pay.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleAutoCalculateRates(compensationForm.basicSalary)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg shadow-xs transition"
+                >
+                  ⚡ Auto-Calculate
+                </button>
+              </div>
+
+              {/* Section 1: Earnings & Allowances */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-1">
+                  <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                    1. Earnings & Monthly Allowances
+                  </h3>
+                  <span className="text-xs font-bold text-emerald-700">
+                    Gross: ₹{(Number(compensationForm.basicSalary || 0) + Number(compensationForm.da || 0) + Number(compensationForm.hra || 0) + Number(compensationForm.conveyance || 0)).toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Basic Monthly Pay (₹) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      value={compensationForm.basicSalary}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCompensationForm({ ...compensationForm, basicSalary: val });
+                      }}
+                      className="w-full text-xs font-bold border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Dearness Allowance (DA) (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={compensationForm.da}
+                      onChange={(e) => setCompensationForm({ ...compensationForm, da: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    />
+                    <span className="text-[10px] text-gray-400">Standard 20% of Basic = ₹{Math.round((compensationForm.basicSalary || 0) * 0.20)}</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      House Rent Allowance (HRA) (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={compensationForm.hra}
+                      onChange={(e) => setCompensationForm({ ...compensationForm, hra: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    />
+                    <span className="text-[10px] text-gray-400">Standard 25% of Basic = ₹{Math.round((compensationForm.basicSalary || 0) * 0.25)}</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Conveyance / Special Allowance (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={compensationForm.conveyance}
+                      onChange={(e) => setCompensationForm({ ...compensationForm, conveyance: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Statutory Deductions */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-1">
+                  <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                    2. Statutory & Tax Deductions
+                  </h3>
+                  <span className="text-xs font-bold text-rose-600">
+                    Total Deductions: -₹{(Number(compensationForm.pf || 0) + Number(compensationForm.esi || 0) + Number(compensationForm.tax || 0)).toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Provident Fund (EPF) (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={compensationForm.pf}
+                      onChange={(e) => setCompensationForm({ ...compensationForm, pf: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-rose-500 focus:outline-hidden"
+                    />
+                    <span className="text-[10px] text-gray-400">12% of Basic = ₹{Math.round((compensationForm.basicSalary || 0) * 0.12)}</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      ESI Contribution (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={compensationForm.esi}
+                      onChange={(e) => setCompensationForm({ ...compensationForm, esi: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-rose-500 focus:outline-hidden"
+                    />
+                    <span className="text-[10px] text-gray-400">0.75% of Gross if &lt; ₹50k</span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Professional Tax & TDS (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={compensationForm.tax}
+                      onChange={(e) => setCompensationForm({ ...compensationForm, tax: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-rose-500 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Net Take-Home Result Banner */}
+              {(() => {
+                const gross = Number(compensationForm.basicSalary || 0) + Number(compensationForm.da || 0) + Number(compensationForm.hra || 0) + Number(compensationForm.conveyance || 0);
+                const deductions = Number(compensationForm.pf || 0) + Number(compensationForm.esi || 0) + Number(compensationForm.tax || 0);
+                const net = gross - deductions;
+                return (
+                  <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 p-4 rounded-xl flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                        Net Monthly Take-Home Pay
+                      </p>
+                      <p className="text-xs text-emerald-700 font-medium">
+                        {numberToWords(net)}
+                      </p>
+                    </div>
+                    <div className="text-xl font-black text-emerald-900">
+                      ₹{net.toLocaleString('en-IN')} / month
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Section 3: Bank Disbursal Account */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider border-b border-gray-100 pb-1">
+                  3. Direct Bank Disbursal Account
+                </h3>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Bank Name</label>
+                    <input
+                      type="text"
+                      value={compensationForm.bankName}
+                      onChange={(e) => setCompensationForm({ ...compensationForm, bankName: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Account Number</label>
+                    <input
+                      type="text"
+                      value={compensationForm.accountNumber}
+                      onChange={(e) => setCompensationForm({ ...compensationForm, accountNumber: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">IFSC Code</label>
+                    <input
+                      type="text"
+                      value={compensationForm.ifsc}
+                      onChange={(e) => setCompensationForm({ ...compensationForm, ifsc: e.target.value })}
+                      className="w-full text-xs border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 flex justify-end space-x-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCompensationStaff(null)}
+                  className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-800 rounded-lg hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-md transition"
+                >
+                  Save Salary Structure
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* OFFICIAL SALARY SLIP (PRINTABLE MODAL) */}
       {selectedPayslip && (
         <div
@@ -1465,3 +1830,4 @@ export default function HRMSDashboard() {
     </div>
   );
 }
+

@@ -5456,6 +5456,64 @@ export const hrmsAPI = {
     return { success: true, data: list[idx] };
   },
 
+  updateCompensation: async (id, compData) => {
+    const list = getStoredHrmsStaff();
+    const idx = list.findIndex(s => s.id === id);
+    if (idx === -1) throw new Error('Staff not found');
+
+    const basic = parseFloat(compData.basicSalary) || list[idx].basicSalary || 50000;
+    const allowances = {
+      da: compData.allowances?.da !== undefined ? parseFloat(compData.allowances.da) : Math.round(basic * 0.20),
+      hra: compData.allowances?.hra !== undefined ? parseFloat(compData.allowances.hra) : Math.round(basic * 0.25),
+      conveyance: compData.allowances?.conveyance !== undefined ? parseFloat(compData.allowances.conveyance) : (list[idx].allowances?.conveyance || 3500),
+    };
+    const deductions = {
+      pf: compData.deductions?.pf !== undefined ? parseFloat(compData.deductions.pf) : Math.round(basic * 0.12),
+      esi: compData.deductions?.esi !== undefined ? parseFloat(compData.deductions.esi) : (basic < 50000 ? Math.round((basic + allowances.da + allowances.hra + allowances.conveyance) * 0.0075) : 0),
+      tax: compData.deductions?.tax !== undefined ? parseFloat(compData.deductions.tax) : (list[idx].deductions?.tax || 2500),
+    };
+
+    list[idx] = {
+      ...list[idx],
+      basicSalary: basic,
+      allowances,
+      deductions,
+      bankDetails: {
+        ...list[idx].bankDetails,
+        ...(compData.bankDetails || {}),
+      },
+    };
+    saveStoredHrmsStaff(list);
+
+    // Also update any open/current payroll records for this employee
+    const payrollList = getStoredHrmsPayroll();
+    const updatedPayroll = payrollList.map(p => {
+      if (p.employeeId === id) {
+        const gross = basic + allowances.da + allowances.hra + allowances.conveyance;
+        const totalDeductions = deductions.pf + deductions.esi + deductions.tax;
+        const net = gross - totalDeductions;
+        return {
+          ...p,
+          basicPay: basic,
+          da: allowances.da,
+          hra: allowances.hra,
+          conveyance: allowances.conveyance,
+          grossSalary: gross,
+          pfDeduction: deductions.pf,
+          esiDeduction: deductions.esi,
+          taxDeduction: deductions.tax,
+          totalDeductions,
+          netSalary: net,
+          bankDetails: list[idx].bankDetails,
+        };
+      }
+      return p;
+    });
+    saveStoredHrmsPayroll(updatedPayroll);
+
+    return { success: true, data: list[idx] };
+  },
+
   deleteStaff: async (id) => {
     const list = getStoredHrmsStaff();
     const next = list.filter(s => s.id !== id);
