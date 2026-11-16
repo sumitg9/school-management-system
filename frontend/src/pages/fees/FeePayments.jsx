@@ -33,7 +33,8 @@ const FeePayments = () => {
   const { id } = useParams(); // fee_structure_id
   const { formatDate, formatCurrency, settings } = useSettings();
   const { showValidationError } = useAlert();
-  const { isStudent, currentStudent, studentLoading, hasPermission } = useAuth();
+  const { isStudent, isParent, currentStudent, studentLoading, hasPermission } = useAuth();
+  const isPersonalView = isStudent() || isParent();
 
   const [feeStructure, setFeeStructure] = useState(null);
   const [payments, setPayments] = useState([]);
@@ -70,7 +71,7 @@ const FeePayments = () => {
   useEffect(() => {
     fetchFeeStructure();
     fetchPayments();
-  }, [id, methodFilter, statusFilter, isStudent(), currentStudent?.id, studentLoading]);
+  }, [id, methodFilter, statusFilter, isPersonalView, currentStudent?.id, studentLoading]);
 
   const fetchFeeStructure = async () => {
     if (!id) return;
@@ -89,15 +90,15 @@ const FeePayments = () => {
   };
 
   const fetchPayments = async () => {
-    if (isStudent() && studentLoading) return;
+    if (isPersonalView && studentLoading) return;
     setLoading(true);
     try {
       const params = {
         per_page: 50,
       };
 
-      // Strict student enforcement: only fetch this student's payment records
-      if (isStudent()) {
+      // Strict student/parent enforcement: only fetch this child's payment records
+      if (isPersonalView) {
         if (!currentStudent?.id) {
           setPayments([]);
           setLoading(false);
@@ -293,7 +294,7 @@ const FeePayments = () => {
         </button>
       ),
     },
-    ...(!isStudent() ? [{
+    ...(!isPersonalView ? [{
       key: 'student',
       label: 'Student',
       render: (row) => (
@@ -441,16 +442,16 @@ const FeePayments = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </button>
-          {isStudent() ? (
+          {isPersonalView ? (
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg shadow-xs">
                 {currentStudent ? `${currentStudent.first_name?.[0] || 'S'}${currentStudent.last_name?.[0] || ''}` : '👨‍🎓'}
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold text-gray-900">My Payment Receipts</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">{isParent() ? "Child's Payment Receipts" : 'My Payment Receipts'}</h1>
                   <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold">
-                    Personal Records
+                    {isParent() ? "Parent View" : "Personal Records"}
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 font-mono mt-1">
@@ -490,7 +491,7 @@ const FeePayments = () => {
           >
             🔄 Refresh
           </button>
-          {!isStudent() && hasPermission('collect-fees') && (
+          {!isPersonalView && hasPermission('collect-fees') && (
             <button
               type="button"
               onClick={() => navigate('/fees/payment')}
@@ -507,7 +508,7 @@ const FeePayments = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{isStudent() ? 'Total Paid' : 'Total Collected'}</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{isPersonalView ? 'Total Paid' : 'Total Collected'}</p>
             <p className="text-2xl font-bold text-gray-900 font-mono mt-1 text-emerald-600">
               {formatCurrency(totalCollected)}
             </p>
@@ -524,7 +525,7 @@ const FeePayments = () => {
             <p className="text-2xl font-bold text-gray-900 font-mono mt-1">
               {filteredPayments.length}
             </p>
-            <p className="text-xs text-gray-500 mt-1">{isStudent() ? 'Receipts issued' : 'Completed entries'}</p>
+            <p className="text-xs text-gray-500 mt-1">{isPersonalView ? 'Receipts issued' : 'Completed entries'}</p>
           </div>
           <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
             🧾
@@ -537,7 +538,7 @@ const FeePayments = () => {
             <p className="text-2xl font-bold text-gray-900 font-mono mt-1 text-blue-600">
               {formatCurrency(totalDiscounts)}
             </p>
-            <p className="text-xs text-gray-500 mt-1">{isStudent() ? 'Concessions received' : 'Concessions given'}</p>
+            <p className="text-xs text-gray-500 mt-1">{isPersonalView ? 'Concessions received' : 'Concessions given'}</p>
           </div>
           <div className="h-12 w-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
             🎁
@@ -567,7 +568,7 @@ const FeePayments = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder={isStudent() ? "Search receipt #, method, remarks..." : "Search by student, receipt, txn..."}
+              placeholder={isPersonalView ? "Search receipt #, method, remarks..." : "Search by student, receipt, txn..."}
               className="input-field text-sm"
             />
           </div>

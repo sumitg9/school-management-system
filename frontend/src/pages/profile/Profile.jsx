@@ -9,7 +9,7 @@ import Badge from '../../components/common/Badge';
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { user, activeRole, currentStudent, currentTeacher, studentLoading, updateProfileData, hasPermission } = useAuth();
+  const { user, activeRole, currentStudent, currentTeacher, studentLoading, updateProfileData, hasPermission, isParent, parentChildren, activeChild, setActiveChild } = useAuth();
   const { formatDate, settings } = useSettings();
 
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'permissions' | 'edit' | 'security'
@@ -165,6 +165,7 @@ const Profile = () => {
   const isStudentRole = activeRole === 'student';
   const isTeacherRole = activeRole === 'teacher';
   const isAdminRole = activeRole === 'admin' || activeRole === 'super-admin';
+  const isParentRole = activeRole === 'parent';
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -255,7 +256,34 @@ const Profile = () => {
 
           {/* Quick Stats Grid based on user role */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 pt-4 border-t border-gray-100">
-            {isStudentRole ? (
+            {isParentRole ? (
+              <>
+                <div className="bg-amber-50/60 border border-amber-100 rounded-2xl p-3.5">
+                  <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wider block">Linked Children</span>
+                  <span className="text-base font-black text-amber-950 font-mono mt-0.5 block">
+                    {parentChildren.length} Enrolled
+                  </span>
+                </div>
+                <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-3.5">
+                  <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider block">Active Child</span>
+                  <span className="text-base font-black text-blue-950 mt-0.5 block truncate">
+                    {activeChild?.first_name || 'None'}
+                  </span>
+                </div>
+                <div className="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-3.5">
+                  <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider block">Family Status</span>
+                  <span className="text-base font-black text-emerald-950 mt-0.5 block">
+                    Verified Parent
+                  </span>
+                </div>
+                <div className="bg-purple-50/60 border border-purple-100 rounded-2xl p-3.5">
+                  <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider block">Data Privacy</span>
+                  <span className="text-base font-black text-purple-950 mt-0.5 block">
+                    Child-Only Scope
+                  </span>
+                </div>
+              </>
+            ) : isStudentRole ? (
               <>
                 <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-3.5">
                   <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider block">Assigned Class</span>
@@ -571,6 +599,102 @@ const Profile = () => {
                 </div>
               </div>
             </div>
+
+            {/* Associated Children Card for Parents */}
+            {isParentRole && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                    <span>👨‍👩‍👧</span>
+                    <span>Associated Children ({parentChildren.length})</span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/students')}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-800 transition cursor-pointer"
+                  >
+                    Manage Children →
+                  </button>
+                </div>
+
+                {parentChildren.length === 0 ? (
+                  <p className="text-xs text-gray-500 italic p-4 text-center">
+                    No verified children are currently associated with your account.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {parentChildren.map((child) => {
+                      const isActive = activeChild && String(activeChild.id) === String(child.id);
+                      const className = child.class?.name || child.classes?.name || (child.class_id ? `Class ${child.class_id}` : 'Class');
+                      const sectionName = child.section?.name || child.sections?.name ? `-${child.section?.name || child.sections?.name}` : '';
+
+                      return (
+                        <div
+                          key={child.id}
+                          className={`p-4 rounded-xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                            isActive ? 'bg-amber-50/40 border-amber-300' : 'bg-gray-50/70 border-gray-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-800 font-bold flex items-center justify-center text-sm flex-shrink-0">
+                              {child.first_name?.[0]}{child.last_name?.[0]}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-gray-900 text-sm">
+                                  {child.first_name} {child.last_name}
+                                </span>
+                                {isActive && (
+                                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                                    Active View
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 font-mono mt-0.5">
+                                {className}{sectionName} • Adm: {child.admission_number || 'N/A'} • Roll: {child.roll_number || 'N/A'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveChild(child);
+                                navigate('/attendance');
+                              }}
+                              className="px-2.5 py-1 text-[11px] font-semibold text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 transition cursor-pointer"
+                            >
+                              Attendance
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveChild(child);
+                                navigate('/fees');
+                              }}
+                              className="px-2.5 py-1 text-[11px] font-semibold text-emerald-700 bg-white border border-emerald-200 rounded-lg hover:bg-emerald-50 transition cursor-pointer"
+                            >
+                              Fees
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveChild(child);
+                                navigate('/assignments');
+                              }}
+                              className="px-2.5 py-1 text-[11px] font-semibold text-purple-700 bg-white border border-purple-200 rounded-lg hover:bg-purple-50 transition cursor-pointer"
+                            >
+                              Assignments
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right Column: Bio & Institutional Role Card */}

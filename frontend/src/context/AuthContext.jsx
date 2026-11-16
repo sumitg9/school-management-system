@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { authAPI, studentAPI, teacherAPI } from '../services/api';
+import { authAPI, studentAPI, teacherAPI, parentAPI } from '../services/api';
 import { toast } from 'react-toastify';
 import { showGlobalValidationError } from './AlertContext';
 import {
@@ -264,9 +264,65 @@ export const AuthProvider = ({ children }) => {
   });
   const [studentLoading, setStudentLoading] = useState(false);
 
+  // Parent children and active child state
+  const [parentChildren, setParentChildren] = useState([]);
+  const [activeChild, setActiveChildState] = useState(null);
+  const [parentLoading, setParentLoading] = useState(false);
+
+  const setActiveChild = (childOrId) => {
+    let target = null;
+    if (typeof childOrId === 'object' && childOrId !== null) {
+      target = childOrId;
+    } else if (childOrId !== undefined && childOrId !== null) {
+      target = parentChildren.find(c => String(c.id) === String(childOrId)) || null;
+    }
+    setActiveChildState(target);
+    if (target?.id) {
+      localStorage.setItem('sms_active_child_id', String(target.id));
+      setStudentProfile(target);
+    }
+  };
+
+  useEffect(() => {
+    const loadParentChildren = async () => {
+      const effective = getEffectiveRole();
+      if (effective !== 'parent') {
+        setParentChildren([]);
+        setActiveChildState(null);
+        return;
+      }
+
+      setParentLoading(true);
+      try {
+        const res = await parentAPI.getChildrenByParentUserId(user?.id, user);
+        const children = res?.data || [];
+        setParentChildren(children);
+
+        if (children.length > 0) {
+          const savedChildId = localStorage.getItem('sms_active_child_id');
+          const matched = savedChildId ? children.find(c => String(c.id) === String(savedChildId)) : null;
+          const initialChild = matched || children[0];
+          setActiveChildState(initialChild);
+          setStudentProfile(initialChild);
+        } else {
+          setActiveChildState(null);
+        }
+      } catch (err) {
+        console.warn('Failed to load parent children:', err);
+      } finally {
+        setParentLoading(false);
+      }
+    };
+
+    loadParentChildren();
+  }, [user, activeRole]);
+
   useEffect(() => {
     const loadStudentInfo = async () => {
       const effective = getEffectiveRole();
+      if (effective === 'parent') {
+        return;
+      }
       if (effective !== 'student') {
         setStudentProfile(null);
         return;
@@ -692,6 +748,10 @@ export const AuthProvider = ({ children }) => {
     currentStudent: studentProfile,
     studentProfile,
     studentLoading,
+    parentChildren,
+    activeChild,
+    setActiveChild,
+    parentLoading,
     currentTeacher: teacherProfile,
     teacherProfile,
     isAuthenticated: !!token,

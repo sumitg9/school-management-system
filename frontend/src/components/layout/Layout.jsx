@@ -7,7 +7,21 @@ import { SYSTEM_ROLES } from '../../utils/permissionRules';
 const Layout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, hasPermission, activeRole, switchActiveRole, resetActiveRole, isAdmin, isStudent } = useAuth();
+  const {
+    user,
+    logout,
+    hasPermission,
+    activeRole,
+    switchActiveRole,
+    resetActiveRole,
+    isAdmin,
+    isStudent,
+    isParent,
+    parentChildren,
+    activeChild,
+    setActiveChild,
+    parentLoading,
+  } = useAuth();
   const { settings } = useSettings();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -22,14 +36,14 @@ const Layout = ({ children }) => {
 
   const allMenuItems = [
     { path: '/', icon: '🏠', label: 'Dashboard', permission: 'view-dashboard' },
-    { path: '/students', icon: '👨‍🎓', label: 'Students', permission: 'view-students' },
+    { path: '/students', icon: isParent() ? '👨‍👩‍👧' : '👨‍🎓', label: isParent() ? 'My Children' : 'Students', permission: 'view-students' },
     { path: '/teachers', icon: '👨‍🏫', label: 'Teachers', permission: 'view-teachers' },
     { path: '/classes', icon: '📚', label: 'Classes', permission: 'view-classes' },
-    { path: '/attendance', icon: '📊', label: isStudent() ? 'My Attendance' : 'Attendance', permission: 'view-attendance' },
-    { path: '/exams', icon: '📝', label: isStudent() ? 'My Exams' : 'Exams', permission: 'view-exams' },
-    { path: '/fees', icon: '💵', label: isStudent() ? 'My Fees' : 'Fees', permission: 'view-fees' },
+    { path: '/attendance', icon: '📊', label: isParent() ? "Child's Attendance" : (isStudent() ? 'My Attendance' : 'Attendance'), permission: 'view-attendance' },
+    { path: '/exams', icon: '📝', label: isParent() ? "Child's Exams" : (isStudent() ? 'My Exams' : 'Exams'), permission: 'view-exams' },
+    { path: '/fees', icon: '💵', label: isParent() ? "Child's Fees" : (isStudent() ? 'My Fees' : 'Fees'), permission: 'view-fees' },
     { path: '/fees/payment', icon: '💳', label: 'Fee Payment', permission: 'collect-fees' },
-    { path: '/assignments', icon: '📋', label: isStudent() ? 'My Assignments' : 'Assignments', permission: 'view-assignments' },
+    { path: '/assignments', icon: '📋', label: isParent() ? "Child's Assignments" : (isStudent() ? 'My Assignments' : 'Assignments'), permission: 'view-assignments' },
     { path: '/reports', icon: '📈', label: 'Reports', permission: 'view-reports' },
     { path: '/tools/bulk', icon: '🔧', label: 'Bulk Operations', permission: 'manage-tools' },
     { path: '/users', icon: '👥', label: 'Users', permission: 'manage-users' },
@@ -149,6 +163,42 @@ const Layout = ({ children }) => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              {/* Multi-Child Selector for Parents */}
+              {isParent() && (
+                <div className="flex items-center gap-2 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-3 py-1.5 shadow-xs">
+                  <span className="text-base">👦👧</span>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Active Child</span>
+                    {parentLoading ? (
+                      <span className="text-xs text-amber-600 animate-pulse font-medium">Loading...</span>
+                    ) : parentChildren && parentChildren.length > 0 ? (
+                      <select
+                        value={activeChild?.id || ''}
+                        onChange={(e) => {
+                          const selected = parentChildren.find(c => String(c.id) === String(e.target.value));
+                          if (selected) setActiveChild(selected);
+                        }}
+                        className="bg-transparent font-bold text-gray-900 border-none outline-hidden cursor-pointer text-xs p-0 -mt-0.5 focus:ring-0"
+                        title="Switch between your enrolled children"
+                      >
+                        {parentChildren.map(child => {
+                          const cName = `${child.first_name} ${child.last_name}`;
+                          const cClass = child.class?.name || child.classes?.name || (child.class_id ? `Class ${child.class_id}` : '');
+                          const cSec = child.section?.name || child.sections?.name ? `-${child.section?.name || child.sections?.name}` : '';
+                          return (
+                            <option key={child.id} value={child.id} className="text-gray-900 bg-white font-medium">
+                              {cName} ({cClass}{cSec})
+                            </option>
+                          );
+                        })}
+                      </select>
+                    ) : (
+                      <span className="text-xs text-gray-500 italic">No child linked</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Role Preview Switcher for Admins */}
               {user && (user?.roles?.includes('admin') || user?.roles?.includes('super-admin')) && (
                 <div className="hidden sm:flex items-center gap-1.5 bg-blue-50/80 border border-blue-200 rounded-xl px-2.5 py-1 text-xs">

@@ -22,7 +22,7 @@ const SHORT_MONTH_NAMES = [
 const StudentFeesView = () => {
   const navigate = useNavigate();
   const { formatDate, formatCurrency, settings, calculateLateFine, isMonthOverdue, getDaysOverdue } = useSettings();
-  const { currentStudent, studentLoading } = useAuth();
+  const { currentStudent, studentLoading, isParent } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [feeStructures, setFeeStructures] = useState([]);
@@ -389,10 +389,12 @@ const StudentFeesView = () => {
       <div className="p-6 max-w-7xl mx-auto space-y-6">
         <FeeTabs />
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center text-gray-500">
-          <span className="text-4xl block mb-3">👨‍🎓</span>
-          <h3 className="text-lg font-bold text-gray-900 mb-1">No Student Profile Linked</h3>
+          <span className="text-4xl block mb-3">{isParent() ? '👦👧' : '👨‍🎓'}</span>
+          <h3 className="text-lg font-bold text-gray-900 mb-1">{isParent() ? 'No Linked Child Found' : 'No Student Profile Linked'}</h3>
           <p className="text-sm text-gray-600 max-w-md mx-auto">
-            Your account is set to Student role, but no linked student record could be loaded. Please contact the administrator.
+            {isParent()
+              ? 'No enrolled child has been linked to your parent account yet. Please verify your contact details or contact school administration.'
+              : 'Your account is set to Student role, but no linked student record could be loaded. Please contact the administrator.'}
           </p>
         </div>
       </div>
@@ -417,7 +419,7 @@ const StudentFeesView = () => {
                   {currentStudent ? `${currentStudent.first_name} ${currentStudent.last_name}` : 'Enrolled Student'}
                 </h1>
                 <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold">
-                  🔒 Student Personal Fee Portal
+                  {isParent() ? "🔒 Parent Portal: Child's Fees" : "🔒 Student Personal Fee Portal"}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 font-mono mt-1.5">

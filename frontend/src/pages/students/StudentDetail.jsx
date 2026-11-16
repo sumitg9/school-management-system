@@ -10,7 +10,7 @@ const StudentDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { formatDate, formatDateTime, formatCurrency } = useSettings();
-  const { isStudent, isTeacher, hasPermission, isStudentAssignedToTeacher } = useAuth();
+  const { isStudent, isParent, parentChildren, currentStudent, isTeacher, hasPermission, isStudentAssignedToTeacher } = useAuth();
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('profile');
@@ -26,6 +26,19 @@ const StudentDetail = () => {
       if (response.success) {
         if (isTeacher() && !isStudentAssignedToTeacher(response.data)) {
           toast.error("You don't have permission to view this student.");
+          navigate('/students');
+          return;
+        }
+        if (isParent()) {
+          const isMyChild = (parentChildren || []).some(c => String(c.id) === String(response.data.id));
+          if (!isMyChild) {
+            toast.error("You don't have permission to view records of other students.");
+            navigate('/students');
+            return;
+          }
+        }
+        if (isStudent() && currentStudent?.id && String(currentStudent.id) !== String(response.data.id)) {
+          toast.error("You don't have permission to view records of other students.");
           navigate('/students');
           return;
         }
@@ -78,7 +91,7 @@ const StudentDetail = () => {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            {!isStudent() && !isTeacher() && hasPermission('edit-students') && (
+            {!isStudent() && !isTeacher() && !isParent() && hasPermission('edit-students') && (
               <button
                 onClick={() => navigate(`/students/${id}/edit`)}
                 className="btn-primary flex items-center space-x-2 cursor-pointer"

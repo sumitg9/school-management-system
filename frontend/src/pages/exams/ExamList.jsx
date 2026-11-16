@@ -12,7 +12,7 @@ const ExamList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const { formatDate } = useSettings();
-  const { isStudent, hasPermission } = useAuth();
+  const { isStudent, isParent, hasPermission } = useAuth();
   const [exams, setExams] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -170,8 +170,8 @@ const ExamList = () => {
         </svg>
       </button>
 
-      {/* Edit and Delete are strictly hidden for students */}
-      {!isStudent() && hasPermission('create-exams') && (
+      {/* Edit and Delete are strictly hidden for students and parents */}
+      {!isStudent() && !isParent() && hasPermission('create-exams') && (
         <button
           onClick={() => navigate(`/exams/${row.id}/edit`)}
           className="text-green-600 hover:text-green-900 cursor-pointer"
@@ -183,7 +183,7 @@ const ExamList = () => {
         </button>
       )}
 
-      {!isStudent() && hasPermission('enter-grades') && (
+      {!isStudent() && !isParent() && hasPermission('enter-grades') && (
         <button
           onClick={() => navigate(`/exams/${row.id}/grades`)}
           className="text-purple-600 hover:text-purple-900 cursor-pointer"
@@ -195,7 +195,7 @@ const ExamList = () => {
         </button>
       )}
 
-      {!isStudent() && hasPermission('delete-exams') && (
+      {!isStudent() && !isParent() && hasPermission('delete-exams') && (
         <button
           onClick={() => handleDelete(row.id)}
           className="text-red-600 hover:text-red-900 cursor-pointer"
@@ -215,10 +215,10 @@ const ExamList = () => {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Examinations</h1>
-            <p className="text-gray-600 mt-1">Manage exams and assessments</p>
+            <h1 className="text-2xl font-bold text-gray-900">{isParent() ? "Child's Examinations" : "Examinations"}</h1>
+            <p className="text-gray-600 mt-1">{isParent() ? "View examination schedules and assessments" : "Manage exams and assessments"}</p>
           </div>
-          {!isStudent() && hasPermission('create-exams') && (
+          {!isStudent() && !isParent() && hasPermission('create-exams') && (
             <button
               onClick={() => navigate('/exams/create')}
               className="btn-primary flex items-center space-x-2 cursor-pointer"

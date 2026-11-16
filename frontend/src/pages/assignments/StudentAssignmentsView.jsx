@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 const StudentAssignmentsView = () => {
   const navigate = useNavigate();
   const { formatDate } = useSettings();
-  const { currentStudent, studentLoading } = useAuth();
+  const { currentStudent, studentLoading, isParent } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [assignments, setAssignments] = useState([]);
@@ -266,10 +266,12 @@ const StudentAssignmentsView = () => {
     return (
       <div className="p-6 max-w-7xl mx-auto space-y-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center text-gray-500">
-          <span className="text-4xl block mb-3">👨‍🎓</span>
-          <h3 className="text-lg font-bold text-gray-900 mb-1">No Student Profile Linked</h3>
+          <span className="text-4xl block mb-3">{isParent() ? '👦👧' : '👨‍🎓'}</span>
+          <h3 className="text-lg font-bold text-gray-900 mb-1">{isParent() ? 'No Linked Child Found' : 'No Student Profile Linked'}</h3>
           <p className="text-sm text-gray-600 max-w-md mx-auto">
-            Your account is set to Student role, but no linked student profile could be loaded. Please contact the administrator.
+            {isParent()
+              ? 'No enrolled child has been linked to your parent account yet. Please verify your contact details or contact school administration.'
+              : 'Your account is set to Student role, but no linked student profile could be loaded. Please contact the administrator.'}
           </p>
         </div>
       </div>
@@ -288,10 +290,10 @@ const StudentAssignmentsView = () => {
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="text-2xl font-bold text-gray-900">
-                  My Class Assignments
+                  {isParent() ? "Child's Class Assignments" : 'My Class Assignments'}
                 </h1>
                 <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full font-bold">
-                  🔒 Class {currentStudent?.class?.name || currentStudent?.class_id || ''} Portal
+                  {isParent() ? '🔒 Parent View' : `🔒 Class ${currentStudent?.class?.name || currentStudent?.class_id || ''} Portal`}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 font-mono mt-1.5">

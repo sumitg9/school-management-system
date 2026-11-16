@@ -55,7 +55,7 @@ const Login = () => {
       admin: { email: 'admin@school.com', password: 'password' },
       teacher: { email: 'teacher@school.com', password: 'password' },
       student: { email: 'student@school.com', password: 'password' },
-      parent: { email: 'parent@school.com', password: 'password' },
+      parent: { email: 'suresh.sharma@parent.school.com', password: 'password' },
     };
 
     if (credentials[roleKey]) {

@@ -15,9 +15,9 @@ const FeeList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const { formatDate, formatCurrency } = useSettings();
-  const { isStudent, hasPermission } = useAuth();
+  const { isStudent, isParent, hasPermission } = useAuth();
 
-  if (isStudent()) {
+  if (isStudent() || isParent()) {
     return <StudentFeesView />;
   }
   const [fees, setFees] = useState([]);

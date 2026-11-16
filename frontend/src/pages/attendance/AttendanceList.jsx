@@ -14,6 +14,7 @@ const AttendanceList = () => {
   const { formatDate } = useSettings();
   const {
     isStudent,
+    isParent,
     isTeacher,
     currentStudent,
     studentLoading,
@@ -24,6 +25,8 @@ const AttendanceList = () => {
     hasPermission,
     isAdmin,
   } = useAuth();
+
+  const isStudentOrParent = isStudent() || isParent();
 
   const [attendances, setAttendances] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -66,11 +69,11 @@ const AttendanceList = () => {
 
   // Fetch classes and all sections only for staff
   useEffect(() => {
-    if (!isStudent()) {
+    if (!isStudentOrParent) {
       fetchClasses();
       fetchAllSections();
     }
-  }, [isStudent()]);
+  }, [isStudentOrParent]);
 
   const fetchAllSections = async () => {
     try {
@@ -85,7 +88,7 @@ const AttendanceList = () => {
 
   // Fetch sections when class changes (staff only)
   useEffect(() => {
-    if (!isStudent()) {
+    if (!isStudentOrParent) {
       if (filters.class_id) {
         fetchSections(filters.class_id);
       } else {
@@ -93,7 +96,7 @@ const AttendanceList = () => {
         setFilters(prev => ({ ...prev, section_id: '' }));
       }
     }
-  }, [filters.class_id, isStudent()]);
+  }, [filters.class_id, isStudentOrParent]);
 
   // Fetch student stats when in student mode
   const fetchStudentStats = useCallback(async (studentId) => {
@@ -110,7 +113,7 @@ const AttendanceList = () => {
 
   // Fetch attendances whenever filters change or student profile resolves
   useEffect(() => {
-    if (isStudent()) {
+    if (isStudentOrParent) {
       if (currentStudent?.id) {
         fetchAttendances();
         fetchStudentStats(currentStudent.id);
@@ -120,7 +123,7 @@ const AttendanceList = () => {
     } else {
       fetchAttendances();
     }
-  }, [filters, isStudent(), currentStudent?.id, studentLoading]);
+  }, [filters, isStudentOrParent, currentStudent?.id, studentLoading]);
 
   const fetchClasses = async () => {
     try {
@@ -150,7 +153,7 @@ const AttendanceList = () => {
       const queryParams = { ...filters };
 
       // Strictly lock to current student when in student view
-      if (isStudent()) {
+      if (isStudentOrParent) {
         if (!currentStudent?.id) {
           setLoading(false);
           return;
@@ -263,7 +266,7 @@ const AttendanceList = () => {
         await attendanceAPI.delete(id);
         toast.success('Attendance record deleted successfully');
         fetchAttendances();
-        if (isStudent() && currentStudent?.id) {
+        if (isStudentOrParent && currentStudent?.id) {
           fetchStudentStats(currentStudent.id);
         }
       } catch (error) {
@@ -439,24 +442,26 @@ const AttendanceList = () => {
   );
 
   // -------------------------------------------------------------
-  // STUDENT VIEW
+  // STUDENT / PARENT CHILD VIEW
   // -------------------------------------------------------------
-  if (isStudent()) {
+  if (isStudentOrParent) {
     return (
       <div className="p-6 max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <span>📅</span> My Attendance Records
+              <span>📅</span> {isParent() ? "Child's Attendance Records" : 'My Attendance Records'}
             </h1>
             <p className="text-sm text-gray-600 mt-1">
-              View your personalized daily attendance history, check-in records, and statistics.
+              {isParent()
+                ? "View your child's daily attendance history, check-in records, and statistics."
+                : 'View your personalized daily attendance history, check-in records, and statistics.'}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full font-semibold">
-              🔒 Personal Student View
+              {isParent() ? '🔒 Child Attendance View' : '🔒 Personal Student View'}
             </span>
           </div>
         </div>

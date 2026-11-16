@@ -10,7 +10,7 @@ const ExamDetail = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { formatDate } = useSettings();
-  const { isStudent, hasPermission } = useAuth();
+  const { isStudent, isParent, hasPermission } = useAuth();
   const [exam, setExam] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
@@ -47,7 +47,7 @@ const ExamDetail = () => {
   const tabs = [
     { id: 'overview', name: 'Overview', icon: '📋' },
     { id: 'schedule', name: 'Schedule', icon: '📅' },
-    ...(!isStudent() && hasPermission('enter-grades') ? [{ id: 'grades', name: 'Grades', icon: '📊' }] : []),
+    ...(!isStudent() && !isParent() && hasPermission('enter-grades') ? [{ id: 'grades', name: 'Grades', icon: '📊' }] : []),
   ];
 
   if (loading) {
@@ -88,7 +88,7 @@ const ExamDetail = () => {
             </div>
           </div>
           <div className="flex space-x-3">
-            {!isStudent() && hasPermission('enter-grades') && (
+            {!isStudent() && !isParent() && hasPermission('enter-grades') && (
               <button
                 onClick={() => navigate(`/exams/${id}/grades`)}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center space-x-2 cursor-pointer"
@@ -99,7 +99,7 @@ const ExamDetail = () => {
                 <span>Manage Grades</span>
               </button>
             )}
-            {!isStudent() && hasPermission('create-exams') && (
+            {!isStudent() && !isParent() && hasPermission('create-exams') && (
               <button
                 onClick={() => navigate(`/exams/${id}/edit`)}
                 className="btn-primary flex items-center space-x-2 cursor-pointer"

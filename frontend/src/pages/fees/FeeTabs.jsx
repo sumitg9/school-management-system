@@ -4,20 +4,21 @@ import { useAuth } from '../../context/AuthContext';
 const FeeTabs = () => {
   const location = useLocation();
   const currentPath = location.pathname;
-  const { isStudent, hasPermission } = useAuth();
+  const { isStudent, isParent, hasPermission } = useAuth();
+  const isPersonalView = isStudent() || isParent();
 
   const allTabs = [
     {
-      name: isStudent() ? 'My Fee Obligations' : 'Fee Structures',
+      name: isParent() ? "Child's Fee Schedule" : (isStudent() ? 'My Fee Obligations' : 'Fee Structures'),
       path: '/fees',
-      icon: isStudent() ? '📊' : '📋',
+      icon: isPersonalView ? '📊' : '📋',
       active:
         currentPath === '/fees' ||
         (currentPath.startsWith('/fees/') &&
           !currentPath.startsWith('/fees/payment') &&
           !currentPath.startsWith('/fees/payments') &&
           !currentPath.includes('/payments')),
-      description: isStudent() ? 'My upcoming, paid & overdue fee schedule' : 'Fee structures & class tuition rules',
+      description: isPersonalView ? 'Upcoming, paid & overdue fee schedule' : 'Fee structures & class tuition rules',
     },
     {
       name: 'Collect Fees / Payment',
@@ -31,19 +32,19 @@ const FeeTabs = () => {
       description: 'Single or advance multi-month fee collection',
     },
     {
-      name: isStudent() ? 'My Payment Receipts' : 'Payment Records',
+      name: isParent() ? "Child's Receipts" : (isStudent() ? 'My Payment Receipts' : 'Payment Records'),
       path: '/fees/payments',
       icon: '🧾',
       active:
         currentPath === '/fees/payments' ||
         currentPath.includes('/payments'),
-      description: isStudent() ? 'My paid fee receipts and transaction breakdown' : 'Search, filter, and inspect past receipts',
+      description: isPersonalView ? 'Paid fee receipts and transaction breakdown' : 'Search, filter, and inspect past receipts',
     },
   ];
 
   const tabs = allTabs.filter(tab => {
-    if (tab.adminOnly && isStudent()) return false;
-    if (tab.permission && (!hasPermission(tab.permission) || isStudent())) return false;
+    if (tab.adminOnly && isPersonalView) return false;
+    if (tab.permission && (!hasPermission(tab.permission) || isPersonalView)) return false;
     return true;
   });
 

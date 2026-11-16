@@ -464,6 +464,18 @@ const UserList = () => {
                         <Badge variant={roleMeta.badgeVariant || 'primary'} size="sm">
                           {roleMeta.badge}
                         </Badge>
+                        {item.role === 'parent' && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                              <span>👨‍👩‍👧</span>
+                              {item.email === 'suresh.sharma@parent.school.com'
+                                ? '2 Children (Aarav, Diya)'
+                                : item.email === 'raj.agarwal@parent.school.com'
+                                  ? '1 Child (Aarushi)'
+                                  : 'Parent User'}
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Status */}
@@ -674,6 +686,18 @@ const UserList = () => {
               </span>
             </div>
           </div>
+
+          {formData.role === 'parent' && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1">
+              <div className="font-bold flex items-center gap-1.5">
+                <span>👨‍👩‍👧</span>
+                <span>Multi-Child Verification Engine</span>
+              </div>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                Parent users are automatically associated with all students whose records match this parent's Name (vs Father/Mother), Contact Phone Number, Email, or Address.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Status */}

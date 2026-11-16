@@ -2,6 +2,7 @@ import axios from 'axios';
 import { supabase } from './supabase';
 import bcrypt from 'bcryptjs';
 import { validateStudentDateOfBirth, validateTeacherDateOfBirth, validateDateOfBirth } from '../utils/dateFormatter';
+import { findLinkedStudentsForParent } from '../utils/parentStudentLinker';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const useSupabase = import.meta.env.VITE_USE_SUPABASE !== 'false';
@@ -567,16 +568,29 @@ const DEFAULT_SYSTEM_USERS = [
     created_at: '2025-10-12T00:00:00.000Z',
   },
   {
-    id: 'user_par_5',
-    name: 'Ramesh Verma',
-    email: 'parent@school.com',
-    phone: '+91 98765 00005',
+    id: 'user_par_suresh',
+    name: 'Suresh Sharma',
+    email: 'suresh.sharma@parent.school.com',
+    phone: '+91 98765 88001',
     role: 'parent',
     roles: ['parent'],
     status: 'active',
     gender: 'male',
-    address: 'Flat 302, Green Glen Layout, Bellandur',
+    address: '789, MG Road, Shivaji Nagar',
     city: 'Bengaluru',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+  {
+    id: 'user_par_raj',
+    name: 'Raj Agarwal',
+    email: 'raj.agarwal@parent.school.com',
+    phone: '+91 89765 43210',
+    role: 'parent',
+    roles: ['parent'],
+    status: 'active',
+    gender: 'male',
+    address: 'Deshbandhu Para, Siliguri',
+    city: 'Siliguri',
     created_at: '2025-10-12T00:00:00.000Z',
   },
   {
@@ -1369,6 +1383,97 @@ export const studentAPI = {
     }
     return { success: true, data };
   },
+};
+
+// ==========================================
+// Parent API
+// ==========================================
+export const parentAPI = {
+  getAll: async (params = {}) => {
+    if (!useSupabase) return api.get('/parents', { params });
+    const { data: parents, error } = await supabase
+      .from('parents')
+      .select('*, user:users(*), children:parent_student(student_id, relation, is_primary, student:students(*, class:classes(name), section:sections(name)))');
+    if (error) throw error;
+    return { success: true, data: parents || [] };
+  },
+
+  getChildrenByParentUserId: async (parentUserId, parentUserObj = null) => {
+    let parentUser = parentUserObj;
+    if (!parentUser && useSupabase && parentUserId) {
+      try {
+        const { data: u } = await supabase.from('users').select('*').eq('id', parentUserId).maybeSingle();
+        if (u) parentUser = u;
+      } catch (_) {}
+    }
+
+    let explicitChildren = [];
+    if (useSupabase && parentUserId) {
+      try {
+        // Find parent record(s) for this user_id
+        const { data: parentRecords } = await supabase
+          .from('parents')
+          .select('id')
+          .eq('user_id', parentUserId);
+        const parentIds = (parentRecords || []).map(p => p.id);
+
+        if (parentIds.length > 0) {
+          const { data: relations } = await supabase
+            .from('parent_student')
+            .select('student_id, relation, is_primary, student:students(*, user:users(*), class:classes(id, name), section:sections(id, name), academic_year:academic_years(id, name))')
+            .in('parent_id', parentIds);
+
+          explicitChildren = (relations || []).map(r => r.student).filter(Boolean);
+        }
+      } catch (err) {
+        console.warn('Could not query explicit parent relations:', err);
+      }
+    }
+
+    // Also fetch all students to apply the multi-attribute verification engine (Name, Phone, Email, Address matching)
+    let allStudents = [];
+    try {
+      const sRes = await studentAPI.getAll({ per_page: 'all' });
+      allStudents = sRes?.data || [];
+    } catch (_) {}
+
+    // Run multi-criteria verification engine
+    const matchedChildren = findLinkedStudentsForParent(parentUser, allStudents);
+
+    // Merge explicit relations and matched children by unique student ID
+    const mergedMap = new Map();
+    explicitChildren.forEach(s => {
+      if (s && s.id) mergedMap.set(String(s.id), s);
+    });
+    matchedChildren.forEach(s => {
+      if (s && s.id && !mergedMap.has(String(s.id))) {
+        mergedMap.set(String(s.id), s);
+      }
+    });
+
+    const finalChildren = Array.from(mergedMap.values());
+    return {
+      success: true,
+      data: finalChildren,
+      count: finalChildren.length
+    };
+  },
+
+  linkStudent: async (parentId, studentId, relation = 'father') => {
+    if (!useSupabase) return api.post('/parents/link-student', { parent_id: parentId, student_id: studentId, relation });
+    const { data, error } = await supabase
+      .from('parent_student')
+      .upsert({
+        parent_id: parentId,
+        student_id: studentId,
+        relation,
+        is_primary: true
+      }, { onConflict: 'parent_id,student_id' })
+      .select()
+      .single();
+    if (error) throw error;
+    return { success: true, data };
+  }
 };
 
 // ==========================================

@@ -10,7 +10,20 @@ import { useAuth } from '../../context/AuthContext';
 const StudentList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
-  const { isStudent, isTeacher, hasPermission, filterTeacherClasses, filterTeacherSections, filterTeacherStudents } = useAuth();
+  const {
+    isStudent,
+    isParent,
+    parentChildren,
+    activeChild,
+    setActiveChild,
+    parentLoading,
+    currentStudent,
+    isTeacher,
+    hasPermission,
+    filterTeacherClasses,
+    filterTeacherSections,
+    filterTeacherStudents,
+  } = useAuth();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
@@ -304,6 +317,178 @@ Ananya,Patel,ananya.patel@example.com,+91 98765 11002,ADM2026002,2026-04-01,1,1,
       )}
     </div>
   );
+
+  // -------------------------------------------------------------
+  // PARENT VIEW: My Children Only (Strict Data Scoping)
+  // -------------------------------------------------------------
+  if (isParent()) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div>
+            <div className="flex items-center gap-3">
+              <span className="text-3xl p-2.5 bg-amber-50 rounded-2xl text-amber-600 shadow-xs">👨‍👩‍👧</span>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">My Children</h1>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  View and manage records for your verified children enrolled in the school.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1.5 rounded-full font-bold">
+              👨‍👩‍👧 {parentChildren.length} Linked Child{parentChildren.length !== 1 ? 'ren' : ''}
+            </span>
+          </div>
+        </div>
+
+        {/* Children Cards */}
+        {parentLoading ? (
+          <div className="p-12 text-center bg-white rounded-2xl border border-gray-100">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600 mb-3"></div>
+            <p className="text-sm text-gray-500">Loading linked children profiles...</p>
+          </div>
+        ) : parentChildren.length === 0 ? (
+          <div className="bg-white rounded-2xl p-12 text-center border border-gray-200 shadow-sm">
+            <span className="text-5xl block mb-3">👦👧</span>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">No Associated Children Found</h3>
+            <p className="text-sm text-gray-600 max-w-md mx-auto mb-4">
+              We could not find any student records verified with your parent details (Name, Contact Phone, Email, or Address). Please contact school administration to link your student profile.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {parentChildren.map((child) => {
+              const isActive = activeChild && String(activeChild.id) === String(child.id);
+              const className = child.class?.name || child.classes?.name || (child.class_id ? `Class ${child.class_id}` : 'N/A');
+              const sectionName = child.section?.name || child.sections?.name || (child.section_id ? `Section ${child.section_id}` : '');
+
+              return (
+                <div
+                  key={child.id}
+                  className={`bg-white rounded-2xl p-6 border transition-all duration-200 shadow-sm flex flex-col justify-between ${
+                    isActive ? 'border-amber-400 ring-2 ring-amber-200 bg-amber-50/20' : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div>
+                    {/* Top status bar */}
+                    <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4">
+                      <div className="flex items-center gap-2">
+                        {isActive ? (
+                          <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            <span>✓</span> Currently Active View
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveChild(child);
+                              toast.info(`Switched active view to ${child.first_name}`);
+                            }}
+                            className="text-xs bg-gray-100 hover:bg-amber-100 text-gray-700 hover:text-amber-900 font-semibold px-2.5 py-0.5 rounded-full transition cursor-pointer"
+                          >
+                            Set as Active Child
+                          </button>
+                        )}
+                      </div>
+                      <Badge variant="success">Enrolled Student</Badge>
+                    </div>
+
+                    {/* Child Identity */}
+                    <div className="flex items-start gap-4 mb-4">
+                      <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-600 text-white flex items-center justify-center font-bold text-xl shadow-sm flex-shrink-0">
+                        {child.first_name?.[0]}{child.last_name?.[0]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-xl font-bold text-gray-900 truncate">
+                          {child.first_name} {child.last_name}
+                        </h3>
+                        <p className="text-sm font-semibold text-amber-700 mt-0.5">
+                          {className} {sectionName ? `• ${sectionName}` : ''}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 font-mono mt-2">
+                          <span>Adm: <strong className="text-gray-800">{child.admission_number || 'N/A'}</strong></span>
+                          {child.roll_number && (
+                            <span>Roll: <strong className="text-gray-800">{child.roll_number}</strong></span>
+                          )}
+                          <span>Gender: <strong className="text-gray-800 capitalize">{child.gender || 'N/A'}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Verified Details */}
+                    <div className="bg-gray-50 rounded-xl p-3 text-xs space-y-1.5 text-gray-600 border border-gray-100 mb-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500">Father's Name:</span>
+                        <span className="font-medium text-gray-900">{child.father_name || 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500">Mother's Name:</span>
+                        <span className="font-medium text-gray-900">{child.mother_name || 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500">Contact / Emergency:</span>
+                        <span className="font-medium text-gray-900">{child.emergency_contact || child.parent_phone || 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500">Address:</span>
+                        <span className="font-medium text-gray-900 truncate max-w-[200px]" title={child.address}>
+                          {child.address || 'N/A'}{child.city ? `, ${child.city}` : ''}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions for this Child */}
+                  <div className="pt-2 border-t border-gray-100 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/students/${child.id}`)}
+                      className="flex-1 px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 shadow-2xs transition text-center cursor-pointer"
+                    >
+                      👤 Full Profile
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveChild(child);
+                        navigate('/attendance');
+                      }}
+                      className="flex-1 px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition text-center cursor-pointer"
+                    >
+                      📊 Attendance
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveChild(child);
+                        navigate('/fees');
+                      }}
+                      className="flex-1 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition text-center cursor-pointer"
+                    >
+                      💰 Fees
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveChild(child);
+                        navigate('/assignments');
+                      }}
+                      className="flex-1 px-3 py-2 text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded-xl hover:bg-purple-100 transition text-center cursor-pointer"
+                    >
+                      📋 Assignments
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">

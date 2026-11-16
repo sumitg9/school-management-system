@@ -30,6 +30,10 @@ const EnhancedDashboard = () => {
   const { formatDateTime } = useSettings();
   const {
     isStudent,
+    isParent,
+    parentChildren,
+    activeChild,
+    setActiveChild,
     isTeacher,
     hasPermission,
     filterTeacherClasses,
@@ -60,7 +64,7 @@ const EnhancedDashboard = () => {
 
   useEffect(() => {
     fetchDashboardData(false);
-  }, []);
+  }, [activeChild?.id, parentChildren?.length]);
 
   const fetchDashboardData = async (isManual = false) => {
     if (isManual) {
@@ -68,6 +72,39 @@ const EnhancedDashboard = () => {
     }
 
     try {
+      if (isParent()) {
+        const childCount = parentChildren?.length || 0;
+        let attRes = { total: 0, present: 0, percentage: 100 };
+        if (activeChild?.id) {
+          try {
+            const stRes = await attendanceAPI.getStudentStats(activeChild.id);
+            if (stRes?.data) attRes = stRes.data;
+          } catch (_) {}
+        }
+        setStats({
+          students: { total: childCount, active: childCount, inactive: 0 },
+          teachers: { total: childCount, active: childCount, inactive: 0 },
+          classes: { total: childCount },
+          attendance: {
+            today: attRes.total || 0,
+            present: attRes.present || 0,
+            absent: attRes.absent || 0,
+            percentage: attRes.percentage || 100,
+          },
+          exams: { upcoming: 0, ongoing: 0, completed: 0 },
+          fees: { total: 0, paid: 0, pending: 0, overdue: 0 },
+          assignments: { total: 0, active: 0, overdue: 0 },
+        });
+        setRecentActivities([
+          { id: 1, type: 'student', action: `Parent Portal: ${parentChildren.length} linked child${parentChildren.length !== 1 ? 'ren' : ''}`, time: 'Active', icon: '👨‍👩‍👧' },
+          { id: 2, type: 'attendance', action: activeChild ? `Viewing ${activeChild.first_name}'s academic records` : 'Select active child', time: 'Today', icon: '👦' },
+          { id: 3, type: 'fee', action: 'Fee schedules and payment receipts available', time: 'Active', icon: '💰' },
+        ]);
+        setInitialLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       if (isTeacher()) {
         const [classesRes, sectionsRes, studentsRes, attendanceRes, assignmentsRes, examsRes] = await Promise.allSettled([
           classAPI.getAll({ per_page: 100 }),
@@ -254,9 +291,19 @@ const EnhancedDashboard = () => {
     { name: 'My Fee Details', icon: '💰', color: 'emerald', path: '/fees' },
   ];
 
-  const quickActions = isStudent()
-    ? studentQuickActions
-    : staffQuickActions.filter(action => !action.permission || hasPermission(action.permission));
+  const parentQuickActions = [
+    { name: 'My Children', icon: '👨‍👩‍👧', color: 'blue', path: '/students' },
+    { name: "Child's Attendance", icon: '📊', color: 'green', path: '/attendance' },
+    { name: "Child's Fees", icon: '💰', color: 'emerald', path: '/fees' },
+    { name: "Child's Assignments", icon: '📚', color: 'purple', path: '/assignments' },
+    { name: 'Examinations', icon: '📝', color: 'red', path: '/exams' },
+  ];
+
+  const quickActions = isParent()
+    ? parentQuickActions
+    : (isStudent()
+      ? studentQuickActions
+      : staffQuickActions.filter(action => !action.permission || hasPermission(action.permission)));
 
   return (
     <div className="p-6">
@@ -298,26 +345,43 @@ const EnhancedDashboard = () => {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        {/* Students */}
+        {/* Card 1: Students / My Children */}
         <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => navigate('/students')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">{isTeacher() ? 'My Students' : 'Total Students'}</p>
+              <p className="text-sm text-gray-500">{isParent() ? 'My Children' : (isTeacher() ? 'My Students' : 'Total Students')}</p>
               <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
-                {stats.students.total}
+                {isParent() ? parentChildren.length : stats.students.total}
               </p>
               <p className="text-sm text-green-600 mt-1">
-                {isTeacher() ? 'In assigned classes' : `↑ ${stats.students.active} Active`}
+                {isParent() ? 'Enrolled in school' : (isTeacher() ? 'In assigned classes' : `↑ ${stats.students.active} Active`)}
               </p>
             </div>
             <div className="h-16 w-16 bg-blue-100 rounded-lg flex items-center justify-center">
-              <span className="text-3xl">👨‍🎓</span>
+              <span className="text-3xl">{isParent() ? '👨‍👩‍👧' : '👨‍🎓'}</span>
             </div>
           </div>
         </div>
 
-        {/* Teachers / Sections */}
-        {isTeacher() ? (
+        {/* Card 2: Active Child / Teachers / Sections */}
+        {isParent() ? (
+          <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => navigate('/students')}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Active Child</p>
+                <p className={`text-xl font-bold text-gray-900 truncate max-w-[150px] ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
+                  {activeChild ? `${activeChild.first_name} ${activeChild.last_name}` : 'None'}
+                </p>
+                <p className="text-sm text-amber-700 font-semibold mt-1">
+                  {activeChild?.class?.name || activeChild?.classes?.name || (activeChild?.class_id ? `Class ${activeChild.class_id}` : 'Select Child')}
+                </p>
+              </div>
+              <div className="h-16 w-16 bg-amber-100 rounded-lg flex items-center justify-center">
+                <span className="text-3xl">👦</span>
+              </div>
+            </div>
+          </div>
+        ) : isTeacher() ? (
           <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => navigate('/sections')}>
             <div className="flex items-center justify-between">
               <div>
@@ -349,31 +413,48 @@ const EnhancedDashboard = () => {
           </div>
         )}
 
-        {/* Classes */}
-        <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => navigate('/classes')}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">{isTeacher() ? 'My Classes' : 'Total Classes'}</p>
-              <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
-                {stats.classes.total}
-              </p>
-              <p className="text-sm text-gray-600 mt-1">{isTeacher() ? 'Assigned classes' : 'All Sections'}</p>
-            </div>
-            <div className="h-16 w-16 bg-purple-100 rounded-lg flex items-center justify-center">
-              <span className="text-3xl">📚</span>
+        {/* Card 3: Child's Fees / Classes */}
+        {isParent() ? (
+          <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => navigate('/fees')}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Child's Fees</p>
+                <p className={`text-2xl font-bold text-emerald-600 font-mono ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
+                  Schedule
+                </p>
+                <p className="text-sm text-gray-600 mt-1">Obligations & receipts</p>
+              </div>
+              <div className="h-16 w-16 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <span className="text-3xl">💰</span>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => navigate('/classes')}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">{isTeacher() ? 'My Classes' : 'Total Classes'}</p>
+                <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
+                  {stats.classes.total}
+                </p>
+                <p className="text-sm text-gray-600 mt-1">{isTeacher() ? 'Assigned classes' : 'All Sections'}</p>
+              </div>
+              <div className="h-16 w-16 bg-purple-100 rounded-lg flex items-center justify-center">
+                <span className="text-3xl">📚</span>
+              </div>
+            </div>
+          </div>
+        )}
 
-        {/* Attendance Today */}
+        {/* Card 4: Attendance Today */}
         <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition cursor-pointer" onClick={() => navigate('/attendance')}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">{isTeacher() ? 'Class Attendance' : 'Attendance Today'}</p>
+              <p className="text-sm text-gray-500">{isParent() ? "Child's Attendance" : (isTeacher() ? 'Class Attendance' : 'Attendance Today')}</p>
               <p className={`text-3xl font-bold text-gray-900 ${initialLoading ? 'opacity-40 animate-pulse' : ''}`}>
                 {stats.attendance.percentage}%
               </p>
-              <p className="text-sm text-gray-600 mt-1">{stats.attendance.today} Records today</p>
+              <p className="text-sm text-gray-600 mt-1">{isParent() ? `${stats.attendance.present} Present days` : `${stats.attendance.today} Records today`}</p>
             </div>
             <div className="h-16 w-16 bg-orange-100 rounded-lg flex items-center justify-center">
               <span className="text-3xl">📊</span>

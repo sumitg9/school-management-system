@@ -15,6 +15,7 @@ const AssignmentList = () => {
   const { formatDate } = useSettings();
   const {
     isStudent,
+    isParent,
     isTeacher,
     user,
     currentTeacher,
@@ -27,7 +28,7 @@ const AssignmentList = () => {
     getTeacherAssignedSubjectIds,
   } = useAuth();
 
-  if (isStudent()) {
+  if (isStudent() || isParent()) {
     return <StudentAssignmentsView />;
   }
   const [assignments, setAssignments] = useState([]);
