@@ -44,6 +44,7 @@ const Layout = ({ children }) => {
     { path: '/fees', icon: '💵', label: isParent() ? "Child's Fees" : (isStudent() ? 'My Fees' : 'Fees'), permission: 'view-fees' },
     { path: '/fees/payment', icon: '💳', label: 'Fee Payment', permission: 'collect-fees' },
     { path: '/assignments', icon: '📋', label: isParent() ? "Child's Assignments" : (isStudent() ? 'My Assignments' : 'Assignments'), permission: 'view-assignments' },
+    { path: '/gallery', icon: '🖼️', label: 'School Gallery', permission: 'view-gallery' },
     { path: '/reports', icon: '📈', label: 'Reports', permission: 'view-reports' },
     { path: '/tools/bulk', icon: '🔧', label: 'Bulk Operations', permission: 'manage-tools' },
     { path: '/users', icon: '👥', label: 'Users', permission: 'manage-users' },

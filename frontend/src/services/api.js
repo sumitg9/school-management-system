@@ -3134,4 +3134,281 @@ export const settingsAPI = {
   },
 };
 
+// ==========================================
+// Gallery API (School Memories & Events)
+// ==========================================
+const DEFAULT_GALLERY_ITEMS = [
+  {
+    id: 'gal-1',
+    title: 'Annual Athletic Meet 2026 - Relay Finals',
+    category: 'Sports',
+    description: 'Thrilling moments as the senior boys 4x100m relay sprint team dashes across the finish line to capture gold during the 2026 Inter-House Championship.',
+    imageUrl: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1200&q=80',
+    eventDate: '2026-02-18',
+    tags: ['Athletics', 'Track & Field', 'Gold Medal', 'Inter-House'],
+    featured: true,
+    uploadedBy: 'School Sports Dept',
+    uploadedAt: '2026-02-18T10:30:00.000Z',
+    likes: 42,
+  },
+  {
+    id: 'gal-2',
+    title: 'National Science & Robotics Innovation Fair',
+    category: 'Science & Academics',
+    description: 'Class 9 and 10 students demonstrating autonomous rover prototypes and automated eco-friendly solar water filtration units to external judges.',
+    imageUrl: 'https://images.unsplash.com/photo-1581092921461-eab62e97a780?auto=format&fit=crop&w=1200&q=80',
+    eventDate: '2026-02-10',
+    tags: ['Robotics', 'STEM', 'Innovation', 'Exhibition'],
+    featured: false,
+    uploadedBy: 'Science Club',
+    uploadedAt: '2026-02-10T14:15:00.000Z',
+    likes: 38,
+  },
+  {
+    id: 'gal-3',
+    title: 'Spring Cultural Fest - Symphony in Harmony',
+    category: 'Cultural & Arts',
+    description: 'The senior school choir and classical orchestra captivating the auditorium audience with harmonic Indian and Western classical compositions.',
+    imageUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80',
+    eventDate: '2026-01-28',
+    tags: ['Music', 'Choir', 'Cultural Fest', 'Auditorium'],
+    featured: false,
+    uploadedBy: 'Arts & Culture Committee',
+    uploadedAt: '2026-01-28T18:00:00.000Z',
+    likes: 29,
+  },
+  {
+    id: 'gal-4',
+    title: 'Republic Day Flag Hoisting & March-Past',
+    category: 'Celebrations',
+    description: 'NCC cadets and house captains in synchronized formation saluting the Tricolour during the solemn 77th Republic Day celebration.',
+    imageUrl: 'https://images.unsplash.com/photo-1532375810709-75b1da00537c?auto=format&fit=crop&w=1200&q=80',
+    eventDate: '2026-01-26',
+    tags: ['Republic Day', 'Patriotic', 'Parade', 'NCC Cadets'],
+    featured: false,
+    uploadedBy: "Principal's Office",
+    uploadedAt: '2026-01-26T09:00:00.000Z',
+    likes: 54,
+  },
+  {
+    id: 'gal-5',
+    title: 'Advanced STEM & Biotech Laboratory Session',
+    category: 'Campus & Facilities',
+    description: 'Senior secondary biology students engaged in molecular genetics experiments in our recently renovated high-tech life sciences laboratory.',
+    imageUrl: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=1200&q=80',
+    eventDate: '2026-01-15',
+    tags: ['Laboratory', 'Biology', 'Microscope', 'Campus'],
+    featured: false,
+    uploadedBy: 'Faculty Dept',
+    uploadedAt: '2026-01-15T11:45:00.000Z',
+    likes: 24,
+  },
+  {
+    id: 'gal-6',
+    title: 'Inter-School Basketball Championship Winners',
+    category: 'Sports',
+    description: 'Our school varsity basketball team hoisting the regional trophy after a thrilling 68-64 fourth-quarter comeback victory.',
+    imageUrl: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=1200&q=80',
+    eventDate: '2026-01-05',
+    tags: ['Basketball', 'Championship', 'Team Sports', 'Trophy'],
+    featured: false,
+    uploadedBy: 'Sports Dept',
+    uploadedAt: '2026-01-05T16:20:00.000Z',
+    likes: 61,
+  },
+  {
+    id: 'gal-7',
+    title: 'Fine Arts & Canvas Oil Painting Showcase',
+    category: 'Cultural & Arts',
+    description: 'Junior and middle school students experimenting with acrylic and oil pastels during the weekend creative fine arts workshop.',
+    imageUrl: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=1200&q=80',
+    eventDate: '2025-12-14',
+    tags: ['Art', 'Painting', 'Creativity', 'Workshop'],
+    featured: false,
+    uploadedBy: 'Art Department',
+    uploadedAt: '2025-12-14T13:10:00.000Z',
+    likes: 31,
+  },
+  {
+    id: 'gal-8',
+    title: 'Collaborative Smart Classrooms & Digital Math',
+    category: 'Campus & Facilities',
+    description: 'Interactive touch display learning in Grade 8 mathematics, fostering teamwork, geometric visualization, and student engagement.',
+    imageUrl: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1200&q=80',
+    eventDate: '2025-11-20',
+    tags: ['Smart Classroom', 'Technology', 'Learning', 'Digital'],
+    featured: false,
+    uploadedBy: 'Admin Office',
+    uploadedAt: '2025-11-20T10:00:00.000Z',
+    likes: 19,
+  },
+];
+
+const getStoredGalleryItems = () => {
+  try {
+    const raw = localStorage.getItem('sms_gallery_items');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to parse stored gallery items', e);
+  }
+  // Initialize with default items
+  try {
+    localStorage.setItem('sms_gallery_items', JSON.stringify(DEFAULT_GALLERY_ITEMS));
+  } catch (_) {}
+  return DEFAULT_GALLERY_ITEMS;
+};
+
+const saveStoredGalleryItems = (items) => {
+  try {
+    localStorage.setItem('sms_gallery_items', JSON.stringify(items));
+  } catch (e) {
+    console.error('Failed to save gallery items to localStorage', e);
+  }
+};
+
+export const galleryAPI = {
+  getAll: async (params = {}) => {
+    let items = getStoredGalleryItems();
+    const { category, search, sort = 'newest' } = params;
+
+    if (category && category !== 'All') {
+      items = items.filter(item => item.category?.toLowerCase() === category.toLowerCase());
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      items = items.filter(item => {
+        const titleMatch = item.title?.toLowerCase().includes(q);
+        const descMatch = item.description?.toLowerCase().includes(q);
+        const catMatch = item.category?.toLowerCase().includes(q);
+        const tagMatch = Array.isArray(item.tags) && item.tags.some(t => t.toLowerCase().includes(q));
+        return titleMatch || descMatch || catMatch || tagMatch;
+      });
+    }
+
+    if (sort === 'newest') {
+      items = [...items].sort((a, b) => new Date(b.eventDate || b.uploadedAt) - new Date(a.eventDate || a.uploadedAt));
+    } else if (sort === 'oldest') {
+      items = [...items].sort((a, b) => new Date(a.eventDate || a.uploadedAt) - new Date(b.eventDate || b.uploadedAt));
+    } else if (sort === 'popular') {
+      items = [...items].sort((a, b) => (b.likes || 0) - (a.likes || 0));
+    }
+
+    return {
+      success: true,
+      data: items,
+      total: items.length,
+    };
+  },
+
+  getById: async (id) => {
+    const items = getStoredGalleryItems();
+    const found = items.find(i => String(i.id) === String(id));
+    if (!found) {
+      throw new Error('Gallery image not found');
+    }
+    return { success: true, data: found };
+  },
+
+  create: async (itemData) => {
+    const items = getStoredGalleryItems();
+    const id = `gal-${Date.now()}`;
+    const isFeatured = !!itemData.featured;
+
+    let updatedList = items;
+    if (isFeatured) {
+      // Unset previous featured item
+      updatedList = updatedList.map(item => ({ ...item, featured: false }));
+    }
+
+    const newItem = {
+      id,
+      title: itemData.title?.trim() || 'Untitled Event Photo',
+      category: itemData.category || 'School Events',
+      description: itemData.description?.trim() || '',
+      imageUrl: itemData.imageUrl,
+      eventDate: itemData.eventDate || new Date().toISOString().split('T')[0],
+      tags: Array.isArray(itemData.tags)
+        ? itemData.tags
+        : typeof itemData.tags === 'string'
+        ? itemData.tags.split(',').map(t => t.trim()).filter(Boolean)
+        : [],
+      featured: isFeatured,
+      uploadedBy: itemData.uploadedBy || 'Admin',
+      uploadedAt: new Date().toISOString(),
+      likes: 0,
+    };
+
+    updatedList = [newItem, ...updatedList];
+    saveStoredGalleryItems(updatedList);
+    return { success: true, data: newItem, message: 'Image successfully uploaded to gallery!' };
+  },
+
+  update: async (id, itemData) => {
+    let items = getStoredGalleryItems();
+    const index = items.findIndex(i => String(i.id) === String(id));
+    if (index === -1) {
+      throw new Error('Gallery image not found to update');
+    }
+
+    const isFeatured = !!itemData.featured;
+    if (isFeatured) {
+      items = items.map(item => ({ ...item, featured: false }));
+    }
+
+    const existing = items[index];
+    const updated = {
+      ...existing,
+      ...itemData,
+      id: existing.id, // Preserve id
+      tags: Array.isArray(itemData.tags)
+        ? itemData.tags
+        : typeof itemData.tags === 'string'
+        ? itemData.tags.split(',').map(t => t.trim()).filter(Boolean)
+        : existing.tags,
+      updatedAt: new Date().toISOString(),
+    };
+
+    items[index] = updated;
+    saveStoredGalleryItems(items);
+    return { success: true, data: updated, message: 'Gallery image updated successfully!' };
+  },
+
+  delete: async (id) => {
+    let items = getStoredGalleryItems();
+    const filtered = items.filter(i => String(i.id) !== String(id));
+    saveStoredGalleryItems(filtered);
+    return { success: true, message: 'Image removed from gallery' };
+  },
+
+  toggleLike: async (id) => {
+    let items = getStoredGalleryItems();
+    const index = items.findIndex(i => String(i.id) === String(id));
+    if (index !== -1) {
+      const likedKey = `sms_gal_liked_${id}`;
+      const isAlreadyLiked = localStorage.getItem(likedKey) === 'true';
+      if (isAlreadyLiked) {
+        items[index].likes = Math.max(0, (items[index].likes || 1) - 1);
+        localStorage.removeItem(likedKey);
+      } else {
+        items[index].likes = (items[index].likes || 0) + 1;
+        localStorage.setItem(likedKey, 'true');
+      }
+      saveStoredGalleryItems(items);
+      return { success: true, data: items[index], liked: !isAlreadyLiked };
+    }
+    return { success: false };
+  },
+
+  resetDefaults: async () => {
+    saveStoredGalleryItems(DEFAULT_GALLERY_ITEMS);
+    return { success: true, data: DEFAULT_GALLERY_ITEMS };
+  },
+};
+
 export default api;

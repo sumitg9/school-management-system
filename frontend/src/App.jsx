@@ -50,6 +50,7 @@ import BulkOperations from './pages/tools/BulkOperations';
 import Settings from './pages/settings/Settings';
 import Profile from './pages/profile/Profile';
 import UserList from './pages/users/UserList';
+import Gallery from './pages/gallery/Gallery';
 import PermissionRoute from './components/common/PermissionRoute';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
@@ -127,6 +128,7 @@ function AppRoutes() {
                     <Route path="/assignments/create" element={<PermissionRoute permission="create-assignments"><AssignmentForm /></PermissionRoute>} />
                     <Route path="/assignments/:id" element={<PermissionRoute permission="view-assignments"><AssignmentDetail /></PermissionRoute>} />
                     <Route path="/assignments/:id/edit" element={<PermissionRoute permission="create-assignments"><AssignmentForm /></PermissionRoute>} />
+                    <Route path="/gallery" element={<PermissionRoute permission="view-gallery"><Gallery /></PermissionRoute>} />
                     <Route path="/users" element={<PermissionRoute permission="manage-users"><UserList /></PermissionRoute>} />
                     <Route path="/settings" element={<PermissionRoute permission="manage-settings"><Settings /></PermissionRoute>} />
                     <Route path="/profile" element={<Profile />} />

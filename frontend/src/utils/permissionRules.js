@@ -200,6 +200,16 @@ export const PERMISSION_MODULES = [
       { id: 'manage-users', label: 'Manage Users', description: 'Create users, assign roles, edit details, and delete users' },
     ],
   },
+  {
+    id: 'gallery',
+    name: 'School Gallery',
+    icon: '🖼️',
+    description: 'School event albums, sports days, cultural fests, and campus photos',
+    permissions: [
+      { id: 'view-gallery', label: 'View Gallery', description: 'Browse and view school photos, events, and albums' },
+      { id: 'manage-gallery', label: 'Manage Gallery', description: 'Upload, edit, and delete photos and album collections' },
+    ],
+  },
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS = {
@@ -216,6 +226,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'manage-tools',
     'manage-settings', 'manage-permissions',
     'view-users', 'manage-users',
+    'view-gallery', 'manage-gallery',
   ],
   'admin': [
     'view-dashboard',
@@ -229,6 +240,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-reports', 'generate-reports',
     'manage-tools',
     'manage-settings', 'manage-permissions',
+    'view-gallery', 'manage-gallery',
   ],
   'teacher': [
     'view-dashboard',
@@ -238,6 +250,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-exams', 'view-grades', 'enter-grades',
     'view-assignments', 'create-assignments', 'grade-assignments',
     'view-reports',
+    'view-gallery',
   ],
   'student': [
     'view-dashboard',
@@ -245,6 +258,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-exams', 'view-grades',
     'view-fees',
     'view-assignments', 'submit-assignments',
+    'view-gallery',
   ],
   'parent': [
     'view-dashboard',
@@ -253,12 +267,14 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-exams', 'view-grades',
     'view-fees',
     'view-assignments',
+    'view-gallery',
   ],
   'finance': [
     'view-dashboard',
     'view-students',
     'view-fees', 'create-fees', 'collect-fees',
     'view-reports', 'generate-reports',
+    'view-gallery',
   ],
   'back-office': [
     'view-dashboard',
@@ -268,11 +284,13 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-attendance',
     'view-reports',
     'manage-tools',
+    'view-gallery',
   ],
   'general': [
     'view-dashboard',
     'view-students',
     'view-classes',
+    'view-gallery',
   ],
 };
 
