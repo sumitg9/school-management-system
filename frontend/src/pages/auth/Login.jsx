@@ -3,11 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
+import { useSettings } from '../../context/SettingsContext';
 
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const { showValidationError } = useAlert();
+  const { settings } = useSettings();
+
+  const schoolName = settings?.school_name || 'School Management System';
+  const schoolTagline = settings?.school_tagline || 'Sign in to your account';
+  const schoolLogo = settings?.school_logo || '';
   const [formData, setFormData] = useState({
     email: 'admin@school.com',
     password: 'password',
@@ -73,13 +79,27 @@ const Login = () => {
       <div className="max-w-md w-full">
         {/* Logo and Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-2xl shadow-lg mb-4">
-            <svg className="w-10 h-10 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
-            </svg>
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-2xl shadow-lg mb-4 overflow-hidden p-2">
+            {schoolLogo ? (
+              schoolLogo.startsWith('preset:') ? (
+                <span className="text-4xl">{schoolLogo.replace('preset:', '')}</span>
+              ) : (
+                <img
+                  src={schoolLogo}
+                  alt={schoolName}
+                  className="h-full w-full object-contain"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.parentElement.innerHTML = '<span class="text-4xl">🎓</span>';
+                  }}
+                />
+              )
+            ) : (
+              <span className="text-4xl">🎓</span>
+            )}
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">School Management System</h1>
-          <p className="text-blue-100">Sign in to your account</p>
+          <h1 className="text-3xl font-bold text-white mb-2">{schoolName}</h1>
+          <p className="text-blue-100">{schoolTagline}</p>
         </div>
 
         {/* Login Card */}

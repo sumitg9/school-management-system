@@ -29,6 +29,14 @@ class SettingController extends Controller
     public function update(Request $request)
     {
         $request->validate([
+            'school_name' => 'nullable|string|max:255',
+            'school_logo' => 'nullable|string',
+            'school_tagline' => 'nullable|string|max:255',
+            'school_email' => 'nullable|string|max:255',
+            'school_phone' => 'nullable|string|max:50',
+            'school_address' => 'nullable|string|max:500',
+            'school_affiliation' => 'nullable|string|max:255',
+            'school_website' => 'nullable|string|max:255',
             'date_time_format' => 'nullable|string|max:100',
             'date_format' => 'nullable|string|max:100',
             'time_format' => 'nullable|string|max:100',
@@ -61,9 +69,11 @@ class SettingController extends Controller
         }
 
         foreach ($payload as $key => $value) {
-            $group = in_array($key, ['date_time_format', 'date_format', 'time_format', 'timezone', 'currency', 'currency_symbol'])
-                ? 'localization'
-                : (str_starts_with($key, 'fee_') ? 'fees' : 'age_criteria');
+            $group = str_starts_with($key, 'school_')
+                ? 'school_info'
+                : (in_array($key, ['date_time_format', 'date_format', 'time_format', 'timezone', 'currency', 'currency_symbol'])
+                    ? 'localization'
+                    : (str_starts_with($key, 'fee_') ? 'fees' : 'age_criteria'));
             $valStr = (is_array($value) || is_object($value)) ? json_encode($value) : (string)$value;
             Setting::set($key, $valStr, $group);
         }

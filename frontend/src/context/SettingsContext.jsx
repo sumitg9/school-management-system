@@ -34,6 +34,16 @@ import { showGlobalValidationError } from './AlertContext';
 const SettingsContext = createContext(null);
 
 export const DEFAULT_SETTINGS = {
+  // School Identity & Branding
+  school_name: 'Delhi Public Academy',
+  school_logo: '',
+  school_tagline: 'Empowering Minds, Shaping Futures',
+  school_email: 'accounts@school.edu',
+  school_phone: '+91 98765 43210',
+  school_address: 'Knowledge Park, Institutional Area, New Delhi',
+  school_affiliation: 'Affiliated to CBSE / State Board • Reg. No: SMS-EDU-2024-9988',
+  school_website: 'www.school.edu',
+
   date_time_format: 'DD-MM-YYYY HH:mm:ss',
   date_format: 'DD-MM-YYYY',
   time_format: 'HH:mm:ss',
@@ -101,6 +111,16 @@ const normalizeSettings = (raw) => {
   merged.fee_grace_period_days = Math.max(0, parseInt(merged.fee_grace_period_days ?? 0, 10) || 0);
   merged.fee_late_fine_max_cap = Math.max(0, parseFloat(merged.fee_late_fine_max_cap ?? 1000) || 0);
 
+  // School Identity normalization
+  merged.school_name = raw?.school_name !== undefined ? String(raw.school_name).trim() : DEFAULT_SETTINGS.school_name;
+  merged.school_logo = raw?.school_logo !== undefined ? String(raw.school_logo) : DEFAULT_SETTINGS.school_logo;
+  merged.school_tagline = raw?.school_tagline !== undefined ? String(raw.school_tagline).trim() : DEFAULT_SETTINGS.school_tagline;
+  merged.school_email = raw?.school_email !== undefined ? String(raw.school_email).trim() : DEFAULT_SETTINGS.school_email;
+  merged.school_phone = raw?.school_phone !== undefined ? String(raw.school_phone).trim() : DEFAULT_SETTINGS.school_phone;
+  merged.school_address = raw?.school_address !== undefined ? String(raw.school_address).trim() : DEFAULT_SETTINGS.school_address;
+  merged.school_affiliation = raw?.school_affiliation !== undefined ? String(raw.school_affiliation).trim() : DEFAULT_SETTINGS.school_affiliation;
+  merged.school_website = raw?.school_website !== undefined ? String(raw.school_website).trim() : DEFAULT_SETTINGS.school_website;
+
   return merged;
 };
 
@@ -134,6 +154,12 @@ export const SettingsProvider = ({ children }) => {
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
+
+  useEffect(() => {
+    if (settings?.school_name) {
+      document.title = `${settings.school_name} - School Management System`;
+    }
+  }, [settings?.school_name]);
 
   const updateSettings = async (newSettings) => {
     try {

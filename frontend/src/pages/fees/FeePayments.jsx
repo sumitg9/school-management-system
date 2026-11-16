@@ -31,7 +31,7 @@ const extractMonthsFromRemarks = (remarksText) => {
 const FeePayments = () => {
   const navigate = useNavigate();
   const { id } = useParams(); // fee_structure_id
-  const { formatDate, formatCurrency } = useSettings();
+  const { formatDate, formatCurrency, settings } = useSettings();
   const { showValidationError } = useAlert();
   const { isStudent, currentStudent, studentLoading, hasPermission } = useAuth();
 
@@ -1220,18 +1220,43 @@ const FeePayments = () => {
                   <div id="printable-payment-receipt" className="text-gray-900 text-xs">
                     {/* Receipt Header */}
                     <div className="border-b-2 border-gray-900 pb-4 mb-4 text-center space-y-1">
-                      <div className="flex items-center justify-center gap-2 mb-1">
-                        <span className="text-2xl">🎓</span>
+                      <div className="flex items-center justify-center gap-3 mb-1">
+                        {settings?.school_logo ? (
+                          settings.school_logo.startsWith('preset:') ? (
+                            <span className="text-3xl">{settings.school_logo.replace('preset:', '')}</span>
+                          ) : (
+                            <img
+                              src={settings.school_logo}
+                              alt="Logo"
+                              className="h-10 w-10 object-contain"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.parentElement.innerHTML = '<span class="text-3xl">🎓</span>';
+                              }}
+                            />
+                          )
+                        ) : (
+                          <span className="text-3xl">🎓</span>
+                        )}
                         <h2 className="text-2xl font-black uppercase tracking-wider text-gray-900">
-                          Delhi Public Academy
+                          {settings?.school_name || 'Delhi Public Academy'}
                         </h2>
                       </div>
-                      <p className="text-xs text-gray-600">
-                        Affiliated to CBSE / State Board • Reg. No: SMS-EDU-2024-9988
-                      </p>
-                      <p className="text-[11px] text-gray-500">
-                        Knowledge Park, Institutional Area, New Delhi • Contact: +91 98765 43210 • Email: accounts@school.edu
-                      </p>
+                      {settings?.school_affiliation && (
+                        <p className="text-xs text-gray-700 font-medium">
+                          {settings.school_affiliation}
+                        </p>
+                      )}
+                      {(settings?.school_address || settings?.school_phone || settings?.school_email || settings?.school_website) && (
+                        <p className="text-[11px] text-gray-500">
+                          {[
+                            settings?.school_address,
+                            settings?.school_phone && `Contact: ${settings.school_phone}`,
+                            settings?.school_email && `Email: ${settings.school_email}`,
+                            settings?.school_website && `Website: ${settings.school_website}`
+                          ].filter(Boolean).join(' • ')}
+                        </p>
+                      )}
                       <div className="pt-2">
                         <span className="inline-block px-3 py-1 bg-gray-900 text-white font-bold text-xs uppercase tracking-widest rounded">
                           Official Fee Payment Receipt

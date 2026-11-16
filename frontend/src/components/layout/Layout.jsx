@@ -1,13 +1,19 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSettings } from '../../context/SettingsContext';
 import { SYSTEM_ROLES } from '../../utils/permissionRules';
 
 const Layout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasPermission, activeRole, switchActiveRole, resetActiveRole, isAdmin, isStudent } = useAuth();
+  const { settings } = useSettings();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const schoolName = settings?.school_name || 'SMS';
+  const schoolTagline = settings?.school_tagline || 'School Management';
+  const schoolLogo = settings?.school_logo || '';
 
   const handleLogout = async () => {
     await logout();
@@ -57,13 +63,33 @@ const Layout = ({ children }) => {
       <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-blue-800 to-indigo-900 text-white transition-all duration-300 flex-shrink-0`}>
         <div className="p-6">
           <div className="flex items-center mb-8">
-            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-              <span className="text-2xl">🎓</span>
+            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
+              {schoolLogo ? (
+                schoolLogo.startsWith('preset:') ? (
+                  <span className="text-2xl">{schoolLogo.replace('preset:', '')}</span>
+                ) : (
+                  <img
+                    src={schoolLogo}
+                    alt={schoolName}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.parentElement.innerHTML = '<span class="text-2xl">🎓</span>';
+                    }}
+                  />
+                )
+              ) : (
+                <span className="text-2xl">🎓</span>
+              )}
             </div>
             {sidebarOpen && (
-              <div className="ml-3">
-                <h1 className="text-lg font-bold">SMS</h1>
-                <p className="text-xs text-blue-200">School Management</p>
+              <div className="ml-3 min-w-0 flex-1">
+                <h1 className="text-base font-bold leading-tight truncate text-white" title={schoolName}>
+                  {schoolName}
+                </h1>
+                <p className="text-xs text-blue-200 truncate" title={schoolTagline}>
+                  {schoolTagline}
+                </p>
               </div>
             )}
           </div>

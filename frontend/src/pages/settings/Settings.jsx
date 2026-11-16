@@ -24,13 +24,34 @@ import UserPermissionsTable from './UserPermissionsTable';
 
 const SAMPLE_DATE = new Date('2026-10-31T12:15:00');
 
+export const LOGO_PRESETS = [
+  { id: 'grad_cap', name: 'Graduation Cap', icon: '🎓' },
+  { id: 'classical', name: 'Academy Columns', icon: '🏛️' },
+  { id: 'open_book', name: 'Book of Wisdom', icon: '📖' },
+  { id: 'shield', name: 'Honor Shield', icon: '🛡️' },
+  { id: 'tree', name: 'Knowledge Tree', icon: '🌳' },
+  { id: 'torch', name: 'Enlightenment Torch', icon: '🔥' },
+  { id: 'globe', name: 'Global School', icon: '🌐' },
+  { id: 'star', name: 'Excellence Star', icon: '⭐' },
+];
+
 const Settings = () => {
   const { settings, updateSettings, loading: initialLoading } = useSettings();
   const { user } = useAuth();
   const confirm = useConfirm();
 
-  // Active navigation tab: 'all' | 'localization' | 'age_criteria'
+  // Active navigation tab: 'all' | 'school_profile' | 'age_criteria' | 'fee_rules' | 'user_permissions' | 'localization'
   const [activeTab, setActiveTab] = useState('all');
+
+  // Form states - School Identity & Branding
+  const [schoolName, setSchoolName] = useState('Delhi Public Academy');
+  const [schoolTagline, setSchoolTagline] = useState('Empowering Minds, Shaping Futures');
+  const [schoolLogo, setSchoolLogo] = useState('');
+  const [schoolEmail, setSchoolEmail] = useState('accounts@school.edu');
+  const [schoolPhone, setSchoolPhone] = useState('+91 98765 43210');
+  const [schoolAddress, setSchoolAddress] = useState('Knowledge Park, Institutional Area, New Delhi');
+  const [schoolAffiliation, setSchoolAffiliation] = useState('Affiliated to CBSE / State Board • Reg. No: SMS-EDU-2024-9988');
+  const [schoolWebsite, setSchoolWebsite] = useState('www.school.edu');
 
   // Form states - Localization
   const [selectedPreset, setSelectedPreset] = useState('DD-MM-YYYY HH:mm:ss');
@@ -135,6 +156,16 @@ const Settings = () => {
       setFeeDueDayOfMonth(settings.fee_due_day_of_month !== undefined ? settings.fee_due_day_of_month : 10);
       setFeeGracePeriodDays(settings.fee_grace_period_days !== undefined ? settings.fee_grace_period_days : 0);
       setFeeLateFineMaxCap(settings.fee_late_fine_max_cap !== undefined ? settings.fee_late_fine_max_cap : 1000);
+
+      // School Profile & Branding
+      setSchoolName(settings.school_name !== undefined ? settings.school_name : 'Delhi Public Academy');
+      setSchoolTagline(settings.school_tagline !== undefined ? settings.school_tagline : 'Empowering Minds, Shaping Futures');
+      setSchoolLogo(settings.school_logo !== undefined ? settings.school_logo : '');
+      setSchoolEmail(settings.school_email !== undefined ? settings.school_email : 'accounts@school.edu');
+      setSchoolPhone(settings.school_phone !== undefined ? settings.school_phone : '+91 98765 43210');
+      setSchoolAddress(settings.school_address !== undefined ? settings.school_address : 'Knowledge Park, Institutional Area, New Delhi');
+      setSchoolAffiliation(settings.school_affiliation !== undefined ? settings.school_affiliation : 'Affiliated to CBSE / State Board • Reg. No: SMS-EDU-2024-9988');
+      setSchoolWebsite(settings.school_website !== undefined ? settings.school_website : 'www.school.edu');
     }
   }, [settings]);
 
@@ -229,6 +260,31 @@ const Settings = () => {
     });
   };
 
+  const handleLogoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file (PNG, JPG, SVG, WEBP)');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image size must be less than 2MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSchoolLogo(reader.result);
+      toast.success('School logo uploaded successfully!');
+    };
+    reader.onerror = () => {
+      toast.error('Failed to read logo image');
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -238,6 +294,14 @@ const Settings = () => {
       : selectedPreset;
 
     const payload = {
+      school_name: schoolName.trim() || 'Delhi Public Academy',
+      school_tagline: schoolTagline.trim(),
+      school_logo: schoolLogo,
+      school_email: schoolEmail.trim(),
+      school_phone: schoolPhone.trim(),
+      school_address: schoolAddress.trim(),
+      school_affiliation: schoolAffiliation.trim(),
+      school_website: schoolWebsite.trim(),
       date_time_format: finalDateTimeFormat,
       date_format: dateFormat,
       time_format: timeFormat,
@@ -264,7 +328,7 @@ const Settings = () => {
   const handleResetDefaults = async () => {
     const isConfirmed = await confirm({
       title: 'Reset System Settings',
-      message: 'Are you sure you want to reset all localization, date/time, age criteria, and fee fine settings to default values?',
+      message: 'Are you sure you want to reset all localization, school branding, date/time, age criteria, and fee fine settings to default values?',
       confirmText: 'Reset to Defaults',
       cancelText: 'Cancel',
       type: 'warning',
@@ -273,6 +337,14 @@ const Settings = () => {
     if (isConfirmed) {
       setSaving(true);
       await updateSettings({
+        school_name: 'Delhi Public Academy',
+        school_tagline: 'Empowering Minds, Shaping Futures',
+        school_logo: '',
+        school_email: 'accounts@school.edu',
+        school_phone: '+91 98765 43210',
+        school_address: 'Knowledge Park, Institutional Area, New Delhi',
+        school_affiliation: 'Affiliated to CBSE / State Board • Reg. No: SMS-EDU-2024-9988',
+        school_website: 'www.school.edu',
         date_time_format: 'DD-MM-YYYY HH:mm:ss',
         date_format: 'DD-MM-YYYY',
         time_format: 'HH:mm:ss',
@@ -291,6 +363,14 @@ const Settings = () => {
         fee_grace_period_days: 0,
         fee_late_fine_max_cap: 1000,
       });
+      setSchoolName('Delhi Public Academy');
+      setSchoolTagline('Empowering Minds, Shaping Futures');
+      setSchoolLogo('');
+      setSchoolEmail('accounts@school.edu');
+      setSchoolPhone('+91 98765 43210');
+      setSchoolAddress('Knowledge Park, Institutional Area, New Delhi');
+      setSchoolAffiliation('Affiliated to CBSE / State Board • Reg. No: SMS-EDU-2024-9988');
+      setSchoolWebsite('www.school.edu');
       setSelectedPreset('DD-MM-YYYY HH:mm:ss');
       setIsCustom(false);
       setCustomDateTimeFormat('');
@@ -336,17 +416,31 @@ const Settings = () => {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
+      <div className="flex items-center gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveTab('all')}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg transition ${
+          className={`px-4 py-2 text-sm font-semibold rounded-lg transition whitespace-nowrap ${
             activeTab === 'all'
               ? 'bg-blue-600 text-white shadow-sm'
               : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
           }`}
         >
           📋 All Settings
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('school_profile')}
+          className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'school_profile'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          <span>🏫</span> School Profile & Branding
+          <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-100 text-emerald-800 font-bold">
+            Identity
+          </span>
         </button>
         <button
           type="button"
@@ -401,6 +495,336 @@ const Settings = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        {/* SECTION 0: SCHOOL PROFILE & BRAND IDENTITY */}
+        {(activeTab === 'all' || activeTab === 'school_profile') && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between border-b pb-4 gap-2">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <span>🏫</span> School Profile & Brand Identity
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Manage your institution name, brand emblem/logo, tagline, and official contact coordinates.
+                    These will be dynamically reflected across the sidebar, login page, browser title, and fee receipts.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                    Live Platform Identity
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Left Column: Form Controls */}
+                <div className="lg:col-span-7 space-y-5">
+                  {/* School Name */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      School / Institution Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={schoolName}
+                      onChange={(e) => setSchoolName(e.target.value)}
+                      placeholder="e.g. Delhi Public Academy"
+                      required
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-medium"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Displayed on the navigation header, login screen, student reports, and official invoices.
+                    </p>
+                  </div>
+
+                  {/* Tagline */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Motto / Tagline
+                    </label>
+                    <input
+                      type="text"
+                      value={schoolTagline}
+                      onChange={(e) => setSchoolTagline(e.target.value)}
+                      placeholder="e.g. Empowering Minds, Shaping Futures"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Subheading displayed beneath the school name in the sidebar and auth pages.
+                    </p>
+                  </div>
+
+                  {/* School Logo Section */}
+                  <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/70 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-semibold text-gray-800">
+                        School Logo / Emblem
+                      </label>
+                      {schoolLogo && (
+                        <button
+                          type="button"
+                          onClick={() => setSchoolLogo('')}
+                          className="text-xs text-red-600 hover:text-red-800 font-medium"
+                        >
+                          Reset to Default Emblem
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Logo Presets */}
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-2">
+                        1. Select a Quick Academic Emblem Preset:
+                      </p>
+                      <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                        {LOGO_PRESETS.map((preset) => (
+                          <button
+                            key={preset.value}
+                            type="button"
+                            onClick={() => setSchoolLogo(preset.value)}
+                            title={preset.name}
+                            className={`flex flex-col items-center justify-center p-2.5 rounded-lg border text-xl transition-all ${
+                              schoolLogo === preset.value
+                                ? 'border-blue-600 bg-blue-100 ring-2 ring-blue-500 shadow-sm scale-105'
+                                : 'border-gray-200 bg-white hover:bg-gray-100 hover:border-gray-300'
+                            }`}
+                          >
+                            <span>{preset.symbol}</span>
+                            <span className="text-[10px] text-gray-600 mt-1 truncate max-w-full font-medium">
+                              {preset.name}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom Logo Upload & Direct URL */}
+                    <div className="pt-2 border-t border-gray-200 space-y-3">
+                      <p className="text-xs font-medium text-gray-600">
+                        2. Or Upload a Custom Image / Provide Image URL:
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Upload Logo (PNG, JPG, SVG, WebP &lt; 2MB)
+                          </label>
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                            onChange={handleLogoUpload}
+                            className="block w-full text-xs text-gray-500 file:mr-2 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-gray-300 rounded-lg p-1 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Direct Image URL
+                          </label>
+                          <input
+                            type="url"
+                            value={schoolLogo.startsWith('data:') || schoolLogo.startsWith('preset:') ? '' : schoolLogo}
+                            onChange={(e) => setSchoolLogo(e.target.value)}
+                            placeholder="https://example.com/logo.png"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Institutional & Receipt Details */}
+                  <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/70 space-y-4">
+                    <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                      <span>🧾</span> Official Institutional Details (For Receipts & Documents)
+                    </h3>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Official School Email
+                        </label>
+                        <input
+                          type="email"
+                          value={schoolEmail}
+                          onChange={(e) => setSchoolEmail(e.target.value)}
+                          placeholder="accounts@school.edu"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Official Contact Phone
+                        </label>
+                        <input
+                          type="text"
+                          value={schoolPhone}
+                          onChange={(e) => setSchoolPhone(e.target.value)}
+                          placeholder="+91 98765 43210"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Affiliation / Registration Details
+                        </label>
+                        <input
+                          type="text"
+                          value={schoolAffiliation}
+                          onChange={(e) => setSchoolAffiliation(e.target.value)}
+                          placeholder="Affiliated to CBSE • Reg. No: SMS-EDU-2024-9988"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          Official Website
+                        </label>
+                        <input
+                          type="text"
+                          value={schoolWebsite}
+                          onChange={(e) => setSchoolWebsite(e.target.value)}
+                          placeholder="www.school.edu"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Campus Address
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={schoolAddress}
+                        onChange={(e) => setSchoolAddress(e.target.value)}
+                        placeholder="Knowledge Park, Institutional Area, New Delhi - 110001"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Live Previews */}
+                <div className="lg:col-span-5 space-y-6">
+                  <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-xl p-5 text-white shadow-lg space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-700/80 pb-3">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
+                        <span>👁️</span> Live Sidebar Header Preview
+                      </span>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                        App Shell
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-3 bg-slate-800/80 rounded-lg border border-slate-700">
+                      <div className="h-10 w-10 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-xl flex-shrink-0 shadow overflow-hidden">
+                        {schoolLogo ? (
+                          schoolLogo.startsWith('preset:') ? (
+                            <span>{schoolLogo.replace('preset:', '')}</span>
+                          ) : (
+                            <img
+                              src={schoolLogo}
+                              alt="Logo"
+                              className="h-full w-full object-cover"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.parentElement.innerHTML = '<span>🏫</span>';
+                              }}
+                            />
+                          )
+                        ) : (
+                          <span>🏫</span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-bold text-white truncate">
+                          {schoolName || 'School Name'}
+                        </div>
+                        <div className="text-[11px] text-gray-400 truncate">
+                          {schoolTagline || 'School Management System'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Fee Receipt Preview */}
+                  <div className="bg-white border-2 border-dashed border-gray-300 rounded-xl p-5 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-gray-600 flex items-center gap-1.5">
+                        <span>🧾</span> Official Receipt Header Preview
+                      </span>
+                      <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+                        Print / PDF
+                      </span>
+                    </div>
+
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 text-center space-y-1.5">
+                      <div className="mx-auto h-12 w-12 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-2xl mb-1 shadow-sm overflow-hidden">
+                        {schoolLogo ? (
+                          schoolLogo.startsWith('preset:') ? (
+                            <span>{schoolLogo.replace('preset:', '')}</span>
+                          ) : (
+                            <img
+                              src={schoolLogo}
+                              alt="Logo"
+                              className="h-full w-full object-cover"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.parentElement.innerHTML = '<span>🏫</span>';
+                              }}
+                            />
+                          )
+                        ) : (
+                          <span>🏫</span>
+                        )}
+                      </div>
+                      <h4 className="text-base font-extrabold text-gray-900 uppercase tracking-tight">
+                        {schoolName || 'SCHOOL NAME'}
+                      </h4>
+                      {schoolAffiliation && (
+                        <p className="text-[11px] text-blue-800 font-semibold">
+                          {schoolAffiliation}
+                        </p>
+                      )}
+                      {schoolAddress && (
+                        <p className="text-[10px] text-gray-500">
+                          {schoolAddress}
+                        </p>
+                      )}
+                      {(schoolEmail || schoolPhone || schoolWebsite) && (
+                        <p className="text-[10px] text-gray-400">
+                          {[
+                            schoolPhone && `Phone: ${schoolPhone}`,
+                            schoolEmail && `Email: ${schoolEmail}`,
+                            schoolWebsite && schoolWebsite
+                          ].filter(Boolean).join(' | ')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Browser Tab Preview */}
+                  <div className="bg-gray-100 rounded-xl p-3 border border-gray-200">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
+                      Browser Tab Title
+                    </span>
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-t-lg border-t border-x border-gray-300 max-w-xs shadow-sm">
+                      <span className="text-xs">
+                        {schoolLogo && schoolLogo.startsWith('preset:') ? schoolLogo.replace('preset:', '') : '🏫'}
+                      </span>
+                      <span className="text-xs font-medium text-gray-700 truncate">
+                        {schoolName || 'SMS'} - School Management System
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* SECTION 1: AGE CRITERIA SETTINGS */}
         {(activeTab === 'all' || activeTab === 'age_criteria') && (
           <div className="space-y-6">
