@@ -3076,28 +3076,454 @@ export const assignmentAPI = {
 // ==========================================
 // Notification API
 // ==========================================
-export const notificationAPI = {
-  getAll: async (params) => {
-    if (!useSupabase) return api.get('/notifications', { params });
-    let query = supabase.from('notifications').select('*', { count: 'exact' }).order('id', { ascending: false });
+const NOTIFICATION_STORAGE_KEY = 'sms_notifications';
 
-    const page = parseInt(params?.page || 1, 10);
-    const perPage = params?.per_page === 'all' ? null : parseInt(params?.per_page || 20, 10);
-    if (perPage) {
-      const from = (page - 1) * perPage;
-      const to = from + perPage - 1;
-      query = query.range(from, to);
+const buildDefaultNotifications = () => {
+  const now = Date.now();
+  const minutesAgo = (m) => new Date(now - m * 60 * 1000).toISOString();
+  const hoursAgo = (h) => new Date(now - h * 3600 * 1000).toISOString();
+  const daysAgo = (d) => new Date(now - d * 86400 * 1000).toISOString();
+
+  return [
+    {
+      id: 'notif-1',
+      title: 'Term 2 Tuition Fee Due: ₹14,500',
+      message: 'Second term tuition and lab fees for Aarav Sharma (Class 10-A) are due on Feb 28, 2026. Avoid late fee penalty by paying online.',
+      type: 'fee',
+      priority: 'urgent',
+      target_role: 'parent',
+      target_email: 'suresh.sharma@parent.school.com',
+      student_name: 'Aarav Sharma',
+      link: '/fee-payment',
+      is_read: false,
+      read_at: null,
+      created_at: minutesAgo(25),
+      metadata: { amount: '₹14,500', dueDate: '2026-02-28', student: 'Aarav Sharma', class: 'Class 10-A' },
+    },
+    {
+      id: 'notif-2',
+      title: 'Attendance Alert: Aarav Sharma Marked Absent',
+      message: 'Aarav Sharma was marked Absent for Period 1 (Mathematics) on Friday, Feb 13. Please verify and submit an excuse slip if sick.',
+      type: 'attendance',
+      priority: 'high',
+      target_role: 'parent',
+      target_email: 'suresh.sharma@parent.school.com',
+      student_name: 'Aarav Sharma',
+      link: '/attendance',
+      is_read: false,
+      read_at: null,
+      created_at: hoursAgo(2),
+      metadata: { student: 'Aarav Sharma', status: 'Absent', date: '2026-02-13', period: 'Period 1 (Maths)' },
+    },
+    {
+      id: 'notif-3',
+      title: 'PTM Slot Confirmed: Diya Sharma',
+      message: 'Parent-Teacher Meeting with Class 8-B Teacher Anjali Gupta has been scheduled for Saturday, Feb 21, 2026 at 10:30 AM in Room 204.',
+      type: 'communication',
+      priority: 'high',
+      target_role: 'parent',
+      target_email: 'suresh.sharma@parent.school.com',
+      student_name: 'Diya Sharma',
+      link: '/communication',
+      is_read: false,
+      read_at: null,
+      created_at: hoursAgo(5),
+      metadata: { teacher: 'Anjali Gupta', date: 'Feb 21, 2026', time: '10:30 AM', venue: 'Room 204' },
+    },
+    {
+      id: 'notif-4',
+      title: 'Unit Test 3 Mathematics Results',
+      message: 'Term 2 UT-3 Mathematics results have been published. Aarav Sharma scored 94/100 (Grade A1) with exemplary marks in Trigonometry.',
+      type: 'exam',
+      priority: 'normal',
+      target_role: 'parent',
+      target_email: 'suresh.sharma@parent.school.com',
+      student_name: 'Aarav Sharma',
+      link: '/exams',
+      is_read: true,
+      read_at: hoursAgo(10),
+      created_at: hoursAgo(18),
+      metadata: { exam: 'Unit Test 3', subject: 'Mathematics', score: '94/100', grade: 'A1' },
+    },
+    {
+      id: 'notif-5',
+      title: 'New Assignment: Physics Lab Report',
+      message: 'Mr. Rajesh Kumar posted a new laboratory homework assignment: "Electromagnetic Induction & Faraday Laws". Due on Feb 23, 2026.',
+      type: 'assignment',
+      priority: 'normal',
+      target_role: 'all',
+      target_email: null,
+      student_name: 'Aarav Sharma',
+      link: '/assignments',
+      is_read: false,
+      read_at: null,
+      created_at: daysAgo(1),
+      metadata: { subject: 'Physics', teacher: 'Rajesh Kumar', dueDate: '2026-02-23', maxMarks: 50 },
+    },
+    {
+      id: 'notif-6',
+      title: 'Annual Athletic Meet 2026 Circular',
+      message: 'Annual Inter-House Sports Championship is scheduled for Thursday, March 5, 2026. Parents are cordially invited to the opening ceremony.',
+      type: 'announcement',
+      priority: 'normal',
+      target_role: 'all',
+      target_email: null,
+      student_name: null,
+      link: '/gallery',
+      is_read: false,
+      read_at: null,
+      created_at: daysAgo(2),
+      metadata: { event: 'Sports Meet', date: '2026-03-05', venue: 'Main Stadium' },
+    },
+    {
+      id: 'notif-7',
+      title: 'Fee Payment Receipt #REC-2026-089',
+      message: 'Payment of ₹12,000 for Diya Sharma (Class 8-B) received successfully via UPI. Download your computerized tax invoice and receipt.',
+      type: 'fee',
+      priority: 'low',
+      target_role: 'parent',
+      target_email: 'suresh.sharma@parent.school.com',
+      student_name: 'Diya Sharma',
+      link: '/fees/payment',
+      is_read: true,
+      read_at: daysAgo(2),
+      created_at: daysAgo(3),
+      metadata: { receiptNo: 'REC-2026-089', amount: '₹12,000', method: 'UPI' },
+    },
+    {
+      id: 'notif-8',
+      title: 'Parent Inquiry: Suresh Sharma',
+      message: 'Parent Suresh Sharma submitted an academic inquiry regarding Olympiad preparation materials and weekend coaching classes.',
+      type: 'communication',
+      priority: 'high',
+      target_role: 'teacher',
+      target_email: 'teacher@school.com',
+      student_name: 'Aarav Sharma',
+      link: '/communication',
+      is_read: false,
+      read_at: null,
+      created_at: hoursAgo(3),
+      metadata: { parent: 'Suresh Sharma', child: 'Aarav Sharma', threadId: 'thread-1' },
+    },
+    {
+      id: 'notif-9',
+      title: 'Student Assignment Submission: Diya Sharma',
+      message: 'Diya Sharma (Class 8-B) has submitted the Chemistry assignment: "Acids, Bases & Salts Lab Observations". Pending grading.',
+      type: 'assignment',
+      priority: 'normal',
+      target_role: 'teacher',
+      target_email: null,
+      student_name: 'Diya Sharma',
+      link: '/assignments',
+      is_read: false,
+      read_at: null,
+      created_at: hoursAgo(7),
+      metadata: { student: 'Diya Sharma', subject: 'Chemistry', submittedAt: 'Yesterday' },
+    },
+    {
+      id: 'notif-10',
+      title: 'Automated Database Backup Completed',
+      message: 'Automated institutional snapshot backup #20260216-01 completed with 0 errors across 1,420 students, 48 faculty and fee tables.',
+      type: 'system',
+      priority: 'low',
+      target_role: 'admin',
+      target_email: null,
+      student_name: null,
+      link: '/settings',
+      is_read: false,
+      read_at: null,
+      created_at: hoursAgo(4),
+      metadata: { status: 'Success', records: 1468, duration: '1.4s' },
+    },
+    {
+      id: 'notif-11',
+      title: 'Fee Collection Summary: ₹1,85,000 Reconciled',
+      message: 'Daily fee collection report: 14 transactions processed today totaling ₹1,85,000 across Net Banking, UPI, and Cash counter.',
+      type: 'fee',
+      priority: 'normal',
+      target_role: 'admin',
+      target_email: null,
+      student_name: null,
+      link: '/fees',
+      is_read: false,
+      read_at: null,
+      created_at: hoursAgo(6),
+      metadata: { totalAmount: '₹1,85,000', transactions: 14, date: 'Today' },
+    },
+    {
+      id: 'notif-12',
+      title: 'Campus Holiday: Maha Shivratri',
+      message: 'School campus, academic classes, administrative offices, and bus transport will remain closed on Friday, March 8, 2026.',
+      type: 'announcement',
+      priority: 'normal',
+      target_role: 'all',
+      target_email: null,
+      student_name: null,
+      link: '/notifications',
+      is_read: true,
+      read_at: daysAgo(3),
+      created_at: daysAgo(4),
+      metadata: { holidayDate: '2026-03-08', occasion: 'Maha Shivratri' },
+    },
+  ];
+};
+
+const getStoredNotifications = () => {
+  try {
+    const raw = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to parse stored notifications', e);
+  }
+  const defaults = buildDefaultNotifications();
+  try {
+    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(defaults));
+  } catch (_) {}
+  return defaults;
+};
+
+const saveStoredNotifications = (notifications) => {
+  try {
+    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(notifications));
+  } catch (e) {
+    console.error('Failed to save notifications', e);
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('sms:notifications-updated', { detail: { count: notifications.length } }));
+  } catch (_) {}
+};
+
+export const notificationAPI = {
+  getAll: async (params = {}) => {
+    let items = getStoredNotifications();
+    const { role, userEmail, category, isRead, priority, search, page = 1, per_page = 20 } = params;
+
+    // Filter by role & target
+    if (role && role !== 'admin' && role !== 'super-admin') {
+      const userEmailLower = (userEmail || '').toLowerCase();
+      items = items.filter(n => {
+        // Universal notifications
+        if (!n.target_role || n.target_role === 'all') return true;
+        // Direct role match
+        if (n.target_role === role) {
+          // If a specific target email is set, match it
+          if (n.target_email && userEmailLower) {
+            return n.target_email.toLowerCase() === userEmailLower;
+          }
+          return true;
+        }
+        return false;
+      });
     }
 
-    const { data, count, error } = await query;
-    if (error) throw error;
-    return paginate(data, count, params);
+    // Filter by category
+    if (category && category !== 'all') {
+      items = items.filter(n => (n.type || '').toLowerCase() === category.toLowerCase());
+    }
+
+    // Filter by read status
+    if (isRead === 'unread' || isRead === false) {
+      items = items.filter(n => !n.is_read);
+    } else if (isRead === 'read' || isRead === true) {
+      items = items.filter(n => !!n.is_read);
+    }
+
+    // Filter by priority
+    if (priority && priority !== 'all') {
+      items = items.filter(n => (n.priority || '').toLowerCase() === priority.toLowerCase());
+    }
+
+    // Filter by search keyword
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      items = items.filter(n =>
+        (n.title || '').toLowerCase().includes(q) ||
+        (n.message || '').toLowerCase().includes(q) ||
+        (n.student_name || '').toLowerCase().includes(q) ||
+        (n.type || '').toLowerCase().includes(q)
+      );
+    }
+
+    // Sort by created_at descending (newest first)
+    items.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+    const total = items.length;
+    const pageNum = parseInt(page, 10) || 1;
+    const perPageNum = per_page === 'all' ? total : parseInt(per_page, 10) || 20;
+    const start = (pageNum - 1) * perPageNum;
+    const paginated = items.slice(start, start + perPageNum);
+
+    return {
+      success: true,
+      data: paginated,
+      total,
+      page: pageNum,
+      per_page: perPageNum,
+      last_page: Math.ceil(total / (perPageNum || 1)) || 1,
+    };
   },
+
+  getUnreadCount: async (params = {}) => {
+    let items = getStoredNotifications();
+    const { role, userEmail } = params;
+
+    if (role && role !== 'admin' && role !== 'super-admin') {
+      const userEmailLower = (userEmail || '').toLowerCase();
+      items = items.filter(n => {
+        if (!n.target_role || n.target_role === 'all') return true;
+        if (n.target_role === role) {
+          if (n.target_email && userEmailLower) {
+            return n.target_email.toLowerCase() === userEmailLower;
+          }
+          return true;
+        }
+        return false;
+      });
+    }
+
+    const unreadCount = items.filter(n => !n.is_read).length;
+    return { success: true, count: unreadCount };
+  },
+
   markAsRead: async (id) => {
-    if (!useSupabase) return api.post(`/notifications/${id}/read`);
-    const { error } = await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
-    if (error) throw error;
+    const items = getStoredNotifications();
+    let updated = false;
+    const next = items.map(n => {
+      if (String(n.id) === String(id)) {
+        updated = true;
+        return { ...n, is_read: true, read_at: new Date().toISOString() };
+      }
+      return n;
+    });
+    if (updated) {
+      saveStoredNotifications(next);
+    }
+    // Also try Supabase if configured
+    if (useSupabase) {
+      try {
+        await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
+      } catch (_) {}
+    }
+    return { success: true, id };
+  },
+
+  markAsUnread: async (id) => {
+    const items = getStoredNotifications();
+    const next = items.map(n => {
+      if (String(n.id) === String(id)) {
+        return { ...n, is_read: false, read_at: null };
+      }
+      return n;
+    });
+    saveStoredNotifications(next);
+    return { success: true, id };
+  },
+
+  markAllAsRead: async (params = {}) => {
+    const items = getStoredNotifications();
+    const { role, userEmail } = params;
+    const nowIso = new Date().toISOString();
+    const userEmailLower = (userEmail || '').toLowerCase();
+
+    const next = items.map(n => {
+      // Check if item belongs to this role/user
+      let belongs = true;
+      if (role && role !== 'admin' && role !== 'super-admin') {
+        if (n.target_role && n.target_role !== 'all' && n.target_role !== role) {
+          belongs = false;
+        }
+        if (n.target_email && userEmailLower && n.target_email.toLowerCase() !== userEmailLower) {
+          belongs = false;
+        }
+      }
+      if (belongs && !n.is_read) {
+        return { ...n, is_read: true, read_at: nowIso };
+      }
+      return n;
+    });
+
+    saveStoredNotifications(next);
     return { success: true };
+  },
+
+  create: async (data) => {
+    const items = getStoredNotifications();
+    const newItem = {
+      id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      title: data.title || 'Institutional Announcement',
+      message: data.message || '',
+      type: data.type || 'announcement',
+      priority: data.priority || 'normal',
+      target_role: data.target_role || 'all',
+      target_email: data.target_email || null,
+      student_name: data.student_name || null,
+      link: data.link || '/notifications',
+      is_read: false,
+      read_at: null,
+      created_at: new Date().toISOString(),
+      metadata: data.metadata || {},
+    };
+
+    items.unshift(newItem);
+    saveStoredNotifications(items);
+
+    // Also persist to Supabase if configured
+    if (useSupabase) {
+      try {
+        await supabase.from('notifications').insert([{
+          type: newItem.type,
+          title: newItem.title,
+          message: newItem.message,
+          data: {
+            ...newItem.metadata,
+            priority: newItem.priority,
+            target_role: newItem.target_role,
+            link: newItem.link,
+          },
+          is_read: false,
+          created_at: newItem.created_at,
+        }]);
+      } catch (_) {}
+    }
+
+    return { success: true, data: newItem };
+  },
+
+  delete: async (id) => {
+    const items = getStoredNotifications();
+    const next = items.filter(n => String(n.id) !== String(id));
+    saveStoredNotifications(next);
+    return { success: true, id };
+  },
+
+  clearAll: async (params = {}) => {
+    const items = getStoredNotifications();
+    const { role, userEmail } = params;
+    const userEmailLower = (userEmail || '').toLowerCase();
+
+    // If role is admin, clear all; else clear only role's matching items
+    if (!role || role === 'admin' || role === 'super-admin') {
+      saveStoredNotifications([]);
+    } else {
+      const remaining = items.filter(n => {
+        if (n.target_role === role) {
+          if (!n.target_email) return false;
+          if (userEmailLower && n.target_email.toLowerCase() === userEmailLower) return false;
+        }
+        return true;
+      });
+      saveStoredNotifications(remaining);
+    }
+    return { success: true };
+  },
+
+  resetDefaults: async () => {
+    const defaults = buildDefaultNotifications();
+    saveStoredNotifications(defaults);
+    return { success: true, data: defaults };
   },
 };
 

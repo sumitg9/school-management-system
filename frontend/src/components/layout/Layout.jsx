@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { SYSTEM_ROLES } from '../../utils/permissionRules';
+import NotificationDropdown from './NotificationDropdown';
 
 const Layout = ({ children }) => {
   const navigate = useNavigate();
@@ -76,6 +77,7 @@ const Layout = ({ children }) => {
       items: [
         { path: '/communication', icon: '💬', label: isParent() ? 'Contact Teachers' : (isTeacher() ? 'Parent Messages' : 'Communications'), permission: 'view-communication' },
         { path: '/gallery', icon: '🖼️', label: 'School Gallery', permission: 'view-gallery' },
+        { path: '/notifications', icon: '🔔', label: 'Notifications Center' },
       ],
     },
     {
@@ -387,12 +389,9 @@ const Layout = ({ children }) => {
                 </div>
               )}
 
-              <button className="relative text-gray-600 hover:text-gray-800">
-                <span className="text-2xl">🔔</span>
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  3
-                </span>
-              </button>
+              {/* Notifications Dropdown */}
+              <NotificationDropdown />
+
               <div className="flex items-center cursor-pointer group relative">
                 <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold mr-3">
                   {user?.name?.charAt(0).toUpperCase() || 'U'}
@@ -408,6 +407,9 @@ const Layout = ({ children }) => {
                 <div className="absolute right-0 top-full w-48 bg-white rounded-lg shadow-lg py-2 hidden group-hover:block z-50">
                   <Link to="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                     👤 Profile
+                  </Link>
+                  <Link to="/notifications" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    🔔 Notifications
                   </Link>
                   {hasPermission('manage-settings') && (
                     <Link to="/settings" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
