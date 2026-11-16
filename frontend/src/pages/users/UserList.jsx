@@ -264,7 +264,7 @@ const UserList = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="px-[15px] py-6 space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div>

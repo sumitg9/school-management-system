@@ -358,7 +358,7 @@ const Gallery = () => {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="px-[15px] py-6 space-y-6 pb-12">
       {/* Page Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
