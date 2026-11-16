@@ -1754,7 +1754,7 @@ const FeePaymentCollect = () => {
                 {/* Receipt Header */}
                 <div className="border-b-2 border-gray-900 pb-4 mb-4 text-center space-y-1">
                   <div className="flex items-center justify-center gap-3 mb-1">
-                    {settings?.school_logo ? (
+                    {typeof settings?.school_logo === 'string' && settings.school_logo && settings.school_logo !== 'null' ? (
                       settings.school_logo.startsWith('preset:') ? (
                         <span className="text-3xl">{settings.school_logo.replace('preset:', '')}</span>
                       ) : (

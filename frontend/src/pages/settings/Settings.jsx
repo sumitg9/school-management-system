@@ -21,18 +21,19 @@ import {
 } from '../../utils/feeTypes';
 import { toast } from 'react-toastify';
 import UserPermissionsTable from './UserPermissionsTable';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
 
 const SAMPLE_DATE = new Date('2026-10-31T12:15:00');
 
 export const LOGO_PRESETS = [
-  { id: 'grad_cap', name: 'Graduation Cap', icon: '🎓' },
-  { id: 'classical', name: 'Academy Columns', icon: '🏛️' },
-  { id: 'open_book', name: 'Book of Wisdom', icon: '📖' },
-  { id: 'shield', name: 'Honor Shield', icon: '🛡️' },
-  { id: 'tree', name: 'Knowledge Tree', icon: '🌳' },
-  { id: 'torch', name: 'Enlightenment Torch', icon: '🔥' },
-  { id: 'globe', name: 'Global School', icon: '🌐' },
-  { id: 'star', name: 'Excellence Star', icon: '⭐' },
+  { id: 'grad_cap', name: 'Academy Cap', symbol: '🎓', value: 'preset:🎓' },
+  { id: 'classical', name: 'Classical Crest', symbol: '🏛️', value: 'preset:🏛️' },
+  { id: 'open_book', name: 'Book of Wisdom', symbol: '📚', value: 'preset:📚' },
+  { id: 'school', name: 'School Building', symbol: '🏫', value: 'preset:🏫' },
+  { id: 'star', name: 'Excellence Star', symbol: '🌟', value: 'preset:🌟' },
+  { id: 'owl', name: 'Wisdom Owl', symbol: '🦉', value: 'preset:🦉' },
+  { id: 'shield', name: 'Honor Shield', symbol: '🛡️', value: 'preset:🛡️' },
+  { id: 'torch', name: 'Knowledge Torch', symbol: '🔥', value: 'preset:🔥' },
 ];
 
 const Settings = () => {
@@ -158,14 +159,14 @@ const Settings = () => {
       setFeeLateFineMaxCap(settings.fee_late_fine_max_cap !== undefined ? settings.fee_late_fine_max_cap : 1000);
 
       // School Profile & Branding
-      setSchoolName(settings.school_name !== undefined ? settings.school_name : 'Delhi Public Academy');
-      setSchoolTagline(settings.school_tagline !== undefined ? settings.school_tagline : 'Empowering Minds, Shaping Futures');
-      setSchoolLogo(settings.school_logo !== undefined ? settings.school_logo : '');
-      setSchoolEmail(settings.school_email !== undefined ? settings.school_email : 'accounts@school.edu');
-      setSchoolPhone(settings.school_phone !== undefined ? settings.school_phone : '+91 98765 43210');
-      setSchoolAddress(settings.school_address !== undefined ? settings.school_address : 'Knowledge Park, Institutional Area, New Delhi');
-      setSchoolAffiliation(settings.school_affiliation !== undefined ? settings.school_affiliation : 'Affiliated to CBSE / State Board • Reg. No: SMS-EDU-2024-9988');
-      setSchoolWebsite(settings.school_website !== undefined ? settings.school_website : 'www.school.edu');
+      setSchoolName(settings.school_name && settings.school_name !== 'null' ? String(settings.school_name) : 'Delhi Public Academy');
+      setSchoolTagline(settings.school_tagline && settings.school_tagline !== 'null' ? String(settings.school_tagline) : 'Empowering Minds, Shaping Futures');
+      setSchoolLogo(settings.school_logo && settings.school_logo !== 'null' ? String(settings.school_logo) : '');
+      setSchoolEmail(settings.school_email && settings.school_email !== 'null' ? String(settings.school_email) : 'accounts@school.edu');
+      setSchoolPhone(settings.school_phone && settings.school_phone !== 'null' ? String(settings.school_phone) : '+91 98765 43210');
+      setSchoolAddress(settings.school_address && settings.school_address !== 'null' ? String(settings.school_address) : 'Knowledge Park, Institutional Area, New Delhi');
+      setSchoolAffiliation(settings.school_affiliation && settings.school_affiliation !== 'null' ? String(settings.school_affiliation) : 'Affiliated to CBSE / State Board • Reg. No: SMS-EDU-2024-9988');
+      setSchoolWebsite(settings.school_website && settings.school_website !== 'null' ? String(settings.school_website) : 'www.school.edu');
     }
   }, [settings]);
 
@@ -294,14 +295,14 @@ const Settings = () => {
       : selectedPreset;
 
     const payload = {
-      school_name: schoolName.trim() || 'Delhi Public Academy',
-      school_tagline: schoolTagline.trim(),
-      school_logo: schoolLogo,
-      school_email: schoolEmail.trim(),
-      school_phone: schoolPhone.trim(),
-      school_address: schoolAddress.trim(),
-      school_affiliation: schoolAffiliation.trim(),
-      school_website: schoolWebsite.trim(),
+      school_name: (schoolName || 'Delhi Public Academy').trim(),
+      school_tagline: (schoolTagline || '').trim(),
+      school_logo: schoolLogo || '',
+      school_email: (schoolEmail || '').trim(),
+      school_phone: (schoolPhone || '').trim(),
+      school_address: (schoolAddress || '').trim(),
+      school_affiliation: (schoolAffiliation || '').trim(),
+      school_website: (schoolWebsite || '').trim(),
       date_time_format: finalDateTimeFormat,
       date_format: dateFormat,
       time_format: timeFormat,
@@ -621,7 +622,7 @@ const Settings = () => {
                           </label>
                           <input
                             type="url"
-                            value={schoolLogo.startsWith('data:') || schoolLogo.startsWith('preset:') ? '' : schoolLogo}
+                            value={typeof schoolLogo === 'string' && (schoolLogo.startsWith('data:') || schoolLogo.startsWith('preset:')) ? '' : (schoolLogo || '')}
                             onChange={(e) => setSchoolLogo(e.target.value)}
                             placeholder="https://example.com/logo.png"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 bg-white"
@@ -720,7 +721,7 @@ const Settings = () => {
 
                     <div className="flex items-center gap-3 p-3 bg-slate-800/80 rounded-lg border border-slate-700">
                       <div className="h-10 w-10 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-xl flex-shrink-0 shadow overflow-hidden">
-                        {schoolLogo ? (
+                        {typeof schoolLogo === 'string' && schoolLogo ? (
                           schoolLogo.startsWith('preset:') ? (
                             <span>{schoolLogo.replace('preset:', '')}</span>
                           ) : (
@@ -762,7 +763,7 @@ const Settings = () => {
 
                     <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 text-center space-y-1.5">
                       <div className="mx-auto h-12 w-12 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-2xl mb-1 shadow-sm overflow-hidden">
-                        {schoolLogo ? (
+                        {typeof schoolLogo === 'string' && schoolLogo ? (
                           schoolLogo.startsWith('preset:') ? (
                             <span>{schoolLogo.replace('preset:', '')}</span>
                           ) : (
@@ -812,7 +813,7 @@ const Settings = () => {
                     </span>
                     <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-t-lg border-t border-x border-gray-300 max-w-xs shadow-sm">
                       <span className="text-xs">
-                        {schoolLogo && schoolLogo.startsWith('preset:') ? schoolLogo.replace('preset:', '') : '🏫'}
+                        {typeof schoolLogo === 'string' && schoolLogo.startsWith('preset:') ? schoolLogo.replace('preset:', '') : '🏫'}
                       </span>
                       <span className="text-xs font-medium text-gray-700 truncate">
                         {schoolName || 'SMS'} - School Management System
@@ -1734,4 +1735,10 @@ const Settings = () => {
   );
 };
 
-export default Settings;
+const SettingsWithErrorBoundary = (props) => (
+  <ErrorBoundary>
+    <Settings {...props} />
+  </ErrorBoundary>
+);
+
+export default SettingsWithErrorBoundary;

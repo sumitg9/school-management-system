@@ -11,9 +11,9 @@ const Login = () => {
   const { showValidationError } = useAlert();
   const { settings } = useSettings();
 
-  const schoolName = settings?.school_name || 'School Management System';
-  const schoolTagline = settings?.school_tagline || 'Sign in to your account';
-  const schoolLogo = settings?.school_logo || '';
+  const schoolName = settings?.school_name && settings.school_name !== 'null' ? settings.school_name : 'School Management System';
+  const schoolTagline = settings?.school_tagline && settings.school_tagline !== 'null' ? settings.school_tagline : 'Sign in to your account';
+  const schoolLogo = settings?.school_logo && settings.school_logo !== 'null' ? settings.school_logo : '';
   const [formData, setFormData] = useState({
     email: 'admin@school.com',
     password: 'password',
@@ -80,7 +80,7 @@ const Login = () => {
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-2xl shadow-lg mb-4 overflow-hidden p-2">
-            {schoolLogo ? (
+            {typeof schoolLogo === 'string' && schoolLogo ? (
               schoolLogo.startsWith('preset:') ? (
                 <span className="text-4xl">{schoolLogo.replace('preset:', '')}</span>
               ) : (

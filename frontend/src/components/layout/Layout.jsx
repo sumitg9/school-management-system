@@ -11,9 +11,9 @@ const Layout = ({ children }) => {
   const { settings } = useSettings();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const schoolName = settings?.school_name || 'SMS';
-  const schoolTagline = settings?.school_tagline || 'School Management';
-  const schoolLogo = settings?.school_logo || '';
+  const schoolName = settings?.school_name && settings.school_name !== 'null' ? settings.school_name : 'SMS';
+  const schoolTagline = settings?.school_tagline && settings.school_tagline !== 'null' ? settings.school_tagline : 'School Management';
+  const schoolLogo = settings?.school_logo && settings.school_logo !== 'null' ? settings.school_logo : '';
 
   const handleLogout = async () => {
     await logout();
@@ -64,7 +64,7 @@ const Layout = ({ children }) => {
         <div className="p-6">
           <div className="flex items-center mb-8">
             <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
-              {schoolLogo ? (
+              {typeof schoolLogo === 'string' && schoolLogo ? (
                 schoolLogo.startsWith('preset:') ? (
                   <span className="text-2xl">{schoolLogo.replace('preset:', '')}</span>
                 ) : (

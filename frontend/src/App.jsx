@@ -51,6 +51,7 @@ import Settings from './pages/settings/Settings';
 import Profile from './pages/profile/Profile';
 import UserList from './pages/users/UserList';
 import PermissionRoute from './components/common/PermissionRoute';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -80,56 +81,58 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Layout>
-                <Routes>
-                  <Route path="/" element={<EnhancedDashboard />} />
-                  <Route path="/dashboard/old" element={<DashboardContent />} />
-                  <Route path="/reports" element={<PermissionRoute permission="view-reports"><AdvancedReports /></PermissionRoute>} />
-                  <Route path="/tools/bulk" element={<PermissionRoute permission="manage-tools"><BulkOperations /></PermissionRoute>} />
-                  <Route path="/students" element={<PermissionRoute permission="view-students"><StudentList /></PermissionRoute>} />
-                  <Route path="/students/create" element={<PermissionRoute permission="create-students"><StudentForm /></PermissionRoute>} />
-                  <Route path="/students/:id" element={<PermissionRoute permission="view-students"><StudentDetail /></PermissionRoute>} />
-                  <Route path="/students/:id/edit" element={<PermissionRoute permission="edit-students"><StudentForm /></PermissionRoute>} />
-                  <Route path="/teachers" element={<PermissionRoute permission="view-teachers"><TeacherList /></PermissionRoute>} />
-                  <Route path="/teachers/create" element={<PermissionRoute permission="create-teachers"><TeacherForm /></PermissionRoute>} />
-                  <Route path="/teachers/:id" element={<PermissionRoute permission="view-teachers"><TeacherDetail /></PermissionRoute>} />
-                  <Route path="/teachers/:id/edit" element={<PermissionRoute permission="edit-teachers"><TeacherForm /></PermissionRoute>} />
-                  <Route path="/classes" element={<PermissionRoute permission="view-classes"><ClassList /></PermissionRoute>} />
-                  <Route path="/classes/create" element={<PermissionRoute permission="create-classes"><ClassForm /></PermissionRoute>} />
-                  <Route path="/classes/:id" element={<PermissionRoute permission="view-classes"><ClassDetail /></PermissionRoute>} />
-                  <Route path="/classes/:id/edit" element={<PermissionRoute permission="edit-classes"><ClassForm /></PermissionRoute>} />
-                  <Route path="/sections" element={<PermissionRoute permission="view-classes"><SectionList /></PermissionRoute>} />
-                  <Route path="/sections/create" element={<PermissionRoute permission="create-classes"><SectionForm /></PermissionRoute>} />
-                  <Route path="/sections/:id/edit" element={<PermissionRoute permission="edit-classes"><SectionForm /></PermissionRoute>} />
-                  <Route path="/subjects" element={<PermissionRoute permission="view-classes"><SubjectList /></PermissionRoute>} />
-                  <Route path="/subjects/create" element={<PermissionRoute permission="create-classes"><SubjectForm /></PermissionRoute>} />
-                  <Route path="/subjects/:id" element={<PermissionRoute permission="view-classes"><SubjectDetail /></PermissionRoute>} />
-                  <Route path="/subjects/:id/edit" element={<PermissionRoute permission="edit-classes"><SubjectForm /></PermissionRoute>} />
-                  <Route path="/attendance" element={<PermissionRoute permission="view-attendance"><AttendanceList /></PermissionRoute>} />
-                  <Route path="/attendance/mark" element={<PermissionRoute permission="mark-attendance"><MarkAttendance /></PermissionRoute>} />
-                  <Route path="/attendance/report" element={<PermissionRoute permission="view-reports"><AttendanceReport /></PermissionRoute>} />
-                  <Route path="/attendance/:id/edit" element={<PermissionRoute permission="edit-attendance"><AttendanceEdit /></PermissionRoute>} />
-                  <Route path="/exams" element={<PermissionRoute permission="view-exams"><ExamList /></PermissionRoute>} />
-                  <Route path="/exams/create" element={<PermissionRoute permission="create-exams"><ExamForm /></PermissionRoute>} />
-                  <Route path="/exams/:id" element={<PermissionRoute permission="view-exams"><ExamDetail /></PermissionRoute>} />
-                  <Route path="/exams/:id/edit" element={<PermissionRoute permission="create-exams"><ExamForm /></PermissionRoute>} />
-                  <Route path="/exams/:id/grades" element={<PermissionRoute permission="enter-grades"><ExamGrades /></PermissionRoute>} />
-                  <Route path="/fees" element={<PermissionRoute permission="view-fees"><FeeList /></PermissionRoute>} />
-                  <Route path="/fees/payment" element={<PermissionRoute permission="collect-fees"><FeePaymentCollect /></PermissionRoute>} />
-                  <Route path="/fees/collect" element={<PermissionRoute permission="collect-fees"><FeePaymentCollect /></PermissionRoute>} />
-                  <Route path="/fees/create" element={<PermissionRoute permission="create-fees"><FeeForm /></PermissionRoute>} />
-                  <Route path="/fees/:id" element={<PermissionRoute permission="view-fees"><FeeDetail /></PermissionRoute>} />
-                  <Route path="/fees/:id/edit" element={<PermissionRoute permission="create-fees"><FeeForm /></PermissionRoute>} />
-                  <Route path="/fees/:id/payments" element={<PermissionRoute permission="view-fees"><FeePayments /></PermissionRoute>} />
-                  <Route path="/fees/payments" element={<PermissionRoute permission="view-fees"><FeePayments /></PermissionRoute>} />
-                  <Route path="/assignments" element={<PermissionRoute permission="view-assignments"><AssignmentList /></PermissionRoute>} />
-                  <Route path="/assignments/create" element={<PermissionRoute permission="create-assignments"><AssignmentForm /></PermissionRoute>} />
-                  <Route path="/assignments/:id" element={<PermissionRoute permission="view-assignments"><AssignmentDetail /></PermissionRoute>} />
-                  <Route path="/assignments/:id/edit" element={<PermissionRoute permission="create-assignments"><AssignmentForm /></PermissionRoute>} />
-                  <Route path="/users" element={<PermissionRoute permission="manage-users"><UserList /></PermissionRoute>} />
-                  <Route path="/settings" element={<PermissionRoute permission="manage-settings"><Settings /></PermissionRoute>} />
-                  <Route path="/profile" element={<Profile />} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
+                <ErrorBoundary>
+                  <Routes>
+                    <Route path="/" element={<EnhancedDashboard />} />
+                    <Route path="/dashboard/old" element={<DashboardContent />} />
+                    <Route path="/reports" element={<PermissionRoute permission="view-reports"><AdvancedReports /></PermissionRoute>} />
+                    <Route path="/tools/bulk" element={<PermissionRoute permission="manage-tools"><BulkOperations /></PermissionRoute>} />
+                    <Route path="/students" element={<PermissionRoute permission="view-students"><StudentList /></PermissionRoute>} />
+                    <Route path="/students/create" element={<PermissionRoute permission="create-students"><StudentForm /></PermissionRoute>} />
+                    <Route path="/students/:id" element={<PermissionRoute permission="view-students"><StudentDetail /></PermissionRoute>} />
+                    <Route path="/students/:id/edit" element={<PermissionRoute permission="edit-students"><StudentForm /></PermissionRoute>} />
+                    <Route path="/teachers" element={<PermissionRoute permission="view-teachers"><TeacherList /></PermissionRoute>} />
+                    <Route path="/teachers/create" element={<PermissionRoute permission="create-teachers"><TeacherForm /></PermissionRoute>} />
+                    <Route path="/teachers/:id" element={<PermissionRoute permission="view-teachers"><TeacherDetail /></PermissionRoute>} />
+                    <Route path="/teachers/:id/edit" element={<PermissionRoute permission="edit-teachers"><TeacherForm /></PermissionRoute>} />
+                    <Route path="/classes" element={<PermissionRoute permission="view-classes"><ClassList /></PermissionRoute>} />
+                    <Route path="/classes/create" element={<PermissionRoute permission="create-classes"><ClassForm /></PermissionRoute>} />
+                    <Route path="/classes/:id" element={<PermissionRoute permission="view-classes"><ClassDetail /></PermissionRoute>} />
+                    <Route path="/classes/:id/edit" element={<PermissionRoute permission="edit-classes"><ClassForm /></PermissionRoute>} />
+                    <Route path="/sections" element={<PermissionRoute permission="view-classes"><SectionList /></PermissionRoute>} />
+                    <Route path="/sections/create" element={<PermissionRoute permission="create-classes"><SectionForm /></PermissionRoute>} />
+                    <Route path="/sections/:id/edit" element={<PermissionRoute permission="edit-classes"><SectionForm /></PermissionRoute>} />
+                    <Route path="/subjects" element={<PermissionRoute permission="view-classes"><SubjectList /></PermissionRoute>} />
+                    <Route path="/subjects/create" element={<PermissionRoute permission="create-classes"><SubjectForm /></PermissionRoute>} />
+                    <Route path="/subjects/:id" element={<PermissionRoute permission="view-classes"><SubjectDetail /></PermissionRoute>} />
+                    <Route path="/subjects/:id/edit" element={<PermissionRoute permission="edit-classes"><SubjectForm /></PermissionRoute>} />
+                    <Route path="/attendance" element={<PermissionRoute permission="view-attendance"><AttendanceList /></PermissionRoute>} />
+                    <Route path="/attendance/mark" element={<PermissionRoute permission="mark-attendance"><MarkAttendance /></PermissionRoute>} />
+                    <Route path="/attendance/report" element={<PermissionRoute permission="view-reports"><AttendanceReport /></PermissionRoute>} />
+                    <Route path="/attendance/:id/edit" element={<PermissionRoute permission="edit-attendance"><AttendanceEdit /></PermissionRoute>} />
+                    <Route path="/exams" element={<PermissionRoute permission="view-exams"><ExamList /></PermissionRoute>} />
+                    <Route path="/exams/create" element={<PermissionRoute permission="create-exams"><ExamForm /></PermissionRoute>} />
+                    <Route path="/exams/:id" element={<PermissionRoute permission="view-exams"><ExamDetail /></PermissionRoute>} />
+                    <Route path="/exams/:id/edit" element={<PermissionRoute permission="create-exams"><ExamForm /></PermissionRoute>} />
+                    <Route path="/exams/:id/grades" element={<PermissionRoute permission="enter-grades"><ExamGrades /></PermissionRoute>} />
+                    <Route path="/fees" element={<PermissionRoute permission="view-fees"><FeeList /></PermissionRoute>} />
+                    <Route path="/fees/payment" element={<PermissionRoute permission="collect-fees"><FeePaymentCollect /></PermissionRoute>} />
+                    <Route path="/fees/collect" element={<PermissionRoute permission="collect-fees"><FeePaymentCollect /></PermissionRoute>} />
+                    <Route path="/fees/create" element={<PermissionRoute permission="create-fees"><FeeForm /></PermissionRoute>} />
+                    <Route path="/fees/:id" element={<PermissionRoute permission="view-fees"><FeeDetail /></PermissionRoute>} />
+                    <Route path="/fees/:id/edit" element={<PermissionRoute permission="create-fees"><FeeForm /></PermissionRoute>} />
+                    <Route path="/fees/:id/payments" element={<PermissionRoute permission="view-fees"><FeePayments /></PermissionRoute>} />
+                    <Route path="/fees/payments" element={<PermissionRoute permission="view-fees"><FeePayments /></PermissionRoute>} />
+                    <Route path="/assignments" element={<PermissionRoute permission="view-assignments"><AssignmentList /></PermissionRoute>} />
+                    <Route path="/assignments/create" element={<PermissionRoute permission="create-assignments"><AssignmentForm /></PermissionRoute>} />
+                    <Route path="/assignments/:id" element={<PermissionRoute permission="view-assignments"><AssignmentDetail /></PermissionRoute>} />
+                    <Route path="/assignments/:id/edit" element={<PermissionRoute permission="create-assignments"><AssignmentForm /></PermissionRoute>} />
+                    <Route path="/users" element={<PermissionRoute permission="manage-users"><UserList /></PermissionRoute>} />
+                    <Route path="/settings" element={<PermissionRoute permission="manage-settings"><Settings /></PermissionRoute>} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </ErrorBoundary>
               </Layout>
             </ProtectedRoute>
           }

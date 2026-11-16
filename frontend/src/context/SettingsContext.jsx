@@ -112,14 +112,14 @@ const normalizeSettings = (raw) => {
   merged.fee_late_fine_max_cap = Math.max(0, parseFloat(merged.fee_late_fine_max_cap ?? 1000) || 0);
 
   // School Identity normalization
-  merged.school_name = raw?.school_name !== undefined ? String(raw.school_name).trim() : DEFAULT_SETTINGS.school_name;
-  merged.school_logo = raw?.school_logo !== undefined ? String(raw.school_logo) : DEFAULT_SETTINGS.school_logo;
-  merged.school_tagline = raw?.school_tagline !== undefined ? String(raw.school_tagline).trim() : DEFAULT_SETTINGS.school_tagline;
-  merged.school_email = raw?.school_email !== undefined ? String(raw.school_email).trim() : DEFAULT_SETTINGS.school_email;
-  merged.school_phone = raw?.school_phone !== undefined ? String(raw.school_phone).trim() : DEFAULT_SETTINGS.school_phone;
-  merged.school_address = raw?.school_address !== undefined ? String(raw.school_address).trim() : DEFAULT_SETTINGS.school_address;
-  merged.school_affiliation = raw?.school_affiliation !== undefined ? String(raw.school_affiliation).trim() : DEFAULT_SETTINGS.school_affiliation;
-  merged.school_website = raw?.school_website !== undefined ? String(raw.school_website).trim() : DEFAULT_SETTINGS.school_website;
+  merged.school_name = raw?.school_name && raw.school_name !== 'null' ? String(raw.school_name).trim() : DEFAULT_SETTINGS.school_name;
+  merged.school_logo = raw?.school_logo && raw.school_logo !== 'null' ? String(raw.school_logo) : DEFAULT_SETTINGS.school_logo;
+  merged.school_tagline = raw?.school_tagline && raw.school_tagline !== 'null' ? String(raw.school_tagline).trim() : DEFAULT_SETTINGS.school_tagline;
+  merged.school_email = raw?.school_email && raw.school_email !== 'null' ? String(raw.school_email).trim() : DEFAULT_SETTINGS.school_email;
+  merged.school_phone = raw?.school_phone && raw.school_phone !== 'null' ? String(raw.school_phone).trim() : DEFAULT_SETTINGS.school_phone;
+  merged.school_address = raw?.school_address && raw.school_address !== 'null' ? String(raw.school_address).trim() : DEFAULT_SETTINGS.school_address;
+  merged.school_affiliation = raw?.school_affiliation && raw.school_affiliation !== 'null' ? String(raw.school_affiliation).trim() : DEFAULT_SETTINGS.school_affiliation;
+  merged.school_website = raw?.school_website && raw.school_website !== 'null' ? String(raw.school_website).trim() : DEFAULT_SETTINGS.school_website;
 
   return merged;
 };
