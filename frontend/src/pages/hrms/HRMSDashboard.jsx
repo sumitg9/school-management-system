@@ -281,6 +281,22 @@ export default function HRMSDashboard() {
       await hrmsAPI.createStaff(staffForm);
       showToast(`Staff member ${staffForm.name} onboarded successfully.`);
       setShowAddStaffModal(false);
+      setStaffForm({
+        name: '',
+        email: '',
+        phone: '',
+        department: 'Science & STEM',
+        designation: '',
+        role: 'teacher',
+        qualification: '',
+        joiningDate: new Date().toISOString().split('T')[0],
+        employmentType: 'Full-Time',
+        basicSalary: 50000,
+        shift: 'General (08:00 AM - 03:30 PM)',
+        bankName: 'HDFC Bank',
+        accountNumber: '',
+        ifsc: 'HDFC0001420',
+      });
       loadStaff();
     } catch (err) {
       console.error(err);
@@ -1175,6 +1191,57 @@ export default function HRMSDashboard() {
                     <option value="Probation">Probationary (1 Year)</option>
                     <option value="Contract">Fixed Term Contract</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Bank Account Details */}
+              <div className="pt-3 border-t border-gray-100 space-y-3">
+                <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center space-x-1.5">
+                  <span>🏦</span>
+                  <span>Bank Account Details (For Salary & Direct Disbursal)</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Bank Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={staffForm.bankName}
+                      onChange={(e) => setStaffForm({ ...staffForm, bankName: e.target.value })}
+                      placeholder="e.g. HDFC Bank, SBI, ICICI"
+                      className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Account Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={staffForm.accountNumber}
+                      onChange={(e) => setStaffForm({ ...staffForm, accountNumber: e.target.value })}
+                      placeholder="e.g. 5010048291024"
+                      className="w-full text-xs font-mono border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      IFSC Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={staffForm.ifsc}
+                      onChange={(e) => setStaffForm({ ...staffForm, ifsc: e.target.value.toUpperCase() })}
+                      placeholder="e.g. HDFC0001420"
+                      className="w-full text-xs font-mono uppercase border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
                 </div>
               </div>
 
