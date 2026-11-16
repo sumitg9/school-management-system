@@ -75,6 +75,7 @@ const Layout = ({ children }) => {
       label: 'Campus & Connect',
       icon: '🌟',
       items: [
+        { path: '/events', icon: '📅', label: 'Events & Calendar', permission: 'view-events' },
         { path: '/communication', icon: '💬', label: isParent() ? 'Contact Teachers' : (isTeacher() ? 'Parent Messages' : 'Communications'), permission: 'view-communication' },
         { path: '/gallery', icon: '🖼️', label: 'School Gallery', permission: 'view-gallery' },
         { path: '/notifications', icon: '🔔', label: 'Notifications Center' },

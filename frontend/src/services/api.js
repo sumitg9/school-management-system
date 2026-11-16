@@ -4336,4 +4336,560 @@ export const communicationAPI = {
   },
 };
 
+// ==========================================
+// School Events & Calendar API
+// ==========================================
+const EVENTS_STORAGE_KEY = 'sms_school_events';
+
+const DEFAULT_SCHOOL_EVENTS = [
+  {
+    id: 'evt-1',
+    title: "Children's Day Mega Carnival & House Parade",
+    description: 'Annual festive carnival featuring student-led science exhibits, game stalls, marching band performances, and cultural stage acts.',
+    category: 'cultural',
+    startDate: '2026-11-14',
+    endDate: '2026-11-14',
+    startTime: '09:00',
+    endTime: '15:30',
+    isAllDay: false,
+    venue: 'School Main Amphitheatre & Sports Ground',
+    targetAudience: 'all',
+    targetGrade: 'All Classes',
+    organizer: 'Student Council & Cultural Committee',
+    contactEmail: 'cultural@school.com',
+    featured: true,
+    priority: 'high',
+    color: 'amber',
+    link: '/gallery',
+    attendeesCount: 650,
+    createdAt: '2026-11-01T10:00:00.000Z',
+  },
+  {
+    id: 'evt-2',
+    title: 'Inter-School Robotics & AI Expo 2026',
+    description: 'Showcase of student-engineered autonomous rovers, IoT weather stations, and computer vision models with live demonstrations to university judges.',
+    category: 'workshop',
+    startDate: '2026-11-16',
+    endDate: '2026-11-16',
+    startTime: '10:00',
+    endTime: '16:00',
+    isAllDay: false,
+    venue: 'Advanced STEM & Biotech Laboratory',
+    targetAudience: 'all',
+    targetGrade: 'Classes 8-12',
+    organizer: 'Robotics Club & Science Dept',
+    contactEmail: 'robotics@school.com',
+    featured: true,
+    priority: 'high',
+    color: 'teal',
+    link: '/gallery',
+    attendeesCount: 320,
+    createdAt: '2026-11-05T09:30:00.000Z',
+  },
+  {
+    id: 'evt-3',
+    title: 'Term 2 Pre-Board Mathematics Examination',
+    description: 'Mandatory standard mock examination for Class 10 covering complete syllabus: Trigonometry, Coordinate Geometry, Quadratic Equations, and Statistics.',
+    category: 'exam',
+    startDate: '2026-11-18',
+    endDate: '2026-11-18',
+    startTime: '09:30',
+    endTime: '12:30',
+    isAllDay: false,
+    venue: 'Examination Hall A & Senior Wing',
+    targetAudience: 'students',
+    targetGrade: 'Class 10',
+    organizer: 'Examination Controller',
+    contactEmail: 'exams@school.com',
+    featured: false,
+    priority: 'urgent',
+    color: 'purple',
+    link: '/exams',
+    attendeesCount: 180,
+    createdAt: '2026-11-02T11:00:00.000Z',
+  },
+  {
+    id: 'evt-4',
+    title: 'Senior Secondary Career Counseling & College Fair',
+    description: 'Representatives from 18 leading engineering, medical, design, and commerce universities sharing admission guidelines, entrance exam paths, and scholarships.',
+    category: 'workshop',
+    startDate: '2026-11-20',
+    endDate: '2026-11-20',
+    startTime: '11:00',
+    endTime: '14:30',
+    isAllDay: false,
+    venue: 'Conference Hall 1 (Admin Block)',
+    targetAudience: 'all',
+    targetGrade: 'Classes 10, 11 & 12',
+    organizer: 'Guidance & Counseling Cell',
+    contactEmail: 'counselor@school.com',
+    featured: false,
+    priority: 'normal',
+    color: 'indigo',
+    link: '/communication',
+    attendeesCount: 220,
+    createdAt: '2026-11-06T14:15:00.000Z',
+  },
+  {
+    id: 'evt-5',
+    title: 'Term 2 Parent-Teacher Conference (PTM)',
+    description: 'One-on-one parent-educator evaluation session to review midterm academic report cards, attendance records, and personalized growth plans.',
+    category: 'ptm',
+    startDate: '2026-11-21',
+    endDate: '2026-11-21',
+    startTime: '09:00',
+    endTime: '13:30',
+    isAllDay: false,
+    venue: 'Respective Classrooms (Junior & Senior Blocks)',
+    targetAudience: 'parents',
+    targetGrade: 'All Classes',
+    organizer: 'Academic Coordinator',
+    contactEmail: 'ptm@school.com',
+    featured: true,
+    priority: 'urgent',
+    color: 'sky',
+    link: '/communication',
+    attendeesCount: 480,
+    createdAt: '2026-11-07T08:45:00.000Z',
+  },
+  {
+    id: 'evt-6',
+    title: 'Annual Inter-House Track & Field Relay Finals',
+    description: 'High-octane sprint championships: 100m dashes, 4x100m relays, high jump, shot put, and cheerleading showdown among Shivaji, Tagore, Ashoka, and Raman houses.',
+    category: 'sports',
+    startDate: '2026-11-24',
+    endDate: '2026-11-24',
+    startTime: '08:00',
+    endTime: '14:30',
+    isAllDay: false,
+    venue: 'Main Athletic Stadium & Running Track',
+    targetAudience: 'all',
+    targetGrade: 'All Classes',
+    organizer: 'Physical Education & Sports Dept',
+    contactEmail: 'sports@school.com',
+    featured: true,
+    priority: 'high',
+    color: 'emerald',
+    link: '/gallery',
+    attendeesCount: 850,
+    createdAt: '2026-11-04T12:00:00.000Z',
+  },
+  {
+    id: 'evt-7',
+    title: 'Guru Nanak Jayanti - Campus Holiday',
+    description: 'School campus, administrative counters, library, and bus transport will remain closed in observation of Guru Nanak Gurpurab.',
+    category: 'holiday',
+    startDate: '2026-11-27',
+    endDate: '2026-11-27',
+    startTime: '00:00',
+    endTime: '23:59',
+    isAllDay: true,
+    venue: 'Entire Campus (Closed)',
+    targetAudience: 'all',
+    targetGrade: 'All Classes',
+    organizer: "Principal's Office",
+    contactEmail: 'admin@school.com',
+    featured: false,
+    priority: 'normal',
+    color: 'rose',
+    link: null,
+    attendeesCount: 0,
+    createdAt: '2026-11-01T00:00:00.000Z',
+  },
+  {
+    id: 'evt-8',
+    title: 'Term 2 Fee Installment Due Date',
+    description: 'Final settlement deadline for Term 2 tuition, science lab, and transportation fees. Online payments can be completed through the fee portal to avoid late fines.',
+    category: 'administrative',
+    startDate: '2026-11-28',
+    endDate: '2026-11-28',
+    startTime: '09:00',
+    endTime: '17:00',
+    isAllDay: true,
+    venue: 'Accounts Office & Online Fee Payment Portal',
+    targetAudience: 'parents',
+    targetGrade: 'All Classes',
+    organizer: 'Finance & Accounts Division',
+    contactEmail: 'accounts@school.com',
+    featured: false,
+    priority: 'urgent',
+    color: 'rose',
+    link: '/fee-payment',
+    attendeesCount: 380,
+    createdAt: '2026-11-03T10:00:00.000Z',
+  },
+  {
+    id: 'evt-9',
+    title: 'Annual Science & Innovation Expo 2026',
+    description: 'School-wide scientific exhibition showcasing sustainable energy models, organic chemistry demonstrations, and interactive biology exhibits.',
+    category: 'academic',
+    startDate: '2026-12-05',
+    endDate: '2026-12-05',
+    startTime: '09:30',
+    endTime: '15:00',
+    isAllDay: false,
+    venue: 'School Exhibition Ground & Science Labs',
+    targetAudience: 'all',
+    targetGrade: 'Classes 6-12',
+    organizer: 'Science Faculty',
+    contactEmail: 'science@school.com',
+    featured: true,
+    priority: 'high',
+    color: 'indigo',
+    link: '/gallery',
+    attendeesCount: 500,
+    createdAt: '2026-11-10T11:00:00.000Z',
+  },
+  {
+    id: 'evt-10',
+    title: 'Winter Musical Symphony & Choir Performance',
+    description: 'The school orchestra, junior choir, and brass ensemble performing classical and contemporary holiday melodies in the grand auditorium.',
+    category: 'cultural',
+    startDate: '2026-12-12',
+    endDate: '2026-12-12',
+    startTime: '17:00',
+    endTime: '20:30',
+    isAllDay: false,
+    venue: 'Main School Auditorium',
+    targetAudience: 'all',
+    targetGrade: 'All Classes',
+    organizer: 'Department of Music & Performing Arts',
+    contactEmail: 'music@school.com',
+    featured: false,
+    priority: 'normal',
+    color: 'amber',
+    link: '/gallery',
+    attendeesCount: 420,
+    createdAt: '2026-11-08T15:30:00.000Z',
+  },
+  {
+    id: 'evt-11',
+    title: 'National Mathematics Day Quiz & Problem Solving Bee',
+    description: 'Commemorating Srinivasa Ramanujan: speed mental math competitions, sudoku challenges, and geometric puzzle tournaments across junior and senior categories.',
+    category: 'academic',
+    startDate: '2026-12-22',
+    endDate: '2026-12-22',
+    startTime: '10:00',
+    endTime: '13:00',
+    isAllDay: false,
+    venue: 'Ramanujan Math Lab & Media Center',
+    targetAudience: 'students',
+    targetGrade: 'Classes 7-10',
+    organizer: 'Mathematics Department',
+    contactEmail: 'maths@school.com',
+    featured: false,
+    priority: 'normal',
+    color: 'purple',
+    link: '/assignments',
+    attendeesCount: 260,
+    createdAt: '2026-11-10T14:00:00.000Z',
+  },
+  {
+    id: 'evt-12',
+    title: 'Christmas Celebrations & Winter Break Begins',
+    description: 'Special Christmas morning carol assembly followed by closure for the annual winter vacation. Campus reopens on January 4, 2027.',
+    category: 'holiday',
+    startDate: '2026-12-25',
+    endDate: '2026-12-25',
+    startTime: '00:00',
+    endTime: '23:59',
+    isAllDay: true,
+    venue: 'School Campus (Closed)',
+    targetAudience: 'all',
+    targetGrade: 'All Classes',
+    organizer: "Principal's Office",
+    contactEmail: 'admin@school.com',
+    featured: false,
+    priority: 'normal',
+    color: 'rose',
+    link: null,
+    attendeesCount: 0,
+    createdAt: '2026-11-01T00:00:00.000Z',
+  },
+  {
+    id: 'evt-13',
+    title: 'Spring Athletic Meet 2026 - Sprint Heats',
+    description: 'Qualifying rounds for 200m and 400m track events for inter-school sports representation.',
+    category: 'sports',
+    startDate: '2026-02-18',
+    endDate: '2026-02-18',
+    startTime: '08:30',
+    endTime: '13:30',
+    isAllDay: false,
+    venue: 'Athletics Ground',
+    targetAudience: 'all',
+    targetGrade: 'Classes 9-12',
+    organizer: 'Sports Department',
+    contactEmail: 'sports@school.com',
+    featured: false,
+    priority: 'normal',
+    color: 'emerald',
+    link: '/gallery',
+    attendeesCount: 350,
+    createdAt: '2026-01-15T10:00:00.000Z',
+  },
+  {
+    id: 'evt-14',
+    title: 'Maha Shivratri - Campus Holiday',
+    description: 'School campus, academic classes, administrative offices, and bus transport closed in observation of Maha Shivratri.',
+    category: 'holiday',
+    startDate: '2026-03-08',
+    endDate: '2026-03-08',
+    startTime: '00:00',
+    endTime: '23:59',
+    isAllDay: true,
+    venue: 'School Campus (Closed)',
+    targetAudience: 'all',
+    targetGrade: 'All Classes',
+    organizer: 'Administration',
+    contactEmail: 'admin@school.com',
+    featured: false,
+    priority: 'normal',
+    color: 'rose',
+    link: null,
+    attendeesCount: 0,
+    createdAt: '2026-02-01T00:00:00.000Z',
+  },
+  {
+    id: 'evt-15',
+    title: 'Central Board Examinations 2026 Commencement',
+    description: 'Final board examinations for Class 10 & 12 begin. All examinees must arrive with admit cards and regulated stationery 45 minutes prior to bell.',
+    category: 'exam',
+    startDate: '2026-03-15',
+    endDate: '2026-03-15',
+    startTime: '09:00',
+    endTime: '12:30',
+    isAllDay: false,
+    venue: 'Central Board Examination Wing',
+    targetAudience: 'students',
+    targetGrade: 'Classes 10 & 12',
+    organizer: 'Board Exam Center Superintendent',
+    contactEmail: 'exams@school.com',
+    featured: true,
+    priority: 'urgent',
+    color: 'purple',
+    link: '/exams',
+    attendeesCount: 240,
+    createdAt: '2026-02-15T09:00:00.000Z',
+  },
+];
+
+const getStoredEvents = () => {
+  try {
+    const raw = localStorage.getItem(EVENTS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to parse stored events', e);
+  }
+  try {
+    localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(DEFAULT_SCHOOL_EVENTS));
+  } catch (_) {}
+  return DEFAULT_SCHOOL_EVENTS;
+};
+
+const saveStoredEvents = (events) => {
+  try {
+    localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(events));
+  } catch (e) {
+    console.error('Failed to save events', e);
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('sms:events-updated', { detail: { count: events.length } }));
+  } catch (_) {}
+};
+
+export const eventsAPI = {
+  getAll: async (params = {}) => {
+    let items = getStoredEvents();
+    const { year, month, category, audience, search, priority } = params;
+
+    // Filter by year & month (month 1-12)
+    if (year !== undefined && year !== null && year !== '') {
+      items = items.filter(e => {
+        if (!e.startDate) return false;
+        const d = new Date(e.startDate);
+        return d.getFullYear() === parseInt(year, 10);
+      });
+    }
+
+    if (month !== undefined && month !== null && month !== '') {
+      const targetMonth = parseInt(month, 10); // 1-12
+      items = items.filter(e => {
+        if (!e.startDate) return false;
+        const d = new Date(e.startDate);
+        return (d.getMonth() + 1) === targetMonth;
+      });
+    }
+
+    // Filter by category
+    if (category && category !== 'all') {
+      items = items.filter(e => (e.category || '').toLowerCase() === category.toLowerCase());
+    }
+
+    // Filter by target audience
+    if (audience && audience !== 'all') {
+      items = items.filter(e => {
+        if (!e.targetAudience || e.targetAudience === 'all') return true;
+        return e.targetAudience.toLowerCase() === audience.toLowerCase();
+      });
+    }
+
+    // Filter by priority
+    if (priority && priority !== 'all') {
+      items = items.filter(e => (e.priority || '').toLowerCase() === priority.toLowerCase());
+    }
+
+    // Search query
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      items = items.filter(e =>
+        (e.title || '').toLowerCase().includes(q) ||
+        (e.description || '').toLowerCase().includes(q) ||
+        (e.venue || '').toLowerCase().includes(q) ||
+        (e.organizer || '').toLowerCase().includes(q) ||
+        (e.targetGrade || '').toLowerCase().includes(q)
+      );
+    }
+
+    // Sort chronologically by startDate + startTime
+    items.sort((a, b) => {
+      const dateA = new Date(`${a.startDate}T${a.startTime || '00:00'}`);
+      const dateB = new Date(`${b.startDate}T${b.startTime || '00:00'}`);
+      return dateA - dateB;
+    });
+
+    return {
+      success: true,
+      data: items,
+      total: items.length,
+    };
+  },
+
+  getById: async (id) => {
+    const items = getStoredEvents();
+    const found = items.find(e => String(e.id) === String(id));
+    if (!found) throw new Error('Event not found');
+    return { success: true, data: found };
+  },
+
+  create: async (eventData) => {
+    const items = getStoredEvents();
+    const newId = `evt-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const newEvent = {
+      id: newId,
+      title: eventData.title?.trim() || 'Untitled Event',
+      description: eventData.description?.trim() || '',
+      category: eventData.category || 'academic',
+      startDate: eventData.startDate || new Date().toISOString().split('T')[0],
+      endDate: eventData.endDate || eventData.startDate || new Date().toISOString().split('T')[0],
+      startTime: eventData.startTime || '09:00',
+      endTime: eventData.endTime || '12:00',
+      isAllDay: !!eventData.isAllDay,
+      venue: eventData.venue?.trim() || 'School Campus',
+      targetAudience: eventData.targetAudience || 'all',
+      targetGrade: eventData.targetGrade?.trim() || 'All Classes',
+      organizer: eventData.organizer?.trim() || 'School Administration',
+      contactEmail: eventData.contactEmail?.trim() || 'admin@school.com',
+      featured: !!eventData.featured,
+      priority: eventData.priority || 'normal',
+      color: eventData.color || 'blue',
+      link: eventData.link || null,
+      attendeesCount: parseInt(eventData.attendeesCount, 10) || 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    items.push(newEvent);
+    saveStoredEvents(items);
+
+    // If creator requested to broadcast notification for this event
+    if (eventData.broadcastNotification) {
+      try {
+        await notificationAPI.create({
+          title: `Upcoming Event: ${newEvent.title}`,
+          message: `${newEvent.description} | Date: ${newEvent.startDate} at ${newEvent.startTime}. Venue: ${newEvent.venue}`,
+          type: newEvent.category === 'sports' ? 'announcement' : (newEvent.category === 'exam' ? 'exam' : 'announcement'),
+          priority: newEvent.priority || 'normal',
+          target_role: newEvent.targetAudience || 'all',
+          link: '/events',
+          metadata: {
+            eventId: newEvent.id,
+            date: newEvent.startDate,
+            venue: newEvent.venue,
+          },
+        });
+      } catch (err) {
+        console.error('Failed to broadcast event notification:', err);
+      }
+    }
+
+    return { success: true, data: newEvent };
+  },
+
+  update: async (id, eventData) => {
+    const items = getStoredEvents();
+    const idx = items.findIndex(e => String(e.id) === String(id));
+    if (idx === -1) throw new Error('Event not found');
+
+    items[idx] = {
+      ...items[idx],
+      ...eventData,
+      id: items[idx].id, // preserve id
+      updatedAt: new Date().toISOString(),
+    };
+
+    saveStoredEvents(items);
+    return { success: true, data: items[idx] };
+  },
+
+  delete: async (id) => {
+    const items = getStoredEvents();
+    const next = items.filter(e => String(e.id) !== String(id));
+    saveStoredEvents(next);
+    return { success: true, id };
+  },
+
+  resetDefaults: async () => {
+    saveStoredEvents(DEFAULT_SCHOOL_EVENTS);
+    return { success: true, data: DEFAULT_SCHOOL_EVENTS };
+  },
+
+  /**
+   * Generates standard RFC 5545 iCalendar content for Google/Apple/Outlook Calendar
+   */
+  generateICal: (event) => {
+    const pad = (n) => String(n).padStart(2, '0');
+    const toIcalDate = (dateStr, timeStr = '09:00') => {
+      const [year, month, day] = (dateStr || '').split('-');
+      const [hour, minute] = (timeStr || '09:00').split(':');
+      return `${year}${pad(month)}${pad(day)}T${pad(hour)}${pad(minute)}00`;
+    };
+
+    const start = toIcalDate(event.startDate, event.startTime);
+    const end = toIcalDate(event.endDate || event.startDate, event.endTime || '10:00');
+
+    return [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//School Management System//Event Calendar//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:${event.id}@schoolmanagementsystem.org`,
+      `DTSTAMP:${toIcalDate(new Date().toISOString().split('T')[0], '00:00')}Z`,
+      `DTSTART:${start}`,
+      `DTEND:${end}`,
+      `SUMMARY:${(event.title || '').replace(/\n/g, ' ')}`,
+      `DESCRIPTION:${(event.description || '').replace(/\n/g, '\\n')}`,
+      `LOCATION:${(event.venue || '').replace(/\n/g, ' ')}`,
+      `CATEGORIES:${(event.category || 'EVENT').toUpperCase()}`,
+      'STATUS:CONFIRMED',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+  },
+};
+
 export default api;

@@ -53,6 +53,7 @@ import UserList from './pages/users/UserList';
 import Gallery from './pages/gallery/Gallery';
 import Communication from './pages/communication/Communication';
 import NotificationCenter from './pages/notifications/NotificationCenter';
+import EventManagement from './pages/events/EventManagement';
 import PermissionRoute from './components/common/PermissionRoute';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
@@ -132,6 +133,8 @@ function AppRoutes() {
                     <Route path="/assignments/:id/edit" element={<PermissionRoute permission="create-assignments"><AssignmentForm /></PermissionRoute>} />
                     <Route path="/gallery" element={<PermissionRoute permission="view-gallery"><Gallery /></PermissionRoute>} />
                     <Route path="/communication" element={<PermissionRoute permission="view-communication"><Communication /></PermissionRoute>} />
+                    <Route path="/events" element={<PermissionRoute permission="view-events"><EventManagement /></PermissionRoute>} />
+                    <Route path="/calendar" element={<Navigate to="/events" replace />} />
                     <Route path="/notifications" element={<NotificationCenter />} />
                     <Route path="/users" element={<PermissionRoute permission="manage-users"><UserList /></PermissionRoute>} />
                     <Route path="/settings" element={<PermissionRoute permission="manage-settings"><Settings /></PermissionRoute>} />

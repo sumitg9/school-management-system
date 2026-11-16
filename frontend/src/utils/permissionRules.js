@@ -220,6 +220,16 @@ export const PERMISSION_MODULES = [
       { id: 'manage-communication', label: 'Send & Manage Messages', description: 'Initiate conversations, send replies, and schedule PTMs' },
     ],
   },
+  {
+    id: 'events',
+    name: 'Events & Calendar',
+    icon: '📅',
+    description: 'School events, athletic tournaments, academic schedule, PTM conferences, and institutional calendar',
+    permissions: [
+      { id: 'view-events', label: 'View Events & Calendar', description: 'Browse school calendar, upcoming events, and schedules' },
+      { id: 'manage-events', label: 'Manage Events', description: 'Create, schedule, edit, and delete school events and calendar entries' },
+    ],
+  },
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS = {
@@ -238,6 +248,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-users', 'manage-users',
     'view-gallery', 'manage-gallery',
     'view-communication', 'manage-communication',
+    'view-events', 'manage-events',
   ],
   'admin': [
     'view-dashboard',
@@ -253,6 +264,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'manage-settings', 'manage-permissions',
     'view-gallery', 'manage-gallery',
     'view-communication', 'manage-communication',
+    'view-events', 'manage-events',
   ],
   'teacher': [
     'view-dashboard',
@@ -264,6 +276,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-reports',
     'view-gallery',
     'view-communication', 'manage-communication',
+    'view-events', 'manage-events',
   ],
   'student': [
     'view-dashboard',
@@ -272,6 +285,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-fees',
     'view-assignments', 'submit-assignments',
     'view-gallery',
+    'view-events',
   ],
   'parent': [
     'view-dashboard',
@@ -282,6 +296,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-assignments',
     'view-gallery',
     'view-communication', 'manage-communication',
+    'view-events',
   ],
   'finance': [
     'view-dashboard',
@@ -289,6 +304,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-fees', 'create-fees', 'collect-fees',
     'view-reports', 'generate-reports',
     'view-gallery',
+    'view-events',
   ],
   'back-office': [
     'view-dashboard',
@@ -299,12 +315,14 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-reports',
     'manage-tools',
     'view-gallery',
+    'view-events', 'manage-events',
   ],
   'general': [
     'view-dashboard',
     'view-students',
     'view-classes',
     'view-gallery',
+    'view-events',
   ],
 };
 
