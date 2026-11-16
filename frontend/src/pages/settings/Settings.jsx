@@ -36,6 +36,15 @@ export const LOGO_PRESETS = [
   { id: 'torch', name: 'Knowledge Torch', symbol: '🔥', value: 'preset:🔥' },
 ];
 
+export const SETTINGS_SECTIONS = [
+  { id: 'all', label: 'All Settings', icon: '📋', badge: 'Overview', description: 'View and manage all settings on a single page' },
+  { id: 'school_profile', label: 'School Profile & Branding', icon: '🏫', badge: 'Identity', description: 'Institution name, logo, tagline, and contact coordinates' },
+  { id: 'age_criteria', label: 'Age Criteria & Eligibility', icon: '👶', badge: 'Criteria', description: 'Minimum age rules for students, teachers, and staff' },
+  { id: 'fee_rules', label: 'Fee Rules & Late Fine', icon: '💳', badge: 'Finance', description: 'Late fee policies, grace periods, and fine structures' },
+  { id: 'user_permissions', label: 'User Roles & Permissions', icon: '🛡️', badge: 'Security', description: 'Configure granular module permissions across 8 system roles' },
+  { id: 'localization', label: 'Localization & Formats', icon: '🌐', badge: 'System', description: 'Date & time formatting, timezone, and currency' },
+];
+
 const Settings = () => {
   const { settings, updateSettings, loading: initialLoading } = useSettings();
   const { user } = useAuth();
@@ -416,83 +425,51 @@ const Settings = () => {
         )}
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex items-center gap-2 border-b border-gray-200 pb-2 overflow-x-auto">
-        <button
-          type="button"
-          onClick={() => setActiveTab('all')}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg transition whitespace-nowrap ${
-            activeTab === 'all'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          📋 All Settings
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('school_profile')}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 whitespace-nowrap ${
-            activeTab === 'school_profile'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          <span>🏫</span> School Profile & Branding
-          <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-100 text-emerald-800 font-bold">
-            Identity
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('age_criteria')}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
-            activeTab === 'age_criteria'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          <span>👶</span> Age Criteria & Eligibility
-          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800 font-bold">
-            Custom
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('fee_rules')}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
-            activeTab === 'fee_rules'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          <span>💳</span> Fee Rules & Late Fine
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('user_permissions')}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
-            activeTab === 'user_permissions'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          <span>🛡️</span> User Roles & Permissions
-          <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-800 font-bold">
-            8 Roles
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('localization')}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg transition flex items-center gap-2 ${
-            activeTab === 'localization'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          <span>🌐</span> Localization & Formats
-        </button>
+      {/* Settings Section Selector (Dropdown Select Box) */}
+      <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xl flex-shrink-0 font-bold border border-blue-100">
+            {SETTINGS_SECTIONS.find(s => s.id === activeTab)?.icon || '⚙️'}
+          </div>
+          <div>
+            <label htmlFor="settings-section-select" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Category View
+            </label>
+            <div className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <span>{SETTINGS_SECTIONS.find(s => s.id === activeTab)?.label || 'All Settings'}</span>
+              {SETTINGS_SECTIONS.find(s => s.id === activeTab)?.badge && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                  {SETTINGS_SECTIONS.find(s => s.id === activeTab)?.badge}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <label htmlFor="settings-section-select" className="text-xs font-semibold text-gray-600 hidden sm:inline whitespace-nowrap">
+            Select Section:
+          </label>
+          <div className="relative w-full sm:w-80">
+            <select
+              id="settings-section-select"
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              className="w-full appearance-none bg-gray-50 hover:bg-gray-100 border border-gray-300 hover:border-gray-400 text-gray-900 text-sm font-semibold rounded-lg px-4 py-2.5 pr-10 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition cursor-pointer shadow-xs"
+            >
+              {SETTINGS_SECTIONS.map((section) => (
+                <option key={section.id} value={section.id}>
+                  {section.icon} {section.label}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
