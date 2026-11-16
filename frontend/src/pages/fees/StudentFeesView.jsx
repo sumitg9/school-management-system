@@ -368,7 +368,7 @@ const StudentFeesView = () => {
 
   if (studentLoading || loading) {
     return (
-      <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="px-[15px] py-6 w-full space-y-6">
         <FeeTabs />
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 animate-pulse space-y-4">
           <div className="h-6 bg-gray-200 rounded w-1/3"></div>
@@ -386,7 +386,7 @@ const StudentFeesView = () => {
 
   if (!currentStudent && !studentLoading && !loading) {
     return (
-      <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="px-[15px] py-6 w-full space-y-6">
         <FeeTabs />
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center text-gray-500">
           <span className="text-4xl block mb-3">{isParent() ? '👦👧' : '👨‍🎓'}</span>
@@ -402,7 +402,7 @@ const StudentFeesView = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="px-[15px] py-6 w-full space-y-6">
       {/* Tab Navigation */}
       <FeeTabs />
 

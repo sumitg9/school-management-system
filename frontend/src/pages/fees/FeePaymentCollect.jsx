@@ -832,7 +832,7 @@ const FeePaymentCollect = () => {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="px-[15px] py-6 w-full space-y-6">
       {/* Tab Navigation */}
       <FeeTabs />
 

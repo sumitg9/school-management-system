@@ -245,7 +245,7 @@ const FeeList = () => {
   );
 
   return (
-    <div className="p-6">
+    <div className="px-[15px] py-6 w-full">
       {/* Tab Navigation */}
       <FeeTabs />
 
