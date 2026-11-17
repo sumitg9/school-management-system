@@ -54,6 +54,7 @@ class SettingController extends Controller
             'fee_due_day_of_month' => 'nullable|integer|min:1|max:31',
             'fee_grace_period_days' => 'nullable|integer|min:0|max:60',
             'fee_late_fine_max_cap' => 'nullable|numeric|min:0',
+            'user_role_permissions' => 'nullable',
             'settings' => 'nullable|array',
         ]);
 

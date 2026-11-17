@@ -93,6 +93,16 @@ const UserList = () => {
     fetchUsers();
   }, [searchQuery, selectedRoleFilter, selectedStatusFilter, activeSchoolId]);
 
+  // Helper to determine if a target user has the Super Admin role
+  const isTargetSuperAdmin = (target) => {
+    if (!target) return false;
+    return (
+      target.role === 'super-admin' ||
+      (Array.isArray(target.roles) && target.roles.includes('super-admin')) ||
+      (target.email || '').toLowerCase().trim() === 'superadmin@school.com'
+    );
+  };
+
   // Open Create Modal
   const handleOpenCreateModal = () => {
     setEditingUser(null);
@@ -112,6 +122,11 @@ const UserList = () => {
 
   // Open Edit Modal
   const handleOpenEditModal = (targetUser) => {
+    // SECURITY GUARD: An admin user cannot edit or modify a Super Admin's data
+    if (isTargetSuperAdmin(targetUser) && !isSuperAdmin()) {
+      toast.error('Access Denied: Administrators cannot edit or modify Super Admin accounts.');
+      return;
+    }
     setEditingUser(targetUser);
     setFormData({
       name: targetUser.name || '',
@@ -129,6 +144,11 @@ const UserList = () => {
 
   // Open Reset Password Modal
   const handleOpenPasswordModal = (targetUser) => {
+    // SECURITY GUARD: An admin user cannot change a Super Admin's password
+    if (isTargetSuperAdmin(targetUser) && !isSuperAdmin()) {
+      toast.error("Access Denied: Administrators cannot change a Super Admin's password.");
+      return;
+    }
     setPasswordTargetUser(targetUser);
     setNewPassword('');
     setShowPassword(false);
@@ -168,19 +188,25 @@ const UserList = () => {
       return;
     }
 
+    // Security Guard: An admin cannot modify a Super Admin
+    if (editingUser && isTargetSuperAdmin(editingUser) && !isSuperAdmin()) {
+      toast.error('Access Denied: Administrators cannot edit or modify Super Admin data.');
+      return;
+    }
+
     // Role safety guard: only Super Admin can assign Super Admin
     if (formData.role === 'super-admin' && !isSuperAdmin()) {
-      toast.error('Only a Super Admin can assign the Super Admin role.');
+      toast.error('Access Denied: Only a Super Admin can assign the Super Admin role.');
       return;
     }
 
     setSubmitting(true);
     try {
       if (editingUser) {
-        await userAPI.update(editingUser.id, formData);
+        await userAPI.update(editingUser.id, formData, currentUser);
         toast.success(`User "${formData.name}" updated successfully!`);
       } else {
-        await userAPI.create(formData);
+        await userAPI.create(formData, currentUser);
         toast.success(`User "${formData.name}" created successfully!`);
       }
       setIsFormModalOpen(false);
@@ -201,9 +227,15 @@ const UserList = () => {
       return;
     }
 
+    // Security Guard: An admin cannot reset a Super Admin's password
+    if (passwordTargetUser && isTargetSuperAdmin(passwordTargetUser) && !isSuperAdmin()) {
+      toast.error("Access Denied: Administrators cannot change a Super Admin's password.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await userAPI.resetPassword(passwordTargetUser.id, newPassword);
+      await userAPI.resetPassword(passwordTargetUser.id, newPassword, currentUser);
       toast.success(`Password for ${passwordTargetUser.name} has been updated.`);
       setIsPasswordModalOpen(false);
     } catch (err) {
@@ -223,8 +255,9 @@ const UserList = () => {
       toast.error('The primary root Super Admin account cannot be deleted.');
       return;
     }
-    if (targetUser.role === 'super-admin' && !isSuperAdmin()) {
-      toast.error('Only a Super Admin can delete another Super Admin.');
+    // Security Guard: An admin cannot delete a Super Admin
+    if (isTargetSuperAdmin(targetUser) && !isSuperAdmin()) {
+      toast.error('Access Denied: Administrators cannot delete a Super Admin account.');
       return;
     }
 
@@ -442,6 +475,8 @@ const UserList = () => {
                   const roleMeta = getRoleDetails(item.role);
                   const isCurrent = String(item.id) === String(currentUser?.id);
                   const isRootSuperAdmin = item.email === 'superadmin@school.com';
+                  const isSuperUser = isTargetSuperAdmin(item);
+                  const callerIsSuper = isSuperAdmin();
 
                   return (
                     <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
@@ -456,6 +491,9 @@ const UserList = () => {
                               <span className="font-semibold text-gray-900">{item.name}</span>
                               {isCurrent && (
                                 <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">You</span>
+                              )}
+                              {isSuperUser && (
+                                <span className="text-xs" title="Super Admin Account">👑</span>
                               )}
                             </div>
                             <span className="text-xs text-gray-500 block">{item.email}</span>
@@ -510,49 +548,61 @@ const UserList = () => {
                       {/* Actions */}
                       {canManageUsers && (
                         <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {/* Reset Password Button */}
-                            <button
-                              onClick={() => handleOpenPasswordModal(item)}
-                              title="Reset Password"
-                              className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
-                            >
-                              <span className="text-sm">🔑</span>
-                            </button>
+                          {isSuperUser && !callerIsSuper ? (
+                            <div className="flex items-center justify-end">
+                              <span
+                                className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-xl shadow-2xs select-none"
+                                title="🔒 Protected: Administrators cannot edit, delete, or reset passwords for Super Admin accounts."
+                              >
+                                <span>🔒</span>
+                                <span>Super Admin Protected</span>
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-end gap-2">
+                              {/* Reset Password Button */}
+                              <button
+                                onClick={() => handleOpenPasswordModal(item)}
+                                title="Reset Password"
+                                className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                              >
+                                <span className="text-sm">🔑</span>
+                              </button>
 
-                            {/* Edit Button */}
-                            <button
-                              onClick={() => handleOpenEditModal(item)}
-                              title="Edit User Details"
-                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
-                            </button>
+                              {/* Edit Button */}
+                              <button
+                                onClick={() => handleOpenEditModal(item)}
+                                title="Edit User Details"
+                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                              </button>
 
-                            {/* Delete Button */}
-                            <button
-                              onClick={() => handleDeleteUser(item)}
-                              disabled={isCurrent || isRootSuperAdmin}
-                              title={
-                                isCurrent
-                                  ? 'You cannot delete yourself'
-                                  : isRootSuperAdmin
-                                  ? 'Primary Super Admin cannot be deleted'
-                                  : 'Delete User'
-                              }
-                              className={`p-1.5 rounded-lg transition ${
-                                isCurrent || isRootSuperAdmin
-                                  ? 'text-gray-200 cursor-not-allowed'
-                                  : 'text-gray-400 hover:text-rose-600 hover:bg-rose-50'
-                              }`}
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </div>
+                              {/* Delete Button */}
+                              <button
+                                onClick={() => handleDeleteUser(item)}
+                                disabled={isCurrent || isRootSuperAdmin}
+                                title={
+                                  isCurrent
+                                    ? 'You cannot delete yourself'
+                                    : isRootSuperAdmin
+                                    ? 'Primary Super Admin cannot be deleted'
+                                    : 'Delete User'
+                                }
+                                className={`p-1.5 rounded-lg transition ${
+                                  isCurrent || isRootSuperAdmin
+                                    ? 'text-gray-200 cursor-not-allowed'
+                                    : 'text-gray-400 hover:text-rose-600 hover:bg-rose-50'
+                                }`}
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
                         </td>
                       )}
                     </tr>

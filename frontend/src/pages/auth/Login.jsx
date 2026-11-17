@@ -168,7 +168,7 @@ const Login = () => {
             </button>
           </form>
 
-          {/* Divider */}
+          {/* Divider and Social Login (Temporarily commented out)
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300"></div>
@@ -178,7 +178,6 @@ const Login = () => {
             </div>
           </div>
 
-          {/* Social Login */}
           <div className="grid grid-cols-2 gap-4">
             <button className="btn-outline py-2">
               <svg className="w-5 h-5 inline mr-2" viewBox="0 0 24 24">
@@ -196,6 +195,7 @@ const Login = () => {
               Microsoft
             </button>
           </div>
+          */}
 
           {/* Demo Access */}
           <div className="mt-6 pt-6 border-t border-gray-200">

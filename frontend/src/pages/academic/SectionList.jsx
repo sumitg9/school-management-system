@@ -108,6 +108,10 @@ const SectionList = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!hasPermission('delete-classes')) {
+      toast.error('Access Denied: You do not have permission to delete section records.');
+      return;
+    }
     const isConfirmed = await confirm({
       title: 'Delete Section',
       message: 'Are you sure you want to delete this section? This action cannot be undone.',

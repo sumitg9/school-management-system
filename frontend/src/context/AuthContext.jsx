@@ -198,6 +198,23 @@ export const AuthProvider = ({ children }) => {
     toast.info(`Reset view to assigned role: ${defaultR}`);
   };
 
+  // Permissions version state for immediate reactivity across components
+  const [permissionsVersion, setPermissionsVersion] = useState(0);
+
+  useEffect(() => {
+    const handlePermUpdate = () => {
+      setPermissionsVersion((v) => v + 1);
+    };
+    window.addEventListener('sms:permissions-updated', handlePermUpdate);
+    window.addEventListener('sms:role-switched', handlePermUpdate);
+    window.addEventListener('storage', handlePermUpdate);
+    return () => {
+      window.removeEventListener('sms:permissions-updated', handlePermUpdate);
+      window.removeEventListener('sms:role-switched', handlePermUpdate);
+      window.removeEventListener('storage', handlePermUpdate);
+    };
+  }, []);
+
   const hasRole = (role) => {
     const effective = getEffectiveRole();
     return normalizeRole(role) === effective;
@@ -206,6 +223,7 @@ export const AuthProvider = ({ children }) => {
   const hasPermission = (permission) => {
     if (!permission) return true;
     const effectiveRole = getEffectiveRole();
+    // Only real Super Admin session on super-admin role retains unrestricted root access
     if (effectiveRole === 'super-admin') return true;
 
     // Strict system constraint: students are strictly forbidden from edit, delete, create, manage, mark, or collect permissions
@@ -222,19 +240,27 @@ export const AuthProvider = ({ children }) => {
       if (isForbidden) return false;
     }
 
-    // Direct user permissions override if present (for non-students)
-    if (user?.permissions?.includes('*') || user?.permissions?.includes(permission)) {
-      return true;
-    }
-
-    // Check configured role permissions from settings
+    // Check configured role permissions from settings and dedicated permissions store
     let configured = null;
     try {
-      const storedSettings = localStorage.getItem('sms_settings');
-      if (storedSettings) {
-        const parsed = JSON.parse(storedSettings);
-        if (parsed.user_role_permissions) {
-          configured = parsed.user_role_permissions;
+      const storedDirect = localStorage.getItem('sms_role_permissions');
+      if (storedDirect) {
+        configured = JSON.parse(storedDirect);
+      } else {
+        const storedAppSettings = localStorage.getItem('app_settings');
+        if (storedAppSettings) {
+          const parsed = JSON.parse(storedAppSettings);
+          if (parsed.user_role_permissions) {
+            configured = parsed.user_role_permissions;
+          }
+        } else {
+          const storedSettings = localStorage.getItem('sms_settings');
+          if (storedSettings) {
+            const parsed = JSON.parse(storedSettings);
+            if (parsed.user_role_permissions) {
+              configured = parsed.user_role_permissions;
+            }
+          }
         }
       }
     } catch (_) {}
@@ -251,9 +277,9 @@ export const AuthProvider = ({ children }) => {
   const isBackOffice = () => hasRole('back-office') || hasRole('librarian') || hasRole('receptionist');
   const isGeneral = () => hasRole('general');
 
-  // Explicit edit & delete checks (guarantees student NEVER has edit or delete anywhere)
-  const canEdit = (perm) => !isStudent() && (perm ? hasPermission(perm) : (isAdmin() || isTeacher()));
-  const canDelete = (perm) => !isStudent() && (perm ? hasPermission(perm) : isAdmin());
+  // Explicit edit & delete checks (strictly respects configured role permissions)
+  const canEdit = (perm) => !isStudent() && (perm ? hasPermission(perm) : (isSuperAdmin() || isTeacher()));
+  const canDelete = (perm) => !isStudent() && (perm ? hasPermission(perm) : isSuperAdmin());
 
   // Student profile state for student role or preview
   const [studentProfile, setStudentProfile] = useState(() => {

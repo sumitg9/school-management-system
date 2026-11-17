@@ -32,6 +32,7 @@ import AttendanceList from './pages/attendance/AttendanceList';
 import MarkAttendance from './pages/attendance/MarkAttendance';
 import AttendanceReport from './pages/attendance/AttendanceReport';
 import AttendanceEdit from './pages/attendance/AttendanceEdit';
+import TimetableManagement from './pages/timetable/TimetableManagement';
 import ExamList from './pages/exams/ExamList';
 import ExamForm from './pages/exams/ExamForm';
 import ExamDetail from './pages/exams/ExamDetail';
@@ -117,6 +118,7 @@ function AppRoutes() {
                     <Route path="/attendance/mark" element={<PermissionRoute permission="mark-attendance"><MarkAttendance /></PermissionRoute>} />
                     <Route path="/attendance/report" element={<PermissionRoute permission="view-reports"><AttendanceReport /></PermissionRoute>} />
                     <Route path="/attendance/:id/edit" element={<PermissionRoute permission="edit-attendance"><AttendanceEdit /></PermissionRoute>} />
+                    <Route path="/timetable" element={<PermissionRoute permission="view-timetable"><TimetableManagement /></PermissionRoute>} />
                     <Route path="/exams" element={<PermissionRoute permission="view-exams"><ExamList /></PermissionRoute>} />
                     <Route path="/exams/create" element={<PermissionRoute permission="create-exams"><ExamForm /></PermissionRoute>} />
                     <Route path="/exams/:id" element={<PermissionRoute permission="view-exams"><ExamDetail /></PermissionRoute>} />

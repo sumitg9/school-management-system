@@ -57,6 +57,10 @@ const ClassList = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!hasPermission('delete-classes')) {
+      toast.error('Access Denied: You do not have permission to delete class records.');
+      return;
+    }
     const isConfirmed = await confirm({
       title: 'Delete Class',
       message: 'Are you sure you want to delete this class? This will also delete all associated sections.',

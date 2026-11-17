@@ -89,9 +89,28 @@ class User extends Authenticatable
     }
 
     // Helper methods
-    public function isAdmin()
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole('super-admin') || $this->email === 'superadmin@school.com';
+    }
+
+    public function isAdmin(): bool
     {
         return $this->hasRole(['super-admin', 'admin']);
+    }
+
+    /**
+     * Check if this user can modify, edit, delete, or change password for another target user.
+     * Administrators cannot edit, delete, or modify Super Admin data.
+     */
+    public function canManageUser(User $targetUser): bool
+    {
+        // A user cannot manage a Super Admin unless the caller is also a Super Admin
+        if ($targetUser->isSuperAdmin() && !$this->isSuperAdmin()) {
+            return false;
+        }
+
+        return true;
     }
 
     public function isTeacher()

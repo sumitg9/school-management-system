@@ -60,6 +60,7 @@ const Layout = ({ children }) => {
         { path: '/teachers', icon: '👨‍🏫', label: 'Teachers Directory', permission: 'view-teachers' },
         { path: '/classes', icon: '🏛️', label: 'Classes & Sections', permission: 'view-classes' },
         { path: '/attendance', icon: '📊', label: isParent() ? "Child's Attendance" : (isStudent() ? 'My Attendance' : 'Attendance Register'), permission: 'view-attendance' },
+        { path: '/timetable', icon: '🗓️', label: isParent() ? "Child's Timetable" : (isStudent() ? 'My Timetable' : 'Timetable & Schedule'), permission: 'view-timetable' },
         { path: '/exams', icon: '📝', label: isParent() ? "Child's Exams" : (isStudent() ? 'My Exams' : 'Exams & Grades'), permission: 'view-exams' },
         { path: '/assignments', icon: '📋', label: isParent() ? "Child's Assignments" : (isStudent() ? 'My Assignments' : 'Assignments'), permission: 'view-assignments' },
       ],

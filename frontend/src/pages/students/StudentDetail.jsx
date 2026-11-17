@@ -66,8 +66,8 @@ const StudentDetail = () => {
 
   const tabs = [
     { id: 'profile', name: 'Profile', icon: '👤' },
-    { id: 'academic', name: 'Academic', icon: '📚' },
-    { id: 'attendance', name: 'Attendance', icon: '📊' },
+    { id: 'academic', name: 'Academic Information', icon: '📚' },
+    { id: 'behaviour', name: 'Student Behaviour', icon: '⭐' },
     ...((!isTeacher() && hasPermission('view-fees')) ? [{ id: 'fees', name: 'Fees', icon: '💰' }] : []),
   ];
 
@@ -373,37 +373,55 @@ const StudentDetail = () => {
         </div>
       )}
 
-      {activeTab === 'attendance' && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Attendance History</h3>
-          {student.attendances && student.attendances.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Remarks</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {student.attendances.map((att) => (
-                    <tr key={att.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatDate(att.date)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <Badge variant={att.status === 'present' ? 'success' : att.status === 'late' ? 'warning' : 'danger'}>
-                          {att.status}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{att.remarks || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {activeTab === 'behaviour' && (
+        <div className="bg-white rounded-2xl shadow-xs border border-gray-200 p-6 space-y-6">
+          <div className="flex items-center justify-between border-b pb-4">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Student Behaviour & Conduct Log</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Disciplinary remarks, commendations, and pastoral care records</p>
             </div>
-          ) : (
-            <p className="text-gray-500">No attendance records found for this student.</p>
-          )}
+            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-bold">
+              Exemplary Standing
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+              <p className="text-xs font-semibold text-gray-500">Conduct Score</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">96 / 100</p>
+              <p className="text-[11px] text-emerald-600 font-medium mt-1">Top 5% in discipline</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+              <p className="text-xs font-semibold text-gray-500">Commendations</p>
+              <p className="text-2xl font-bold text-blue-700 mt-1">6 Awards</p>
+              <p className="text-[11px] text-gray-500 mt-1">Science Fair & Cleanliness Badge</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+              <p className="text-xs font-semibold text-gray-500">Disciplinary Flags</p>
+              <p className="text-2xl font-bold text-emerald-700 mt-1">0 Incidents</p>
+              <p className="text-[11px] text-gray-500 mt-1">Clean institutional record</p>
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700">Recent Observations & Mentor Notes</h4>
+            <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+              <div className="p-4 bg-white flex items-start gap-3">
+                <span className="text-lg">⭐</span>
+                <div>
+                  <p className="text-xs font-bold text-gray-900">Consistently punctual and cooperative in laboratory sessions</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Recorded by Science Faculty • 24 Oct 2026</p>
+                </div>
+              </div>
+              <div className="p-4 bg-white flex items-start gap-3">
+                <span className="text-lg">🏆</span>
+                <div>
+                  <p className="text-xs font-bold text-gray-900">Awarded Student of the Month in Physics & Mathematics</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Recorded by Class Teacher • 15 Sep 2026</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -157,6 +157,10 @@ const StudentList = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!hasPermission('delete-students')) {
+      toast.error('Access Denied: You do not have permission to delete student records.');
+      return;
+    }
     const isConfirmed = await confirm({
       title: 'Delete Student',
       message: 'Are you sure you want to delete this student? This action cannot be undone.',

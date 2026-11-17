@@ -214,6 +214,10 @@ const ClassDetail = () => {
 
   // Delete Section
   const handleDeleteSection = async (section) => {
+    if (!hasPermission('delete-classes')) {
+      toast.error('Access Denied: You do not have permission to delete section records.');
+      return;
+    }
     const isConfirmed = await confirm({
       title: `Delete Section ${section.name}?`,
       message: `Are you sure you want to delete Section "${section.name}" of ${classData.name}? Any enrolled students in this section will be unlinked. This action cannot be undone.`,

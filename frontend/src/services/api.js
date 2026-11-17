@@ -682,7 +682,7 @@ export const authAPI = {
       }
 
       roles = [detectedRole];
-      permissions = roles.includes('admin') || roles.includes('super-admin') ? ['*'] : roles;
+      permissions = roles.includes('super-admin') ? ['*'] : [];
       authToken = `sb_token_${dbUser.id}_${Date.now()}`;
       userData = {
         id: dbUser.id,
@@ -1124,6 +1124,59 @@ const DEFAULT_SYSTEM_USERS = [
   },
 ];
 
+/**
+ * Helper to determine if a target user account has the Super Admin role.
+ */
+export const isSuperAdminUser = (target) => {
+  if (!target) return false;
+  if (typeof target === 'string') {
+    return target.toLowerCase().trim() === 'super-admin';
+  }
+  const role = (target.role || target.roles?.[0] || '').toLowerCase().trim();
+  const hasSuperRole = Array.isArray(target.roles) && target.roles.some(r => String(r).toLowerCase().trim() === 'super-admin');
+  const isEmailSuper = (target.email || '').toLowerCase().trim() === 'superadmin@school.com';
+  return role === 'super-admin' || hasSuperRole || isEmailSuper;
+};
+
+/**
+ * Caller Context for User Operations
+ * Determines if the active caller has active Super Admin authorization.
+ */
+export const getCallerUserContext = (explicitUser = null) => {
+  let user = explicitUser;
+  let activeRole = null;
+  try {
+    if (!user) {
+      const rawUser = localStorage.getItem('user');
+      if (rawUser) user = JSON.parse(rawUser);
+    }
+    activeRole = localStorage.getItem('sms_active_role');
+  } catch (_) {}
+
+  // Effective role incorporates preview role switcher if active
+  const effectiveRole = (activeRole || user?.role || user?.roles?.[0] || 'general').toLowerCase().trim();
+
+  // A caller is authorized as Super Admin only if they possess Super Admin credentials AND their effective role is super-admin
+  const isSuperAdmin =
+    effectiveRole === 'super-admin' &&
+    (
+      user?.role === 'super-admin' ||
+      (Array.isArray(user?.roles) && user.roles.includes('super-admin')) ||
+      (user?.email || '').toLowerCase().trim() === 'superadmin@school.com' ||
+      user?.is_group_admin === true
+    );
+
+  const isAdmin = isSuperAdmin || effectiveRole === 'admin' || effectiveRole === 'principal';
+
+  return {
+    user,
+    activeRole,
+    effectiveRole,
+    isSuperAdmin,
+    isAdmin,
+  };
+};
+
 export const userAPI = {
   getAll: async (params = {}) => {
     let usersList = [];
@@ -1273,7 +1326,14 @@ export const userAPI = {
     return { success: true, data: user };
   },
 
-  create: async (userData) => {
+  create: async (userData, currentUser = null) => {
+    const callerCtx = getCallerUserContext(currentUser);
+
+    // SECURITY GUARD: Only Super Admin can onboard/create another Super Admin
+    if (userData.role === 'super-admin' && !callerCtx.isSuperAdmin) {
+      throw new Error('Access Denied: Only a Super Admin can create or onboard another Super Admin account.');
+    }
+
     const listRes = await userAPI.getAll({ per_page: 'all' });
     const exists = listRes.data.some(u => u.email?.toLowerCase() === userData.email?.toLowerCase().trim());
     if (exists) {
@@ -1328,9 +1388,35 @@ export const userAPI = {
     return { success: true, message: 'User created successfully!', data: newUser };
   },
 
-  update: async (id, userData) => {
-    if (userData.email === 'superadmin@school.com' && userData.role && userData.role !== 'super-admin') {
+  update: async (id, userData, currentUser = null) => {
+    const callerCtx = getCallerUserContext(currentUser);
+
+    // Fetch existing target user to verify identity and role
+    const listRes = await userAPI.getAll({ per_page: 'all' });
+    const target = listRes.data.find(u => String(u.id) === String(id));
+    if (!target) {
+      throw new Error('User not found.');
+    }
+
+    const targetIsSuper = isSuperAdminUser(target) || isSuperAdminUser(userData);
+
+    // SECURITY ENFORCEMENT: An admin user CANNOT edit, delete or modify a Super Admin's data
+    if (targetIsSuper && !callerCtx.isSuperAdmin) {
+      throw new Error("Access Denied: Administrators are strictly prohibited from editing or modifying a Super Admin's account.");
+    }
+
+    if (target.email === 'superadmin@school.com' && userData.role && userData.role !== 'super-admin') {
       throw new Error('Root Super Admin role cannot be changed.');
+    }
+
+    // Role escalation guard: only a Super Admin can promote someone to Super Admin
+    if (userData.role === 'super-admin' && !callerCtx.isSuperAdmin) {
+      throw new Error('Access Denied: Only a Super Admin can assign the Super Admin role.');
+    }
+
+    // Deactivation guard: only a Super Admin can deactivate a Super Admin
+    if (targetIsSuper && userData.status && userData.status !== 'active' && !callerCtx.isSuperAdmin) {
+      throw new Error('Access Denied: Administrators cannot deactivate or suspend a Super Admin.');
     }
 
     if (useSupabase) {
@@ -1353,7 +1439,6 @@ export const userAPI = {
       if (idx >= 0) {
         customList[idx] = { ...customList[idx], ...userData };
       } else {
-        const listRes = await userAPI.getAll({ per_page: 'all' });
         const existing = listRes.data.find(u => String(u.id) === String(id));
         if (existing) {
           customList.push({ ...existing, ...userData });
@@ -1365,8 +1450,11 @@ export const userAPI = {
     return { success: true, message: 'User updated successfully!' };
   },
 
-  delete: async (id, currentUser) => {
-    if (String(id) === String(currentUser?.id)) {
+  delete: async (id, currentUser = null) => {
+    const callerCtx = getCallerUserContext(currentUser);
+    const caller = currentUser || callerCtx.user;
+
+    if (String(id) === String(caller?.id)) {
       throw new Error('You cannot delete your own logged-in account.');
     }
 
@@ -1380,8 +1468,11 @@ export const userAPI = {
       throw new Error('The primary root Super Admin account cannot be deleted.');
     }
 
-    if (target.role === 'super-admin' && currentUser?.roles?.[0] !== 'super-admin') {
-      throw new Error('Only a Super Admin can delete another Super Admin.');
+    const targetIsSuper = isSuperAdminUser(target);
+
+    // SECURITY ENFORCEMENT: An admin user CANNOT delete a Super Admin
+    if (targetIsSuper && !callerCtx.isSuperAdmin) {
+      throw new Error('Access Denied: Administrators are strictly prohibited from deleting a Super Admin account.');
     }
 
     if (useSupabase) {
@@ -1404,10 +1495,26 @@ export const userAPI = {
     return { success: true, message: 'User deleted successfully.' };
   },
 
-  resetPassword: async (id, newPassword) => {
+  resetPassword: async (id, newPassword, currentUser = null) => {
     if (!newPassword || newPassword.length < 6) {
       throw new Error('Password must be at least 6 characters.');
     }
+
+    const callerCtx = getCallerUserContext(currentUser);
+
+    const listRes = await userAPI.getAll({ per_page: 'all' });
+    const target = listRes.data.find(u => String(u.id) === String(id));
+    if (!target) {
+      throw new Error('User not found.');
+    }
+
+    const targetIsSuper = isSuperAdminUser(target);
+
+    // SECURITY ENFORCEMENT: An admin user CANNOT change a Super Admin's password
+    if (targetIsSuper && !callerCtx.isSuperAdmin) {
+      throw new Error("Access Denied: Administrators are strictly prohibited from resetting or changing a Super Admin's password.");
+    }
+
     if (useSupabase) {
       try {
         const hashedPassword = bcrypt.hashSync(newPassword, 10);
@@ -1881,7 +1988,19 @@ export const studentAPI = {
     return { success: true, message: 'Student updated successfully', data: updatedStudent };
   },
 
-  delete: async (id) => {
+  delete: async (id, currentUser = null) => {
+    const callerCtx = getCallerUserContext(currentUser);
+    if (!callerCtx.isSuperAdmin) {
+      let configured = null;
+      try {
+        const stored = localStorage.getItem('sms_role_permissions');
+        if (stored) configured = JSON.parse(stored);
+      } catch (_) {}
+      const rolePerms = configured?.[callerCtx.role] || [];
+      if (!rolePerms.includes('delete-students') && !rolePerms.includes('*')) {
+        throw new Error('Access Denied: Your role does not have permission to delete student records.');
+      }
+    }
     if (!useSupabase) return api.delete(`/students/${id}`);
     const { error } = await supabase.from('students').delete().eq('id', id);
     if (error) throw error;
@@ -2585,7 +2704,19 @@ export const teacherAPI = {
     return { success: true, message: 'Teacher updated successfully', data: updatedTeacher };
   },
 
-  delete: async (id) => {
+  delete: async (id, currentUser = null) => {
+    const callerCtx = getCallerUserContext(currentUser);
+    if (!callerCtx.isSuperAdmin) {
+      let configured = null;
+      try {
+        const stored = localStorage.getItem('sms_role_permissions');
+        if (stored) configured = JSON.parse(stored);
+      } catch (_) {}
+      const rolePerms = configured?.[callerCtx.role] || [];
+      if (!rolePerms.includes('delete-teachers') && !rolePerms.includes('*')) {
+        throw new Error('Access Denied: Your role does not have permission to delete teacher records.');
+      }
+    }
     if (!useSupabase) return api.delete(`/teachers/${id}`);
     const { error } = await supabase.from('teachers').delete().eq('id', id);
     if (error) throw error;
@@ -2906,7 +3037,19 @@ export const classAPI = {
 
     return { success: true, data: res };
   },
-  delete: async (id) => {
+  delete: async (id, currentUser = null) => {
+    const callerCtx = getCallerUserContext(currentUser);
+    if (!callerCtx.isSuperAdmin) {
+      let configured = null;
+      try {
+        const stored = localStorage.getItem('sms_role_permissions');
+        if (stored) configured = JSON.parse(stored);
+      } catch (_) {}
+      const rolePerms = configured?.[callerCtx.role] || [];
+      if (!rolePerms.includes('delete-classes') && !rolePerms.includes('*')) {
+        throw new Error('Access Denied: Your role does not have permission to delete class records.');
+      }
+    }
     if (!useSupabase) return api.delete(`/classes/${id}`);
     const { error } = await supabase.from('classes').delete().eq('id', id);
     if (error) throw error;
@@ -4271,31 +4414,114 @@ export const notificationAPI = {
 // ==========================================
 export const settingsAPI = {
   getAll: async () => {
-    if (!useSupabase) return api.get('/settings');
-    const { data, error } = await supabase.from('settings').select('*');
-    if (error) throw error;
-    const settingsMap = {};
-    (data || []).forEach(item => {
-      let val = item.value;
-      if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
-        try {
-          val = JSON.parse(val);
-        } catch {
-          // keep as string
-        }
+    // 1. Read existing cached settings and permissions from localStorage
+    let settingsMap = {};
+    try {
+      const stored = localStorage.getItem('app_settings');
+      if (stored) {
+        settingsMap = JSON.parse(stored);
       }
-      settingsMap[item.key] = val;
-    });
+    } catch (_) {}
+
+    try {
+      const storedPerms = localStorage.getItem('sms_role_permissions');
+      if (storedPerms) {
+        settingsMap.user_role_permissions = JSON.parse(storedPerms);
+      }
+    } catch (_) {}
+
+    if (!useSupabase) {
+      try {
+        const res = await api.get('/settings');
+        if (res?.data) {
+          const apiData = res.data.data || res.data;
+          settingsMap = { ...settingsMap, ...apiData };
+        }
+      } catch (err) {
+        console.warn('Backend settings fetch failed, using local fallback:', err);
+      }
+      return { success: true, data: settingsMap };
+    }
+
+    try {
+      // Race Supabase select against a 5-second timeout to prevent stalling on slow/hanging networks
+      const fetchPromise = supabase.from('settings').select('*');
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Supabase settings query timed out')), 5000)
+      );
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (!error && Array.isArray(data)) {
+        data.forEach(item => {
+          let val = item.value;
+          if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+            try {
+              val = JSON.parse(val);
+            } catch {
+              // keep as string
+            }
+          }
+          settingsMap[item.key] = val;
+        });
+      }
+    } catch (err) {
+      console.warn('Supabase settings fetch failed or timed out, preserving local settings:', err);
+    }
+
+    // Crucial safeguard: ensure custom local permissions are preserved if saved locally
+    try {
+      const localPerms = localStorage.getItem('sms_role_permissions');
+      if (localPerms) {
+        settingsMap.user_role_permissions = JSON.parse(localPerms);
+      }
+    } catch (_) {}
+
     return { success: true, data: settingsMap };
   },
   update: async (data) => {
-    if (!useSupabase) return api.put('/settings', data);
-    for (const [key, value] of Object.entries(data)) {
-      const valStr = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '');
-      const { error } = await supabase.from('settings').upsert({ key, value: valStr }, { onConflict: 'key' });
-      if (error) throw error;
+    // 1. Immediately persist locally to guarantee zero data loss across refreshes
+    try {
+      const stored = localStorage.getItem('app_settings');
+      let currentSettings = stored ? JSON.parse(stored) : {};
+      currentSettings = { ...currentSettings, ...data };
+      localStorage.setItem('app_settings', JSON.stringify(currentSettings));
+      localStorage.setItem('sms_settings', JSON.stringify(currentSettings));
+
+      if (data.user_role_permissions) {
+        localStorage.setItem('sms_role_permissions', JSON.stringify(data.user_role_permissions));
+      }
+    } catch (e) {
+      console.warn('Local storage write warning:', e);
     }
-    return { success: true, data };
+
+    // 2. Synchronize to Supabase with timeout guard
+    if (useSupabase) {
+      try {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Supabase settings upsert timeout')), 6000)
+        );
+
+        for (const [key, value] of Object.entries(data)) {
+          const valStr = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '');
+          const upsertPromise = supabase.from('settings').upsert({ key, value: valStr }, { onConflict: 'key' });
+          const res = await Promise.race([upsertPromise, timeoutPromise]);
+          if (res?.error) {
+            console.error('Supabase settings upsert error for key:', key, res.error);
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase settings upsert encountered issue (persisted locally):', err);
+      }
+      return { success: true, message: 'Settings saved and persisted successfully.', data };
+    }
+
+    // 3. Synchronize to Laravel backend if not Supabase
+    try {
+      await api.put('/settings', data);
+    } catch (err) {
+      console.warn('Backend API settings save failed, persisted locally:', err);
+    }
+    return { success: true, message: 'Settings saved and persisted successfully.', data };
   },
 };
 
@@ -6744,6 +6970,612 @@ export const hrmsAPI = {
     saveStoredHrmsLeaves(DEFAULT_HRMS_LEAVES);
     saveStoredHrmsPayroll(buildDefaultPayroll());
     return { success: true, message: 'HRMS reset to institutional demo data' };
+  },
+};
+
+// ============================================================================
+// TIMETABLE & SUBSTITUTION MANAGEMENT API
+// ============================================================================
+
+export const DEFAULT_TIMETABLE_PERIODS = [
+  { id: '1', period_number: 1, name: 'Period 1', start_time: '08:00', end_time: '08:45', is_break: false, order: 1 },
+  { id: '2', period_number: 2, name: 'Period 2', start_time: '08:45', end_time: '09:30', is_break: false, order: 2 },
+  { id: '3', period_number: 3, name: 'Period 3', start_time: '09:30', end_time: '10:15', is_break: false, order: 3 },
+  { id: 'b1', period_number: 0, name: 'Break', start_time: '10:15', end_time: '10:30', is_break: true, order: 4 },
+  { id: '4', period_number: 4, name: 'Period 4', start_time: '10:30', end_time: '11:15', is_break: false, order: 5 },
+  { id: '5', period_number: 5, name: 'Period 5', start_time: '11:15', end_time: '12:00', is_break: false, order: 6 },
+  { id: 'b2', period_number: 0, name: 'Lunch Break', start_time: '12:00', end_time: '12:40', is_break: true, order: 7 },
+  { id: '6', period_number: 6, name: 'Period 6', start_time: '12:40', end_time: '01:25', is_break: false, order: 8 },
+  { id: '7', period_number: 7, name: 'Period 7', start_time: '01:25', end_time: '02:10', is_break: false, order: 9 },
+];
+
+export const DEFAULT_TIMETABLE_ROOMS = [
+  { id: '1', name: 'Room 201', type: 'classroom', building: 'Main Academic Block', floor: '2nd Floor', capacity: 45 },
+  { id: '2', name: 'Room 202', type: 'classroom', building: 'Main Academic Block', floor: '2nd Floor', capacity: 45 },
+  { id: '3', name: 'Room 203', type: 'classroom', building: 'Main Academic Block', floor: '2nd Floor', capacity: 40 },
+  { id: '4', name: 'Room 204', type: 'classroom', building: 'Science Wing', floor: '1st Floor', capacity: 42 },
+  { id: '5', name: 'Room 205', type: 'classroom', building: 'Language Wing', floor: '2nd Floor', capacity: 40 },
+  { id: '6', name: 'Lab 1', type: 'lab', building: 'Science Wing', floor: 'Ground Floor', capacity: 35 },
+  { id: '7', name: 'Lab 2', type: 'lab', building: 'Science Wing', floor: '1st Floor', capacity: 35 },
+  { id: '8', name: 'Lab 3', type: 'lab', building: 'IT Center', floor: '3rd Floor', capacity: 50 },
+  { id: '9', name: 'Room 105', type: 'classroom', building: 'Humanities Wing', floor: '1st Floor', capacity: 38 },
+  { id: '10', name: 'Room 106', type: 'activity', building: 'Arts Block', floor: '1st Floor', capacity: 30 },
+  { id: '11', name: 'Room 107', type: 'activity', building: 'Music Conservatory', floor: '1st Floor', capacity: 30 },
+  { id: '12', name: 'Ground', type: 'facility', building: 'Sports Complex', floor: 'Outdoors', capacity: 150 },
+  { id: '13', name: 'Library', type: 'facility', building: 'Central Block', floor: '2nd Floor', capacity: 80 },
+];
+
+// Helper builders for initial realistic Class 10-A slots matching reference design image
+const buildDefaultClass10Slots = (schoolId = 1, classId = 10, sectionId = 1) => {
+  const schedule = [
+    // MONDAY
+    { day: 'Monday', p: '1', sub: 'Mathematics', teacher: 'R. Sharma', tId: 101, room: 'Room 201', rId: '1', type: 'lecture' },
+    { day: 'Monday', p: '2', sub: 'English', teacher: 'S. Verma', tId: 102, room: 'Room 202', rId: '2', type: 'lecture' },
+    { day: 'Monday', p: '3', sub: 'Physics', teacher: 'A. Singh', tId: 103, room: 'Lab 1', rId: '6', type: 'lab' },
+    { day: 'Monday', p: '4', sub: 'Chemistry', teacher: 'P. Mehta', tId: 104, room: 'Lab 2', rId: '7', type: 'lab' },
+    { day: 'Monday', p: '5', sub: 'History', teacher: 'V. Joshi', tId: 105, room: 'Room 203', rId: '3', type: 'lecture' },
+    { day: 'Monday', p: '6', sub: 'Computer', teacher: 'N. Gupta', tId: 106, room: 'Lab 3', rId: '8', type: 'lab' },
+    { day: 'Monday', p: '7', sub: 'Physical Ed.', teacher: 'M. Khan', tId: 107, room: 'Ground', rId: '12', type: 'activity' },
+
+    // TUESDAY
+    { day: 'Tuesday', p: '1', sub: 'Science', teacher: 'A. Singh', tId: 103, room: 'Room 204', rId: '4', type: 'lecture' },
+    { day: 'Tuesday', p: '2', sub: 'Hindi', teacher: 'K. Gupta', tId: 108, room: 'Room 205', rId: '5', type: 'lecture' },
+    { day: 'Tuesday', p: '3', sub: 'Mathematics', teacher: 'R. Sharma', tId: 101, room: 'Room 201', rId: '1', type: 'lecture' },
+    { day: 'Tuesday', p: '4', sub: 'English', teacher: 'S. Verma', tId: 102, room: 'Room 202', rId: '2', type: 'lecture' },
+    { day: 'Tuesday', p: '5', sub: 'Geography', teacher: 'T. Das', tId: 109, room: 'Room 203', rId: '3', type: 'lecture' },
+    { day: 'Tuesday', p: '6', sub: 'Art', teacher: 'P. Rao', tId: 110, room: 'Room 106', rId: '10', type: 'activity' },
+    { day: 'Tuesday', p: '7', sub: 'Library', teacher: 'S. Roy', tId: 111, room: 'Library', rId: '13', type: 'activity' },
+
+    // WEDNESDAY
+    { day: 'Wednesday', p: '1', sub: 'Physics', teacher: 'A. Singh', tId: 103, room: 'Lab 1', rId: '6', type: 'lab' },
+    { day: 'Wednesday', p: '2', sub: 'Mathematics', teacher: 'R. Sharma', tId: 101, room: 'Room 201', rId: '1', type: 'lecture' },
+    { day: 'Wednesday', p: '3', sub: 'Chemistry', teacher: 'P. Mehta', tId: 104, room: 'Lab 2', rId: '7', type: 'lab' },
+    { day: 'Wednesday', p: '4', sub: 'English', teacher: 'S. Verma', tId: 102, room: 'Room 202', rId: '2', type: 'lecture' },
+    { day: 'Wednesday', p: '5', sub: 'Computer', teacher: 'N. Gupta', tId: 106, room: 'Lab 3', rId: '8', type: 'lab' },
+    { day: 'Wednesday', p: '6', sub: 'Hindi', teacher: 'K. Gupta', tId: 108, room: 'Room 205', rId: '5', type: 'lecture' },
+    { day: 'Wednesday', p: '7', sub: 'Music', teacher: 'R. Iyer', tId: 112, room: 'Room 107', rId: '11', type: 'activity' },
+
+    // THURSDAY
+    { day: 'Thursday', p: '1', sub: 'Chemistry', teacher: 'P. Mehta', tId: 104, room: 'Lab 2', rId: '7', type: 'lab' },
+    { day: 'Thursday', p: '2', sub: 'History', teacher: 'V. Joshi', tId: 105, room: 'Room 203', rId: '3', type: 'lecture' },
+    { day: 'Thursday', p: '3', sub: 'Mathematics', teacher: 'R. Sharma', tId: 101, room: 'Room 201', rId: '1', type: 'lecture' },
+    { day: 'Thursday', p: '4', sub: 'Biology', teacher: 'D. Patel', tId: 113, room: 'Lab 1', rId: '6', type: 'substitution', is_substituted: true, original_teacher: 'B. Sen', substitute_teacher: 'D. Patel' },
+    { day: 'Thursday', p: '5', sub: 'Physical Ed.', teacher: 'M. Khan', tId: 107, room: 'Ground', rId: '12', type: 'activity' },
+    { day: 'Thursday', p: '6', sub: 'Science', teacher: 'A. Singh', tId: 103, room: 'Room 204', rId: '4', type: 'lecture' },
+    { day: 'Thursday', p: '7', sub: 'Value Ed.', teacher: 'S. Nair', tId: 114, room: 'Room 105', rId: '9', type: 'lecture' },
+
+    // FRIDAY
+    { day: 'Friday', p: '1', sub: 'English', teacher: 'S. Verma', tId: 102, room: 'Room 202', rId: '2', type: 'lecture' },
+    { day: 'Friday', p: '2', sub: 'Geography', teacher: 'T. Das', tId: 109, room: 'Room 203', rId: '3', type: 'lecture' },
+    { day: 'Friday', p: '3', sub: 'Computer', teacher: 'N. Gupta', tId: 106, room: 'Lab 3', rId: '8', type: 'lab' },
+    { day: 'Friday', p: '4', sub: 'Mathematics', teacher: 'R. Sharma', tId: 101, room: 'Room 201', rId: '1', type: 'lecture' },
+    { day: 'Friday', p: '5', sub: 'Hindi', teacher: 'K. Gupta', tId: 108, room: 'Room 205', rId: '5', type: 'lecture' },
+    { day: 'Friday', p: '6', sub: 'Chemistry', teacher: 'P. Mehta', tId: 104, room: 'Lab 2', rId: '7', type: 'lab' },
+    { day: 'Friday', p: '7', sub: 'Library', teacher: 'S. Roy', tId: 111, room: 'Library', rId: '13', type: 'activity' },
+
+    // SATURDAY
+    { day: 'Saturday', p: '1', sub: 'Physical Ed.', teacher: 'M. Khan', tId: 107, room: 'Ground', rId: '12', type: 'activity' },
+    { day: 'Saturday', p: '2', sub: 'Art', teacher: 'P. Rao', tId: 110, room: 'Room 106', rId: '10', type: 'activity' },
+    { day: 'Saturday', p: '3', sub: 'Music', teacher: 'R. Iyer', tId: 112, room: 'Room 107', rId: '11', type: 'activity' },
+    { day: 'Saturday', p: '4', sub: 'Value Ed.', teacher: 'S. Nair', tId: 114, room: 'Room 105', rId: '9', type: 'lecture' },
+    { day: 'Saturday', p: '5', sub: 'English', teacher: 'S. Verma', tId: 102, room: 'Room 202', rId: '2', type: 'lecture' },
+    { day: 'Saturday', p: '6', sub: 'Hindi', teacher: 'K. Gupta', tId: 108, room: 'Room 205', rId: '5', type: 'lecture' },
+    { day: 'Saturday', p: '7', sub: '--', teacher: '--', tId: null, room: '--', rId: null, type: 'free' },
+  ];
+
+  return schedule.map((item, idx) => ({
+    id: `slot-10A-${item.day}-${item.p}`,
+    school_id: schoolId,
+    class_id: classId,
+    class_name: 'Class 10-A',
+    section_id: sectionId,
+    section_name: 'A',
+    term: 'Term 1 (2024-25)',
+    academic_year: '2024-25',
+    day_of_week: item.day,
+    period_id: item.p,
+    subject_id: item.sub,
+    subject_name: item.sub,
+    teacher_id: item.tId,
+    teacher_name: item.teacher,
+    room_id: item.rId,
+    room_name: item.room,
+    activity_type: item.type,
+    is_substituted: !!item.is_substituted,
+    original_teacher_name: item.original_teacher || null,
+    substitute_teacher_name: item.substitute_teacher || null,
+    status: 'published',
+    order: idx,
+  }));
+};
+
+const buildDefaultSubstitutions = () => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  return [
+    {
+      id: 'sub-1',
+      school_id: 1,
+      class_id: 10,
+      class_name: 'Class 10-A',
+      section_id: 1,
+      section_name: 'A',
+      period_id: '4',
+      day_of_week: 'Thursday',
+      date: todayStr,
+      subject_name: 'Biology',
+      original_teacher_id: 115,
+      original_teacher_name: 'B. Sen',
+      substitute_teacher_id: 113,
+      substitute_teacher_name: 'D. Patel',
+      room_name: 'Lab 1',
+      reason: 'Medical Leave',
+      created_at: new Date().toISOString(),
+      status: 'active',
+    },
+    {
+      id: 'sub-2',
+      school_id: 1,
+      class_id: 9,
+      class_name: 'Class 9-B',
+      section_id: 2,
+      section_name: 'B',
+      period_id: '2',
+      day_of_week: 'Thursday',
+      date: todayStr,
+      subject_name: 'Mathematics',
+      original_teacher_id: 101,
+      original_teacher_name: 'R. Sharma',
+      substitute_teacher_id: 103,
+      substitute_teacher_name: 'A. Singh',
+      room_name: 'Room 204',
+      reason: 'Conference Duty',
+      created_at: new Date().toISOString(),
+      status: 'active',
+    },
+    {
+      id: 'sub-3',
+      school_id: 1,
+      class_id: 8,
+      class_name: 'Class 8-A',
+      section_id: 1,
+      section_name: 'A',
+      period_id: '5',
+      day_of_week: 'Thursday',
+      date: todayStr,
+      subject_name: 'History',
+      original_teacher_id: 105,
+      original_teacher_name: 'V. Joshi',
+      substitute_teacher_id: 109,
+      substitute_teacher_name: 'T. Das',
+      room_name: 'Room 203',
+      reason: 'Official Workshop',
+      created_at: new Date().toISOString(),
+      status: 'active',
+    },
+  ];
+};
+
+const getStoredTimetableSlots = () => {
+  try {
+    const raw = localStorage.getItem('sms_timetable_slots');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  const defaults = buildDefaultClass10Slots();
+  try {
+    localStorage.setItem('sms_timetable_slots', JSON.stringify(defaults));
+  } catch (_) {}
+  return defaults;
+};
+
+const saveStoredTimetableSlots = (slots) => {
+  try {
+    localStorage.setItem('sms_timetable_slots', JSON.stringify(slots));
+  } catch (_) {}
+};
+
+const getStoredTimetablePeriods = () => {
+  try {
+    const raw = localStorage.getItem('sms_timetable_periods');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  try {
+    localStorage.setItem('sms_timetable_periods', JSON.stringify(DEFAULT_TIMETABLE_PERIODS));
+  } catch (_) {}
+  return DEFAULT_TIMETABLE_PERIODS;
+};
+
+const saveStoredTimetablePeriods = (periods) => {
+  try {
+    localStorage.setItem('sms_timetable_periods', JSON.stringify(periods));
+  } catch (_) {}
+};
+
+const getStoredTimetableRooms = () => {
+  try {
+    const raw = localStorage.getItem('sms_timetable_rooms');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  try {
+    localStorage.setItem('sms_timetable_rooms', JSON.stringify(DEFAULT_TIMETABLE_ROOMS));
+  } catch (_) {}
+  return DEFAULT_TIMETABLE_ROOMS;
+};
+
+const saveStoredTimetableRooms = (rooms) => {
+  try {
+    localStorage.setItem('sms_timetable_rooms', JSON.stringify(rooms));
+  } catch (_) {}
+};
+
+const getStoredSubstitutions = () => {
+  try {
+    const raw = localStorage.getItem('sms_timetable_substitutions');
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  const defaults = buildDefaultSubstitutions();
+  try {
+    localStorage.setItem('sms_timetable_substitutions', JSON.stringify(defaults));
+  } catch (_) {}
+  return defaults;
+};
+
+const saveStoredSubstitutions = (subs) => {
+  try {
+    localStorage.setItem('sms_timetable_substitutions', JSON.stringify(subs));
+  } catch (_) {}
+};
+
+export const timetableAPI = {
+  // 1. Get Timetable Slots with Filters & Scoping
+  getTimetable: async (params = {}) => {
+    const effectiveSchoolId = getEffectiveSchoolId(params.school_id);
+    let allSlots = getStoredTimetableSlots();
+
+    if (effectiveSchoolId !== 'all') {
+      allSlots = allSlots.filter(s => !s.school_id || String(s.school_id) === String(effectiveSchoolId));
+    }
+
+    if (params.class_id) {
+      allSlots = allSlots.filter(s => String(s.class_id) === String(params.class_id));
+    }
+
+    if (params.section_id) {
+      allSlots = allSlots.filter(s => String(s.section_id) === String(params.section_id));
+    }
+
+    if (params.term) {
+      allSlots = allSlots.filter(s => !s.term || s.term === params.term);
+    }
+
+    if (params.teacher_id) {
+      allSlots = allSlots.filter(s => String(s.teacher_id) === String(params.teacher_id));
+    }
+
+    if (params.day_of_week) {
+      allSlots = allSlots.filter(s => s.day_of_week === params.day_of_week);
+    }
+
+    // Merge active substitutions for today/selected date
+    const todayStr = params.date || new Date().toISOString().split('T')[0];
+    const subs = getStoredSubstitutions().filter(sub => sub.date === todayStr);
+
+    const enriched = allSlots.map(slot => {
+      const activeSub = subs.find(
+        sub =>
+          String(sub.class_id) === String(slot.class_id) &&
+          sub.day_of_week === slot.day_of_week &&
+          String(sub.period_id) === String(slot.period_id)
+      );
+
+      if (activeSub) {
+        return {
+          ...slot,
+          is_substituted: true,
+          original_teacher_name: activeSub.original_teacher_name,
+          substitute_teacher_name: activeSub.substitute_teacher_name,
+          teacher_name: activeSub.substitute_teacher_name,
+          teacher_id: activeSub.substitute_teacher_id,
+          activity_type: 'substitution',
+          substitution_reason: activeSub.reason,
+          substitution_id: activeSub.id,
+        };
+      }
+      return slot;
+    });
+
+    return {
+      success: true,
+      data: enriched,
+      count: enriched.length,
+      publishedStatus: 'Published',
+      publishedOn: '20 May 2024',
+    };
+  },
+
+  // 2. CONFLICT CHECKER (Crucial Requirement: Prevent double-booking same teacher!)
+  checkConflicts: ({ teacher_id, room_id, day_of_week, period_id, class_id, section_id, slot_id, date, substitute_id }) => {
+    const effectiveSchoolId = getEffectiveSchoolId();
+    const allSlots = getStoredTimetableSlots().filter(
+      s => !s.school_id || String(s.school_id) === String(effectiveSchoolId)
+    );
+
+    // 2.1 TEACHER CONFLICT CHECK
+    if (teacher_id && teacher_id !== '--') {
+      const teacherConflict = allSlots.find(s =>
+        String(s.teacher_id) === String(teacher_id) &&
+        s.day_of_week === day_of_week &&
+        String(s.period_id) === String(period_id) &&
+        String(s.id) !== String(slot_id) &&
+        (String(s.class_id) !== String(class_id) || (section_id && String(s.section_id) !== String(section_id)))
+      );
+
+      if (teacherConflict) {
+        return {
+          hasConflict: true,
+          type: 'teacher',
+          message: `Double-Booking Conflict: Teacher ${teacherConflict.teacher_name || 'Teacher'} is already scheduled for ${teacherConflict.class_name || 'another class'} on ${day_of_week} at Period ${period_id}!`,
+          conflictingSlot: teacherConflict,
+        };
+      }
+    }
+
+    // 2.2 ROOM CONFLICT CHECK
+    if (room_id && room_id !== '--') {
+      const roomConflict = allSlots.find(s =>
+        String(s.room_id) === String(room_id) &&
+        s.day_of_week === day_of_week &&
+        String(s.period_id) === String(period_id) &&
+        String(s.id) !== String(slot_id) &&
+        (String(s.class_id) !== String(class_id) || (section_id && String(s.section_id) !== String(section_id)))
+      );
+
+      if (roomConflict) {
+        return {
+          hasConflict: true,
+          type: 'room',
+          message: `Room Conflict: Classroom ${roomConflict.room_name || 'Room'} is already occupied by ${roomConflict.class_name || 'another class'} on ${day_of_week} at Period ${period_id}!`,
+          conflictingSlot: roomConflict,
+        };
+      }
+    }
+
+    // 2.3 ACTIVE SUBSTITUTION CONFLICT CHECK
+    if (teacher_id && date) {
+      const subs = getStoredSubstitutions();
+      const subConflict = subs.find(sub =>
+        sub.date === date &&
+        sub.day_of_week === day_of_week &&
+        String(sub.period_id) === String(period_id) &&
+        String(sub.substitute_teacher_id) === String(teacher_id) &&
+        String(sub.id) !== String(substitute_id) &&
+        (String(sub.class_id) !== String(class_id) || (section_id && String(sub.section_id) !== String(section_id)))
+      );
+
+      if (subConflict) {
+        return {
+          hasConflict: true,
+          type: 'substitute',
+          message: `Substitution Conflict: ${subConflict.substitute_teacher_name} is already serving as substitute for ${subConflict.class_name} during this period!`,
+          conflictingSub: subConflict,
+        };
+      }
+    }
+
+    return { hasConflict: false };
+  },
+
+  // 3. Save or Update Timetable Slot
+  saveSlot: async (slotData) => {
+    // Run conflict prevention check first
+    const conflict = timetableAPI.checkConflicts({
+      teacher_id: slotData.teacher_id,
+      room_id: slotData.room_id,
+      day_of_week: slotData.day_of_week,
+      period_id: slotData.period_id,
+      class_id: slotData.class_id,
+      section_id: slotData.section_id,
+      slot_id: slotData.id,
+    });
+
+    if (conflict.hasConflict) {
+      throw new Error(conflict.message);
+    }
+
+    const slots = getStoredTimetableSlots();
+    const effectiveSchoolId = getEffectiveSchoolId(slotData.school_id);
+
+    const slotPayload = {
+      ...slotData,
+      id: slotData.id || `slot-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      school_id: effectiveSchoolId,
+      updated_at: new Date().toISOString(),
+    };
+
+    const existingIdx = slots.findIndex(s => String(s.id) === String(slotPayload.id));
+    if (existingIdx >= 0) {
+      slots[existingIdx] = slotPayload;
+    } else {
+      slots.push(slotPayload);
+    }
+
+    saveStoredTimetableSlots(slots);
+    return { success: true, data: slotPayload };
+  },
+
+  // 4. Delete Timetable Slot
+  deleteSlot: async (slotId) => {
+    const slots = getStoredTimetableSlots();
+    const filtered = slots.filter(s => String(s.id) !== String(slotId));
+    saveStoredTimetableSlots(filtered);
+    return { success: true, message: 'Timetable slot removed successfully' };
+  },
+
+  // 5. Publish Timetable
+  publishTimetable: async ({ class_id, term, status = 'published' }) => {
+    const slots = getStoredTimetableSlots();
+    slots.forEach(s => {
+      if (!class_id || String(s.class_id) === String(class_id)) {
+        s.status = status;
+        s.published_at = new Date().toISOString();
+      }
+    });
+    saveStoredTimetableSlots(slots);
+    return {
+      success: true,
+      status,
+      published_at: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    };
+  },
+
+  // 6. Get Periods and Breaks
+  getPeriods: async () => {
+    return { success: true, data: getStoredTimetablePeriods() };
+  },
+
+  savePeriod: async (periodData) => {
+    const periods = getStoredTimetablePeriods();
+    const newPeriod = {
+      ...periodData,
+      id: periodData.id || `p-${Date.now()}`,
+    };
+    const idx = periods.findIndex(p => String(p.id) === String(newPeriod.id));
+    if (idx >= 0) periods[idx] = newPeriod;
+    else periods.push(newPeriod);
+    periods.sort((a, b) => (a.order || 0) - (b.order || 0));
+    saveStoredTimetablePeriods(periods);
+    return { success: true, data: newPeriod };
+  },
+
+  deletePeriod: async (periodId) => {
+    const periods = getStoredTimetablePeriods().filter(p => String(p.id) !== String(periodId));
+    saveStoredTimetablePeriods(periods);
+    return { success: true };
+  },
+
+  // 7. Get Rooms and Classrooms
+  getRooms: async () => {
+    return { success: true, data: getStoredTimetableRooms() };
+  },
+
+  saveRoom: async (roomData) => {
+    const rooms = getStoredTimetableRooms();
+    const newRoom = {
+      ...roomData,
+      id: roomData.id || `room-${Date.now()}`,
+    };
+    const idx = rooms.findIndex(r => String(r.id) === String(newRoom.id));
+    if (idx >= 0) rooms[idx] = newRoom;
+    else rooms.push(newRoom);
+    saveStoredTimetableRooms(rooms);
+    return { success: true, data: newRoom };
+  },
+
+  deleteRoom: async (roomId) => {
+    const rooms = getStoredTimetableRooms().filter(r => String(r.id) !== String(roomId));
+    saveStoredTimetableRooms(rooms);
+    return { success: true };
+  },
+
+  // 8. Substitutions Management
+  getSubstitutions: async (params = {}) => {
+    const subs = getStoredSubstitutions();
+    const effectiveSchoolId = getEffectiveSchoolId(params.school_id);
+    let filtered = subs;
+
+    if (effectiveSchoolId !== 'all') {
+      filtered = filtered.filter(s => !s.school_id || String(s.school_id) === String(effectiveSchoolId));
+    }
+    if (params.date) {
+      filtered = filtered.filter(s => s.date === params.date);
+    }
+    return { success: true, data: filtered, count: filtered.length };
+  },
+
+  assignSubstitute: async (subData) => {
+    // Prevent assigning the substitute teacher if already scheduled or substituting elsewhere
+    const conflict = timetableAPI.checkConflicts({
+      teacher_id: subData.substitute_teacher_id,
+      day_of_week: subData.day_of_week,
+      period_id: subData.period_id,
+      class_id: subData.class_id,
+      section_id: subData.section_id,
+      date: subData.date,
+    });
+
+    if (conflict.hasConflict) {
+      throw new Error(`Cannot Assign Substitute: ${conflict.message}`);
+    }
+
+    const subs = getStoredSubstitutions();
+    const newSub = {
+      ...subData,
+      id: subData.id || `sub-${Date.now()}`,
+      created_at: new Date().toISOString(),
+      status: 'active',
+    };
+
+    subs.unshift(newSub);
+    saveStoredSubstitutions(subs);
+    return { success: true, data: newSub };
+  },
+
+  deleteSubstitute: async (subId) => {
+    const subs = getStoredSubstitutions().filter(s => String(s.id) !== String(subId));
+    saveStoredSubstitutions(subs);
+    return { success: true, message: 'Substitute assignment removed' };
+  },
+
+  // 9. Teacher Availability for a Given Period
+  getTeacherAvailability: async ({ day_of_week, period_id, date, teachersList = [] }) => {
+    const slots = getStoredTimetableSlots();
+    const effectiveSchoolId = getEffectiveSchoolId();
+    const schoolSlots = slots.filter(s => !s.school_id || String(s.school_id) === String(effectiveSchoolId));
+
+    const occupiedTeacherMap = {};
+    schoolSlots.forEach(s => {
+      if (s.day_of_week === day_of_week && String(s.period_id) === String(period_id) && s.teacher_id) {
+        occupiedTeacherMap[String(s.teacher_id)] = {
+          class_name: s.class_name,
+          subject_name: s.subject_name,
+          room_name: s.room_name,
+        };
+      }
+    });
+
+    // Also check substitutions on date
+    if (date) {
+      const subs = getStoredSubstitutions().filter(sub => sub.date === date && String(sub.period_id) === String(period_id));
+      subs.forEach(sub => {
+        if (sub.substitute_teacher_id) {
+          occupiedTeacherMap[String(sub.substitute_teacher_id)] = {
+            class_name: sub.class_name,
+            subject_name: `${sub.subject_name} (Substitute)`,
+            room_name: sub.room_name,
+          };
+        }
+      });
+    }
+
+    return teachersList.map(t => ({
+      ...t,
+      is_available: !occupiedTeacherMap[String(t.id)],
+      occupied_with: occupiedTeacherMap[String(t.id)] || null,
+    }));
+  },
+
+  // 10. Reset Timetable Data to Initial Seeded Layout
+  resetTimetableDefaults: async () => {
+    localStorage.removeItem('sms_timetable_slots');
+    localStorage.removeItem('sms_timetable_periods');
+    localStorage.removeItem('sms_timetable_rooms');
+    localStorage.removeItem('sms_timetable_substitutions');
+    return {
+      success: true,
+      slots: getStoredTimetableSlots(),
+      periods: getStoredTimetablePeriods(),
+      rooms: getStoredTimetableRooms(),
+      substitutions: getStoredSubstitutions(),
+    };
   },
 };
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Fragment } from 'react';
+import React, { useState, useEffect, useRef, Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useSettings } from '../../context/SettingsContext';
@@ -20,25 +20,63 @@ const UserPermissionsTable = () => {
 
   // Local state for role permissions matrix
   const [rolePermissions, setRolePermissions] = useState(() => {
+    try {
+      const direct = localStorage.getItem('sms_role_permissions');
+      if (direct) {
+        const parsed = JSON.parse(direct);
+        if (parsed && typeof parsed === 'object') {
+          return mergeRolePermissions(parsed);
+        }
+      }
+    } catch (_) {}
     return mergeRolePermissions(settings?.user_role_permissions);
   });
 
-  const [selectedRole, setSelectedRole] = useState('teacher');
+  const [selectedRole, setSelectedRole] = useState('admin');
   const [viewMode, setViewMode] = useState('inspector'); // 'inspector' | 'matrix'
   const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
+  const lastSavedPermsRef = useRef(null);
 
-  // Sync with settings whenever settings change
+  // Sync with settings whenever settings change (without overriding unsaved user edits or just-saved edits)
   useEffect(() => {
-    if (settings?.user_role_permissions) {
-      setRolePermissions(mergeRolePermissions(settings.user_role_permissions));
-      setHasChanges(false);
+    if (!settings?.user_role_permissions) return;
+    if (hasChanges) return;
+
+    // Check if the current settings match what we just saved locally
+    if (lastSavedPermsRef.current) {
+      try {
+        const direct = localStorage.getItem('sms_role_permissions');
+        if (direct && direct === lastSavedPermsRef.current) {
+          return;
+        }
+      } catch (_) {}
+      if (JSON.stringify(settings.user_role_permissions) === lastSavedPermsRef.current) {
+        return;
+      }
     }
+
+    try {
+      const direct = localStorage.getItem('sms_role_permissions');
+      if (direct) {
+        const parsed = JSON.parse(direct);
+        if (parsed && typeof parsed === 'object') {
+          setRolePermissions(mergeRolePermissions(parsed));
+          return;
+        }
+      }
+    } catch (_) {}
+    setRolePermissions(mergeRolePermissions(settings.user_role_permissions));
   }, [settings?.user_role_permissions]);
 
   // Toggle a single permission for a role
   const handleTogglePermission = (roleId, permissionId) => {
+    if (!isSuperAdmin()) {
+      toast.error('Access Denied: Only a Super Admin can modify system role permissions.');
+      return;
+    }
+
     if (roleId === 'super-admin') {
       toast.info('Super Admin role retains full root permissions by default.');
       return;
@@ -75,6 +113,11 @@ const UserPermissionsTable = () => {
 
   // Toggle all permissions in a module for a role
   const handleToggleModulePermissions = (roleId, moduleObj) => {
+    if (!isSuperAdmin()) {
+      toast.error('Access Denied: Only a Super Admin can modify system role permissions.');
+      return;
+    }
+
     if (roleId === 'super-admin') return;
 
     if (moduleObj.id === 'users' && !isSuperAdmin()) {
@@ -115,6 +158,10 @@ const UserPermissionsTable = () => {
 
   // Enable all permissions for a role
   const handleEnableAllForRole = (roleId) => {
+    if (!isSuperAdmin()) {
+      toast.error('Access Denied: Only a Super Admin can modify system role permissions.');
+      return;
+    }
     if (roleId === 'super-admin') return;
     let allIds = PERMISSION_MODULES.flatMap(m => m.permissions.map(p => p.id));
     if (roleId === 'student') {
@@ -130,6 +177,10 @@ const UserPermissionsTable = () => {
 
   // Disable all permissions for a role
   const handleDisableAllForRole = (roleId) => {
+    if (!isSuperAdmin()) {
+      toast.error('Access Denied: Only a Super Admin can modify system role permissions.');
+      return;
+    }
     if (roleId === 'super-admin') return;
     setRolePermissions(prev => ({
       ...prev,
@@ -141,6 +192,10 @@ const UserPermissionsTable = () => {
 
   // Reset a specific role to default
   const handleResetRoleToDefault = (roleId) => {
+    if (!isSuperAdmin()) {
+      toast.error('Access Denied: Only a Super Admin can modify system role permissions.');
+      return;
+    }
     const defaultList = DEFAULT_ROLE_PERMISSIONS[roleId] || [];
     setRolePermissions(prev => ({
       ...prev,
@@ -152,6 +207,10 @@ const UserPermissionsTable = () => {
 
   // Reset all roles to system defaults
   const handleResetAllToDefault = async () => {
+    if (!isSuperAdmin()) {
+      toast.error('Access Denied: Only a Super Admin can modify system role permissions.');
+      return;
+    }
     const isConfirmed = await confirm({
       title: 'Reset All Role Permissions?',
       message: 'Are you sure you want to restore all user roles to default recommended system permissions? This will overwrite your custom changes.',
@@ -160,7 +219,12 @@ const UserPermissionsTable = () => {
     });
 
     if (isConfirmed) {
-      setRolePermissions({ ...DEFAULT_ROLE_PERMISSIONS });
+      const defaults = { ...DEFAULT_ROLE_PERMISSIONS };
+      setRolePermissions(defaults);
+      try {
+        localStorage.setItem('sms_role_permissions', JSON.stringify(defaults));
+        window.dispatchEvent(new CustomEvent('sms:permissions-updated', { detail: defaults }));
+      } catch (_) {}
       setHasChanges(true);
       toast.info('All user roles reset to default permissions. Click Save to persist.');
     }
@@ -168,8 +232,22 @@ const UserPermissionsTable = () => {
 
   // Save changes
   const handleSavePermissions = async () => {
+    if (!isSuperAdmin()) {
+      toast.error('Access Denied: Only a Super Admin can modify system role permissions.');
+      return;
+    }
     setSaving(true);
     try {
+      const permsJson = JSON.stringify(rolePermissions);
+      lastSavedPermsRef.current = permsJson;
+
+      // 1. Immediately write to dedicated localStorage to guarantee persistence across refresh
+      try {
+        localStorage.setItem('sms_role_permissions', permsJson);
+        window.dispatchEvent(new CustomEvent('sms:permissions-updated', { detail: rolePermissions }));
+      } catch (_) {}
+
+      // 2. Persist to SettingsContext & API
       const res = await updateSettings({
         user_role_permissions: rolePermissions,
       });

@@ -7,6 +7,7 @@ import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
+import StudentAttendanceMatrix from '../../components/attendance/StudentAttendanceMatrix';
 
 const AttendanceList = () => {
   const navigate = useNavigate();
@@ -27,6 +28,9 @@ const AttendanceList = () => {
   } = useAuth();
 
   const isStudentOrParent = isStudent() || isParent();
+
+  // View Mode: 'sheet' (Annual Student Matrix Sheet like design) | 'register' (Daily Register Log)
+  const [viewMode, setViewMode] = useState('sheet');
 
   const [attendances, setAttendances] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -455,236 +459,275 @@ const AttendanceList = () => {
             </h1>
             <p className="text-sm text-gray-600 mt-1">
               {isParent()
-                ? "View your child's daily attendance history, check-in records, and statistics."
-                : 'View your personalized daily attendance history, check-in records, and statistics.'}
+                ? "View your child's annual attendance matrix sheet, check-in records, and statistics."
+                : 'View your personalized annual attendance matrix sheet, check-in records, and statistics.'}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <div className="inline-flex rounded-xl bg-gray-100 p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('sheet')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === 'sheet'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <span>📊</span>
+                <span>Annual Sheet</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('register')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === 'register'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <span>📋</span>
+                <span>Daily Log</span>
+              </button>
+            </div>
+
             <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full font-semibold">
               {isParent() ? '🔒 Child Attendance View' : '🔒 Personal Student View'}
             </span>
           </div>
         </div>
 
-        {/* Student Profile & Attendance Summary Card */}
-        {studentLoading ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 animate-pulse">
-            <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="h-16 bg-gray-100 rounded-xl"></div>
-              <div className="h-16 bg-gray-100 rounded-xl"></div>
-              <div className="h-16 bg-gray-100 rounded-xl"></div>
-              <div className="h-16 bg-gray-100 rounded-xl"></div>
-              <div className="h-16 bg-gray-100 rounded-xl"></div>
-            </div>
-          </div>
+        {viewMode === 'sheet' ? (
+          <StudentAttendanceMatrix
+            student={currentStudent}
+            showBreadcrumb={false}
+            showTabs={false}
+            allowCreateNew={false}
+            canSelectStudent={false}
+          />
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 space-y-4">
-            {/* Student Details Bar (Strictly Read-Only - No other student or class selection) */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg shadow-xs">
-                  {currentStudent ? `${currentStudent.first_name?.[0] || 'S'}${currentStudent.last_name?.[0] || ''}` : '👨‍🎓'}
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-gray-900">
-                    {currentStudent ? `${currentStudent.first_name} ${currentStudent.last_name}` : 'Enrolled Student'}
-                  </h2>
-                  <p className="text-xs text-gray-500 font-mono">
-                    Admission No: <span className="font-semibold text-gray-800">{currentStudent?.admission_number || 'N/A'}</span>
-                    {currentStudent?.roll_number && (
-                      <span className="ml-2 pl-2 border-l border-gray-300">
-                        Roll: <span className="font-semibold text-gray-800">{currentStudent.roll_number}</span>
-                      </span>
-                    )}
-                  </p>
+          <>
+            {/* Student Profile & Attendance Summary Card */}
+            {studentLoading ? (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <div className="h-16 bg-gray-100 rounded-xl"></div>
+                  <div className="h-16 bg-gray-100 rounded-xl"></div>
+                  <div className="h-16 bg-gray-100 rounded-xl"></div>
+                  <div className="h-16 bg-gray-100 rounded-xl"></div>
+                  <div className="h-16 bg-gray-100 rounded-xl"></div>
                 </div>
               </div>
-
-              {/* Locked Class & Section Info */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 font-medium">Assigned Class:</span>
-                <span className="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-900 rounded-lg text-xs font-bold">
-                  {currentStudent?.class?.name || (currentStudent?.class_id ? `Class ${currentStudent.class_id}` : 'Class 10')}
-                </span>
-                <span className="px-3 py-1 bg-purple-50 border border-purple-200 text-purple-900 rounded-lg text-xs font-bold">
-                  {currentStudent?.section?.name || (currentStudent?.section_id ? `Section ${currentStudent.section_id}` : 'Section A')}
-                </span>
-              </div>
-            </div>
-
-            {/* Attendance Stat Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-center">
-                <p className="text-xs font-medium text-gray-500">Total Recorded</p>
-                <p className="text-xl font-bold text-gray-900 mt-1">{studentStats.total} <span className="text-xs font-normal text-gray-500">Days</span></p>
-              </div>
-
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-center">
-                <p className="text-xs font-medium text-emerald-700 flex items-center justify-center gap-1">
-                  <span>✓</span> Present
-                </p>
-                <p className="text-xl font-bold text-emerald-800 mt-1">{studentStats.present} <span className="text-xs font-normal text-emerald-600">Days</span></p>
-              </div>
-
-              <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 text-center">
-                <p className="text-xs font-medium text-red-700 flex items-center justify-center gap-1">
-                  <span>✕</span> Absent
-                </p>
-                <p className="text-xl font-bold text-red-800 mt-1">{studentStats.absent} <span className="text-xs font-normal text-red-600">Days</span></p>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-center">
-                <p className="text-xs font-medium text-amber-700 flex items-center justify-center gap-1">
-                  <span>⏰</span> Late / Excused
-                </p>
-                <p className="text-xl font-bold text-amber-800 mt-1">{(studentStats.late || 0) + (studentStats.excused || 0)} <span className="text-xs font-normal text-amber-600">Days</span></p>
-              </div>
-
-              <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-3.5 text-center">
-                <p className="text-xs font-medium text-indigo-700">Attendance Rate</p>
-                <p className={`text-xl font-extrabold mt-1 ${
-                  studentStats.percentage >= 75 ? 'text-emerald-700' : studentStats.percentage >= 60 ? 'text-amber-700' : 'text-red-700'
-                }`}>
-                  {studentStats.percentage}%
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Student Specific Filters (Date Presets, Date Pickers, Status - Strictly No Class/Section) */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-100">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Filter By Date:</span>
-              <div className="inline-flex rounded-xl bg-gray-100 p-1 text-xs">
-                <button
-                  type="button"
-                  onClick={() => handleDatePresetChange('this_month')}
-                  className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
-                    datePreset === 'this_month' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  This Month
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDatePresetChange('last_30_days')}
-                  className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
-                    datePreset === 'last_30_days' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Last 30 Days
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDatePresetChange('all')}
-                  className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
-                    datePreset === 'all' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  All Records
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDatePresetChange('custom')}
-                  className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
-                    datePreset === 'custom' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Custom Range
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDatePresetChange('single')}
-                  className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
-                    datePreset === 'single' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Specific Date
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                handleDatePresetChange('this_month');
-                handleFilterChange('status', '');
-              }}
-              className="text-xs text-gray-500 hover:text-gray-800 underline cursor-pointer self-end md:self-auto"
-            >
-              Reset Filters
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {datePreset === 'single' ? (
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Date</label>
-                <input
-                  type="date"
-                  value={filters.date || ''}
-                  onChange={(e) => handleFilterChange('date', e.target.value)}
-                  className="input-field text-xs"
-                />
-              </div>
-            ) : datePreset === 'custom' ? (
-              <>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Start Date</label>
-                  <input
-                    type="date"
-                    value={filters.start_date || ''}
-                    onChange={(e) => handleFilterChange('start_date', e.target.value)}
-                    className="input-field text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">End Date</label>
-                  <input
-                    type="date"
-                    value={filters.end_date || ''}
-                    onChange={(e) => handleFilterChange('end_date', e.target.value)}
-                    className="input-field text-xs"
-                  />
-                </div>
-              </>
             ) : (
-              <div className="sm:col-span-2 flex items-center text-xs text-gray-500 italic pt-2">
-                Showing {datePreset === 'this_month' ? 'records from the current month' : datePreset === 'last_30_days' ? 'records from the past 30 days' : 'all recorded attendance sessions'}.
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 space-y-4">
+                {/* Student Details Bar (Strictly Read-Only - No other student or class selection) */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg shadow-xs">
+                      {currentStudent ? `${currentStudent.first_name?.[0] || 'S'}${currentStudent.last_name?.[0] || ''}` : '👨‍🎓'}
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-gray-900">
+                        {currentStudent ? `${currentStudent.first_name} ${currentStudent.last_name}` : 'Enrolled Student'}
+                      </h2>
+                      <p className="text-xs text-gray-500 font-mono">
+                        Admission No: <span className="font-semibold text-gray-800">{currentStudent?.admission_number || 'N/A'}</span>
+                        {currentStudent?.roll_number && (
+                          <span className="ml-2 pl-2 border-l border-gray-300">
+                            Roll: <span className="font-semibold text-gray-800">{currentStudent.roll_number}</span>
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Locked Class & Section Info */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 font-medium">Assigned Class:</span>
+                    <span className="px-3 py-1 bg-blue-50 border border-blue-200 text-blue-900 rounded-lg text-xs font-bold">
+                      {currentStudent?.class?.name || (currentStudent?.class_id ? `Class ${currentStudent.class_id}` : 'Class 10')}
+                    </span>
+                    <span className="px-3 py-1 bg-purple-50 border border-purple-200 text-purple-900 rounded-lg text-xs font-bold">
+                      {currentStudent?.section?.name || (currentStudent?.section_id ? `Section ${currentStudent.section_id}` : 'Section A')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Attendance Stat Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 text-center">
+                    <p className="text-xs font-medium text-gray-500">Total Recorded</p>
+                    <p className="text-xl font-bold text-gray-900 mt-1">{studentStats.total} <span className="text-xs font-normal text-gray-500">Days</span></p>
+                  </div>
+
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 text-center">
+                    <p className="text-xs font-medium text-emerald-700 flex items-center justify-center gap-1">
+                      <span>✓</span> Present
+                    </p>
+                    <p className="text-xl font-bold text-emerald-800 mt-1">{studentStats.present} <span className="text-xs font-normal text-emerald-600">Days</span></p>
+                  </div>
+
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3.5 text-center">
+                    <p className="text-xs font-medium text-red-700 flex items-center justify-center gap-1">
+                      <span>✕</span> Absent
+                    </p>
+                    <p className="text-xl font-bold text-red-800 mt-1">{studentStats.absent} <span className="text-xs font-normal text-red-600">Days</span></p>
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-center">
+                    <p className="text-xs font-medium text-amber-700 flex items-center justify-center gap-1">
+                      <span>⏰</span> Late / Excused
+                    </p>
+                    <p className="text-xl font-bold text-amber-800 mt-1">{(studentStats.late || 0) + (studentStats.excused || 0)} <span className="text-xs font-normal text-amber-600">Days</span></p>
+                  </div>
+
+                  <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-xl p-3.5 text-center">
+                    <p className="text-xs font-medium text-indigo-700">Attendance Rate</p>
+                    <p className={`text-xl font-extrabold mt-1 ${
+                      studentStats.percentage >= 75 ? 'text-emerald-700' : studentStats.percentage >= 60 ? 'text-amber-700' : 'text-red-700'
+                    }`}>
+                      {studentStats.percentage}%
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Attendance Status</label>
-              <select
-                value={filters.status}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="input-field text-xs"
-              >
-                <option value="">All Statuses (Present, Absent, Late)</option>
-                <option value="present">Present Only</option>
-                <option value="absent">Absent Only</option>
-                <option value="late">Late Only</option>
-                <option value="excused">Excused / On-Leave</option>
-              </select>
-            </div>
-          </div>
-        </div>
+            {/* Student Specific Filters (Date Presets, Date Pickers, Status - Strictly No Class/Section) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Filter By Date:</span>
+                  <div className="inline-flex rounded-xl bg-gray-100 p-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => handleDatePresetChange('this_month')}
+                      className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
+                        datePreset === 'this_month' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      This Month
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDatePresetChange('last_30_days')}
+                      className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
+                        datePreset === 'last_30_days' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Last 30 Days
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDatePresetChange('all')}
+                      className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
+                        datePreset === 'all' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      All Records
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDatePresetChange('custom')}
+                      className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
+                        datePreset === 'custom' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Custom Range
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDatePresetChange('single')}
+                      className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
+                        datePreset === 'single' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Specific Date
+                    </button>
+                  </div>
+                </div>
 
-        {/* Student Attendance Records Table (No action buttons, no other students) */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-          <DataTable
-            columns={studentColumns}
-            data={attendances}
-            loading={loading}
-            pagination={pagination}
-            onPageChange={handlePageChange}
-            actions={null}
-          />
-        </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDatePresetChange('this_month');
+                    handleFilterChange('status', '');
+                  }}
+                  className="text-xs text-gray-500 hover:text-gray-800 underline cursor-pointer self-end md:self-auto"
+                >
+                  Reset Filters
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {datePreset === 'single' ? (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Date</label>
+                    <input
+                      type="date"
+                      value={filters.date || ''}
+                      onChange={(e) => handleFilterChange('date', e.target.value)}
+                      className="input-field text-xs"
+                    />
+                  </div>
+                ) : datePreset === 'custom' ? (
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={filters.start_date || ''}
+                        onChange={(e) => handleFilterChange('start_date', e.target.value)}
+                        className="input-field text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={filters.end_date || ''}
+                        onChange={(e) => handleFilterChange('end_date', e.target.value)}
+                        className="input-field text-xs"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="sm:col-span-2 flex items-center text-xs text-gray-500 italic pt-2">
+                    Showing {datePreset === 'this_month' ? 'records from the current month' : datePreset === 'last_30_days' ? 'records from the past 30 days' : 'all recorded attendance sessions'}.
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Attendance Status</label>
+                  <select
+                    value={filters.status}
+                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    className="input-field text-xs"
+                  >
+                    <option value="">All Statuses (Present, Absent, Late)</option>
+                    <option value="present">Present Only</option>
+                    <option value="absent">Absent Only</option>
+                    <option value="late">Late Only</option>
+                    <option value="excused">Excused / On-Leave</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Student Attendance Records Table (No action buttons, no other students) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              <DataTable
+                columns={studentColumns}
+                data={attendances}
+                loading={loading}
+                pagination={pagination}
+                onPageChange={handlePageChange}
+                actions={null}
+              />
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -697,10 +740,45 @@ const AttendanceList = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Attendance Records</h1>
-          <p className="text-gray-600 text-sm mt-1">View, track, and manage school attendance registers</p>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <span>📅</span> Attendance Management
+          </h1>
+          <p className="text-gray-600 text-sm mt-1">
+            {viewMode === 'sheet'
+              ? 'View comprehensive annual attendance matrix sheets and statistics by student'
+              : 'View, track, and manage school attendance registers'}
+          </p>
         </div>
-        <div className="flex items-center space-x-3">
+
+        <div className="flex items-center space-x-3 flex-wrap">
+          {/* View Mode Toggle: Annual Sheet vs Daily Register */}
+          <div className="inline-flex rounded-xl bg-gray-100 p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setViewMode('sheet')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                viewMode === 'sheet'
+                  ? 'bg-white text-blue-700 shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <span>📊</span>
+              <span>Annual Sheet</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('register')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                viewMode === 'register'
+                  ? 'bg-white text-blue-700 shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <span>📋</span>
+              <span>Daily Log</span>
+            </button>
+          </div>
+
           {hasPermission('mark-attendance') && (
             <button
               onClick={() => navigate('/attendance/mark')}
@@ -726,94 +804,105 @@ const AttendanceList = () => {
         </div>
       </div>
 
-      {/* Staff Filters */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Date</label>
-            <input
-              type="date"
-              value={filters.date}
-              onChange={(e) => handleFilterChange('date', e.target.value)}
-              className="input-field text-xs"
+      {viewMode === 'sheet' ? (
+        <StudentAttendanceMatrix
+          canSelectStudent={true}
+          showBreadcrumb={false}
+          showTabs={true}
+          allowCreateNew={hasPermission('mark-attendance')}
+        />
+      ) : (
+        <>
+          {/* Staff Filters */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={filters.date}
+                  onChange={(e) => handleFilterChange('date', e.target.value)}
+                  className="input-field text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Class</label>
+                <select
+                  value={filters.class_id}
+                  onChange={(e) => handleFilterChange('class_id', e.target.value)}
+                  className="input-field text-xs"
+                >
+                  <option value="">All Classes</option>
+                  {classes.map((cls) => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Section</label>
+                <select
+                  value={filters.section_id}
+                  onChange={(e) => handleFilterChange('section_id', e.target.value)}
+                  className="input-field text-xs"
+                  disabled={!filters.class_id}
+                >
+                  <option value="">All Sections</option>
+                  {sections.map((section) => (
+                    <option key={section.id} value={section.id}>
+                      {section.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Status</label>
+                <select
+                  value={filters.status}
+                  onChange={(e) => handleFilterChange('status', e.target.value)}
+                  className="input-field text-xs"
+                >
+                  <option value="">All Status</option>
+                  <option value="present">Present</option>
+                  <option value="absent">Absent</option>
+                  <option value="late">Late</option>
+                  <option value="excused">Excused</option>
+                </select>
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={() => {
+                    setFilters({
+                      page: 1,
+                      per_page: 20,
+                      class_id: '',
+                      section_id: '',
+                      date: new Date().toISOString().split('T')[0],
+                      status: '',
+                    });
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            <DataTable
+              columns={staffColumns}
+              data={attendances}
+              loading={loading}
+              pagination={pagination}
+              onPageChange={handlePageChange}
+              actions={staffActions}
             />
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Class</label>
-            <select
-              value={filters.class_id}
-              onChange={(e) => handleFilterChange('class_id', e.target.value)}
-              className="input-field text-xs"
-            >
-              <option value="">All Classes</option>
-              {classes.map((cls) => (
-                <option key={cls.id} value={cls.id}>
-                  {cls.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Section</label>
-            <select
-              value={filters.section_id}
-              onChange={(e) => handleFilterChange('section_id', e.target.value)}
-              className="input-field text-xs"
-              disabled={!filters.class_id}
-            >
-              <option value="">All Sections</option>
-              {sections.map((section) => (
-                <option key={section.id} value={section.id}>
-                  {section.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Status</label>
-            <select
-              value={filters.status}
-              onChange={(e) => handleFilterChange('status', e.target.value)}
-              className="input-field text-xs"
-            >
-              <option value="">All Status</option>
-              <option value="present">Present</option>
-              <option value="absent">Absent</option>
-              <option value="late">Late</option>
-              <option value="excused">Excused</option>
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={() => {
-                setFilters({
-                  page: 1,
-                  per_page: 20,
-                  class_id: '',
-                  section_id: '',
-                  date: new Date().toISOString().split('T')[0],
-                  status: '',
-                });
-              }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 transition cursor-pointer"
-            >
-              Clear Filters
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <DataTable
-          columns={staffColumns}
-          data={attendances}
-          loading={loading}
-          pagination={pagination}
-          onPageChange={handlePageChange}
-          actions={staffActions}
-        />
-      </div>
+        </>
+      )}
     </div>
   );
 };

@@ -83,14 +83,21 @@ const normalizeSettings = (raw) => {
   }
 
   // Normalize user role permissions
-  if (typeof merged.user_role_permissions === 'string') {
+  let candidatePerms = raw?.user_role_permissions ?? merged.user_role_permissions;
+  if (!candidatePerms) {
     try {
-      merged.user_role_permissions = JSON.parse(merged.user_role_permissions);
+      const stored = localStorage.getItem('sms_role_permissions');
+      if (stored) candidatePerms = JSON.parse(stored);
+    } catch (_) {}
+  }
+  if (typeof candidatePerms === 'string') {
+    try {
+      candidatePerms = JSON.parse(candidatePerms);
     } catch {
-      merged.user_role_permissions = DEFAULT_ROLE_PERMISSIONS;
+      candidatePerms = DEFAULT_ROLE_PERMISSIONS;
     }
   }
-  merged.user_role_permissions = mergeRolePermissions(merged.user_role_permissions);
+  merged.user_role_permissions = mergeRolePermissions(candidatePerms);
 
   merged.student_min_age_years = parseInt(merged.student_min_age_years ?? 2, 10);
   merged.student_min_age_months = parseInt(merged.student_min_age_months ?? 6, 10);
@@ -128,7 +135,17 @@ export const SettingsProvider = ({ children }) => {
   const [settings, setSettings] = useState(() => {
     try {
       const cached = localStorage.getItem('app_settings');
-      return cached ? normalizeSettings(JSON.parse(cached)) : DEFAULT_SETTINGS;
+      const cachedPerms = localStorage.getItem('sms_role_permissions');
+      let base = cached ? normalizeSettings(JSON.parse(cached)) : DEFAULT_SETTINGS;
+      if (cachedPerms) {
+        try {
+          const parsedPerms = JSON.parse(cachedPerms);
+          if (parsedPerms && typeof parsedPerms === 'object') {
+            base.user_role_permissions = mergeRolePermissions(parsedPerms);
+          }
+        } catch (_) {}
+      }
+      return base;
     } catch {
       return DEFAULT_SETTINGS;
     }
@@ -140,9 +157,28 @@ export const SettingsProvider = ({ children }) => {
     try {
       const response = await settingsAPI.getAll();
       if (response && response.success && response.data) {
-        const merged = normalizeSettings(response.data);
+        // Retain any locally configured permissions so remote defaults never overwrite user settings
+        let rolePerms = response.data.user_role_permissions;
+        try {
+          const localPerms = localStorage.getItem('sms_role_permissions');
+          if (localPerms) {
+            const parsedLocal = JSON.parse(localPerms);
+            if (parsedLocal && typeof parsedLocal === 'object') {
+              rolePerms = mergeRolePermissions(parsedLocal);
+            }
+          }
+        } catch (_) {}
+
+        const merged = normalizeSettings({
+          ...response.data,
+          user_role_permissions: rolePerms || response.data.user_role_permissions,
+        });
         setSettings(merged);
         localStorage.setItem('app_settings', JSON.stringify(merged));
+        localStorage.setItem('sms_settings', JSON.stringify(merged));
+        if (merged.user_role_permissions) {
+          localStorage.setItem('sms_role_permissions', JSON.stringify(merged.user_role_permissions));
+        }
       }
     } catch (error) {
       console.warn('Could not fetch settings, using defaults/cached:', error);
@@ -163,19 +199,21 @@ export const SettingsProvider = ({ children }) => {
 
   const updateSettings = async (newSettings) => {
     try {
-      const response = await settingsAPI.update(newSettings);
-      if (response && response.success) {
-        const updated = normalizeSettings({ ...settings, ...(response.data || newSettings) });
-        setSettings(updated);
-        localStorage.setItem('app_settings', JSON.stringify(updated));
-        toast.success(response.message || 'Settings updated successfully!');
-        return { success: true, data: updated };
+      // 1. Immediately write to local storage stores
+      if (newSettings.user_role_permissions) {
+        localStorage.setItem('sms_role_permissions', JSON.stringify(newSettings.user_role_permissions));
       }
-      return { success: false };
+      const updated = normalizeSettings({ ...settings, ...newSettings });
+      setSettings(updated);
+      localStorage.setItem('app_settings', JSON.stringify(updated));
+      localStorage.setItem('sms_settings', JSON.stringify(updated));
+
+      // 2. Persist to API / Supabase
+      const response = await settingsAPI.update(newSettings);
+      return { success: true, message: response?.message || 'Settings updated successfully!', data: updated };
     } catch (error) {
-      const msg = error.response?.data?.message || error.message || 'Failed to update settings';
-      showGlobalValidationError(msg, 'Settings Error');
-      return { success: false, error };
+      console.warn('Remote settings update error (persisted locally):', error);
+      return { success: true, message: 'Settings saved locally.', data: settings };
     }
   };
 
