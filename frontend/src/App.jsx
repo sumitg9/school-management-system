@@ -55,6 +55,8 @@ import Communication from './pages/communication/Communication';
 import NotificationCenter from './pages/notifications/NotificationCenter';
 import EventManagement from './pages/events/EventManagement';
 import HRMSDashboard from './pages/hrms/HRMSDashboard';
+import SchoolsManagement from './pages/schools/SchoolsManagement';
+import { SchoolProvider } from './context/SchoolContext';
 import PermissionRoute from './components/common/PermissionRoute';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
@@ -137,6 +139,7 @@ function AppRoutes() {
                     <Route path="/events" element={<PermissionRoute permission="view-events"><EventManagement /></PermissionRoute>} />
                     <Route path="/calendar" element={<Navigate to="/events" replace />} />
                     <Route path="/hrms" element={<PermissionRoute permission="view-hrms"><HRMSDashboard /></PermissionRoute>} />
+                    <Route path="/schools" element={<PermissionRoute permission="view-schools"><SchoolsManagement /></PermissionRoute>} />
                     <Route path="/notifications" element={<NotificationCenter />} />
                     <Route path="/users" element={<PermissionRoute permission="manage-users"><UserList /></PermissionRoute>} />
                     <Route path="/settings" element={<PermissionRoute permission="manage-settings"><Settings /></PermissionRoute>} />
@@ -158,13 +161,15 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <SettingsProvider>
-          <ConfirmProvider>
-            <AlertProvider>
-              <AppRoutes />
-            </AlertProvider>
-          </ConfirmProvider>
-        </SettingsProvider>
+        <SchoolProvider>
+          <SettingsProvider>
+            <ConfirmProvider>
+              <AlertProvider>
+                <AppRoutes />
+              </AlertProvider>
+            </ConfirmProvider>
+          </SettingsProvider>
+        </SchoolProvider>
       </AuthProvider>
     </Router>
   );

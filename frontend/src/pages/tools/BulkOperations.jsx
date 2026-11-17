@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import Badge from '../../components/common/Badge';
 import { studentAPI } from '../../services/api';
 import { useAlert } from '../../context/AlertContext';
+import { seedAllBranchesData, clearAllBranchesData } from '../../services/dataSeeder';
 
 const CSV_TEMPLATES = {
   students: `first_name,last_name,email,phone,admission_number,admission_date,class_id,section_id,academic_year_id,roll_number,date_of_birth,gender,blood_group,religion,caste,nationality,mother_tongue,status,address,city,state,country,postal_code,father_name,father_phone,father_occupation,mother_name,mother_phone,mother_occupation,guardian_name,guardian_phone,guardian_relation,emergency_contact_name,emergency_contact_phone,emergency_contact_relation,previous_school,medical_conditions,allergies,notes
@@ -28,6 +29,43 @@ const BulkOperations = () => {
   const [exportType, setExportType] = useState('students');
   const [exportFormat, setExportFormat] = useState('csv');
   const [loading, setLoading] = useState(false);
+
+  // Seeder States
+  const [seeding, setSeeding] = useState(false);
+  const [seedProgress, setSeedProgress] = useState({ step: '', percent: 0, message: '' });
+  const [seedResult, setSeedResult] = useState(null);
+  const [selectedBranchesToSeed, setSelectedBranchesToSeed] = useState([1, 2, 3]);
+
+  const handleRunSeeder = async () => {
+    if (selectedBranchesToSeed.length === 0) {
+      toast.warning('Please select at least one branch campus to seed.');
+      return;
+    }
+    setSeeding(true);
+    setSeedResult(null);
+    try {
+      const res = await seedAllBranchesData({
+        branches: selectedBranchesToSeed,
+        onProgress: (step, percent, message) => {
+          setSeedProgress({ step, percent, message });
+        },
+      });
+      setSeedResult(res.summary);
+      toast.success('🎉 Dummy data seeded successfully across all branches & features!');
+    } catch (err) {
+      toast.error(err.message || 'Failed to seed branch data.');
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const handleClearSeeded = () => {
+    if (window.confirm('Are you sure you want to reset seeded demo data back to baseline?')) {
+      clearAllBranchesData();
+      toast.info('Seeded branch data reset successfully.');
+      setSeedResult(null);
+    }
+  };
 
   const importTypes = [
     { id: 'students', name: 'Students', icon: '👨‍🎓', description: 'Import student records' },
@@ -172,10 +210,185 @@ const BulkOperations = () => {
             >
               📤 Export Data
             </button>
+            <button
+              onClick={() => setActiveTab('seeder')}
+              className={`px-6 py-3 font-medium ${
+                activeTab === 'seeder'
+                  ? 'border-b-2 border-emerald-500 text-emerald-600 font-bold'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              🌱 Multi-Branch Demo Seeder
+            </button>
           </div>
         </div>
 
-        {/* Import Tab */}
+        {/* Enterprise Multi-Branch Seeder Tab */}
+        {activeTab === 'seeder' && (
+          <div className="p-6 space-y-6">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start space-x-3 text-emerald-950">
+              <span className="text-2xl">🌱</span>
+              <div>
+                <h4 className="font-bold text-base text-emerald-950">Enterprise Multi-Branch & Multi-Feature Seeder</h4>
+                <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
+                  Populate complete dummy datasets across all 3 school branches (Siliguri Main, Kolkata Central, Bangalore South)
+                  covering student admissions, faculty with bank details & IFSC, fee structures, receipts, 3-month HRMS payrolls,
+                  institutional events, and notifications. All records maintain strict multi-tenant branch data isolation.
+                </p>
+              </div>
+            </div>
+
+            {/* Target Campus Cards */}
+            <div>
+              <h4 className="text-sm font-bold text-gray-900 mb-3">1. Target Branch Campuses</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {[
+                  { id: 1, name: 'Siliguri Main Campus', code: 'DPS-SLG-01', board: 'CBSE', state: 'West Bengal', color: 'blue', emoji: '🏫' },
+                  { id: 2, name: 'Kolkata Central Campus', code: 'DPS-KOL-02', board: 'ICSE', state: 'West Bengal', color: 'purple', emoji: '🏛️' },
+                  { id: 3, name: 'Bangalore South Branch', code: 'DPS-BLR-03', board: 'CBSE', state: 'Karnataka', color: 'emerald', emoji: '🎓' },
+                ].map((b) => {
+                  const isChecked = selectedBranchesToSeed.includes(b.id);
+                  return (
+                    <div
+                      key={b.id}
+                      onClick={() => {
+                        if (isChecked) {
+                          setSelectedBranchesToSeed(selectedBranchesToSeed.filter((x) => x !== b.id));
+                        } else {
+                          setSelectedBranchesToSeed([...selectedBranchesToSeed, b.id]);
+                        }
+                      }}
+                      className={`p-4 rounded-xl border-2 cursor-pointer transition ${
+                        isChecked
+                          ? 'border-emerald-600 bg-emerald-50/70 shadow-sm'
+                          : 'border-gray-200 bg-gray-50 opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl">{b.emoji}</span>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="h-4 w-4 text-emerald-600 rounded pointer-events-none"
+                        />
+                      </div>
+                      <p className="font-bold text-gray-900 text-sm">{b.name}</p>
+                      <p className="text-xs text-gray-500 font-mono mt-0.5">{b.code} • {b.board}</p>
+                      <p className="text-[11px] text-gray-400 mt-1">{b.state}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Feature Modules Breakdown */}
+            <div>
+              <h4 className="text-sm font-bold text-gray-900 mb-3">2. Features Covered in Seeding</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 bg-gray-50 border rounded-lg">
+                  <p className="font-bold text-gray-800">📚 Classes & Sections</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Classes 1-10 with Sections A/B and capacities</p>
+                </div>
+                <div className="p-3 bg-gray-50 border rounded-lg">
+                  <p className="font-bold text-gray-800">👨‍🏫 Faculty & Bank Details</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">HODs, PGTs, basic pay, bank accounts, and IFSC</p>
+                </div>
+                <div className="p-3 bg-gray-50 border rounded-lg">
+                  <p className="font-bold text-gray-800">👨‍🎓 Students & Parents</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Full admissions, DOBs, blood groups, and parent links</p>
+                </div>
+                <div className="p-3 bg-gray-50 border rounded-lg">
+                  <p className="font-bold text-gray-800">💵 Fees & Receipts</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Tuition & lab fees with branch-prefix receipts</p>
+                </div>
+                <div className="p-3 bg-gray-50 border rounded-lg">
+                  <p className="font-bold text-gray-800">👔 HRMS Payroll</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">3-Month monthly salary slips (Gross, PF, PT, Net)</p>
+                </div>
+                <div className="p-3 bg-gray-50 border rounded-lg">
+                  <p className="font-bold text-gray-800">📅 Institutional Events</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Sports meets, science exhibitions, and PTMs</p>
+                </div>
+                <div className="p-3 bg-gray-50 border rounded-lg">
+                  <p className="font-bold text-gray-800">🔔 System Notifications</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Fee reminders, exam dates, and staff bulletins</p>
+                </div>
+                <div className="p-3 bg-gray-50 border rounded-lg">
+                  <p className="font-bold text-gray-800">🛡️ Tenant Scoping</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Full school_id foreign key & security boundary</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            {seeding && (
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-emerald-900">
+                  <span>{seedProgress.step || 'Processing...'}</span>
+                  <span>{seedProgress.percent}%</span>
+                </div>
+                <div className="w-full bg-emerald-200 h-2.5 rounded-full overflow-hidden">
+                  <div
+                    className="bg-emerald-600 h-full rounded-full transition-all duration-300"
+                    style={{ width: `${seedProgress.percent}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-emerald-700 italic">{seedProgress.message}</p>
+              </div>
+            )}
+
+            {/* Completion Summary Card */}
+            {seedResult && (
+              <div className="p-4 bg-emerald-100/70 border border-emerald-300 rounded-xl space-y-3">
+                <div className="flex items-center space-x-2 text-sm font-bold text-emerald-900">
+                  <span>🎉</span>
+                  <span>Multi-Branch Seeding Completed Successfully!</span>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                  <div className="bg-white p-3 rounded-lg border border-emerald-200 shadow-2xs">
+                    <p className="text-gray-500 text-[10px] uppercase font-bold">Campuses</p>
+                    <p className="text-xl font-black text-emerald-900">{seedResult.schools} Branches</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-emerald-200 shadow-2xs">
+                    <p className="text-gray-500 text-[10px] uppercase font-bold">Students Enrolled</p>
+                    <p className="text-xl font-black text-emerald-900">{seedResult.students} Students</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-emerald-200 shadow-2xs">
+                    <p className="text-gray-500 text-[10px] uppercase font-bold">Faculty & Staff</p>
+                    <p className="text-xl font-black text-emerald-900">{seedResult.teachers + seedResult.hrmsStaff} Members</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-emerald-200 shadow-2xs">
+                    <p className="text-gray-500 text-[10px] uppercase font-bold">Monthly Payslips</p>
+                    <p className="text-xl font-black text-emerald-900">{seedResult.payrollRecords} Records</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Seeder Action Buttons */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleClearSeeded}
+                disabled={seeding}
+                className="px-4 py-2.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-xl font-bold text-xs transition disabled:opacity-50"
+              >
+                Reset / Clear Seed Data
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRunSeeder}
+                disabled={seeding}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-50 flex items-center space-x-2"
+              >
+                <span>{seeding ? '⏳' : '🌱'}</span>
+                <span>{seeding ? 'Seeding in Progress...' : 'Run Enterprise Seeder (All Branches)'}</span>
+              </button>
+            </div>
+          </div>
+        )}
         {activeTab === 'import' && (
           <div className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -13,6 +13,7 @@ class ClassModel extends Model
     protected $table = 'classes';
 
     protected $fillable = [
+        'school_id',
         'name',
         'numeric_name',
         'order',

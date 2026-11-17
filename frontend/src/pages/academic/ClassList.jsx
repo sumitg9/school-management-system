@@ -6,11 +6,13 @@ import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
+import { useSchool } from '../../context/SchoolContext';
 
 const ClassList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const { hasPermission, isTeacher, isStudent, filterTeacherClasses } = useAuth();
+  const { activeSchoolId, currentSchool } = useSchool();
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState(null);
@@ -23,12 +25,12 @@ const ClassList = () => {
 
   useEffect(() => {
     fetchClasses();
-  }, [filters]);
+  }, [filters, activeSchoolId]);
 
   const fetchClasses = async () => {
     setLoading(true);
     try {
-      const response = await classAPI.getAll(filters);
+      const response = await classAPI.getAll({ ...filters, school_id: activeSchoolId });
       if (response.success) {
         const rawList = response.data || [];
         const scopedList = filterTeacherClasses(rawList);
@@ -178,7 +180,14 @@ const ClassList = () => {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Classes</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900">Classes</h1>
+              {currentSchool && (
+                <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 border border-blue-200">
+                  📍 {currentSchool.shortName || currentSchool.name}
+                </span>
+              )}
+            </div>
             <p className="text-gray-600 mt-1">Manage class records</p>
           </div>
           <div className="flex space-x-3">

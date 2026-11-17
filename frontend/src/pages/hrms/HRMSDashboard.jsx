@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useSchool } from '../../context/SchoolContext';
 import { hrmsAPI } from '../../services/api';
 
 const DEPARTMENTS = [
@@ -40,8 +41,10 @@ const numberToWords = (num) => {
 
 export default function HRMSDashboard() {
   const { user, activeRole, hasPermission } = useAuth();
+  const { activeSchoolId, currentSchool } = useSchool();
   const currentRole = activeRole || user?.roles?.[0] || user?.role || 'admin';
-  const canManage = hasPermission('manage-hrms') || currentRole === 'admin' || currentRole === 'super-admin' || currentRole === 'finance';
+  const isTeacher = currentRole === 'teacher';
+  const canManage = (hasPermission('manage-hrms') || currentRole === 'admin' || currentRole === 'super-admin' || currentRole === 'finance') && !isTeacher;
 
   // Navigation tab
   const [activeTab, setActiveTab] = useState('directory'); // 'directory' | 'leaves' | 'attendance' | 'payroll' | 'departments'
@@ -53,6 +56,7 @@ export default function HRMSDashboard() {
   const [attendanceData, setAttendanceData] = useState([]);
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);
+  const [showBankAccount, setShowBankAccount] = useState(false);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -69,6 +73,15 @@ export default function HRMSDashboard() {
   const [selectedPayslip, setSelectedPayslip] = useState(null);
   const [selectedCompensationStaff, setSelectedCompensationStaff] = useState(null);
   const [toastMsg, setToastMsg] = useState(null);
+
+  // Mask bank account number helper
+  const maskAccount = (num) => {
+    if (!num) return '•••• •••• 1024';
+    if (showBankAccount) return num;
+    const s = String(num);
+    if (s.length <= 4) return s;
+    return '•••• •••• ' + s.slice(-4);
+  };
 
   // Compensation Form
   const [compensationForm, setCompensationForm] = useState({
@@ -204,6 +217,7 @@ export default function HRMSDashboard() {
         department: selectedDept === 'All Departments' ? undefined : selectedDept,
         status: selectedStatus === 'all' ? undefined : selectedStatus,
         search,
+        school_id: activeSchoolId,
       });
       if (res && res.success) {
         setStaffList(res.data || []);
@@ -219,6 +233,7 @@ export default function HRMSDashboard() {
     try {
       const res = await hrmsAPI.getLeaves({
         status: leaveStatusFilter === 'all' ? undefined : leaveStatusFilter,
+        school_id: activeSchoolId,
       });
       if (res && res.success) {
         setLeavesList(res.data || []);
@@ -230,7 +245,7 @@ export default function HRMSDashboard() {
 
   const loadAttendance = async (dateStr) => {
     try {
-      const res = await hrmsAPI.getDailyAttendance(dateStr);
+      const res = await hrmsAPI.getDailyAttendance(dateStr, { school_id: activeSchoolId });
       if (res && res.success) {
         setAttendanceData(res.data || []);
       }
@@ -244,6 +259,7 @@ export default function HRMSDashboard() {
       const res = await hrmsAPI.getPayroll({
         month: payrollMonth,
         year: payrollYear,
+        school_id: activeSchoolId,
       });
       if (res && res.success) {
         setPayrollList(res.data || []);
@@ -267,8 +283,14 @@ export default function HRMSDashboard() {
     };
 
     window.addEventListener('sms:hrms-updated', handleHrmsUpdated);
-    return () => window.removeEventListener('sms:hrms-updated', handleHrmsUpdated);
-  }, [selectedDept, selectedStatus, search, leaveStatusFilter, payrollMonth, payrollYear, attendanceDate]);
+    window.addEventListener('sms:school-switched', handleHrmsUpdated);
+    window.addEventListener('sms:role-switched', handleHrmsUpdated);
+    return () => {
+      window.removeEventListener('sms:hrms-updated', handleHrmsUpdated);
+      window.removeEventListener('sms:school-switched', handleHrmsUpdated);
+      window.removeEventListener('sms:role-switched', handleHrmsUpdated);
+    };
+  }, [activeSchoolId, currentRole, activeRole, selectedDept, selectedStatus, search, leaveStatusFilter, payrollMonth, payrollYear, attendanceDate]);
 
   // Handle Add Staff
   const handleCreateStaff = async (e) => {
@@ -278,7 +300,10 @@ export default function HRMSDashboard() {
       return;
     }
     try {
-      await hrmsAPI.createStaff(staffForm);
+      await hrmsAPI.createStaff({
+        ...staffForm,
+        school_id: activeSchoolId === 'all' ? 1 : activeSchoolId,
+      });
       showToast(`Staff member ${staffForm.name} onboarded successfully.`);
       setShowAddStaffModal(false);
       setStaffForm({
@@ -312,8 +337,12 @@ export default function HRMSDashboard() {
       return;
     }
     try {
-      const targetEmpId = leaveForm.employeeId || staffList[0]?.id;
-      await hrmsAPI.applyLeave({ ...leaveForm, employeeId: targetEmpId });
+      const targetEmpId = isTeacher ? (myStaff?.id || 'EMP-101') : (leaveForm.employeeId || staffList[0]?.id);
+      await hrmsAPI.applyLeave({
+        ...leaveForm,
+        employeeId: targetEmpId,
+        school_id: activeSchoolId === 'all' ? 1 : activeSchoolId,
+      });
       showToast('Leave application submitted for approval.');
       setShowLeaveModal(false);
       setLeaveForm({
@@ -406,7 +435,35 @@ export default function HRMSDashboard() {
     }
   };
 
-  // Metrics
+  // Staff resolution for personalized views
+  const myStaff = staffList.find(
+    (s) =>
+      (s.email && user?.email && s.email.toLowerCase().trim() === user.email.toLowerCase().trim()) ||
+      (user?.teacher_id && s.id === user.teacher_id) ||
+      (user?.id && s.userId === user.id)
+  ) || staffList[0] || null;
+
+  const myAttendanceRecord = attendanceData.find(
+    (a) => a.employeeId === myStaff?.id || (myStaff && a.employeeName === myStaff.name)
+  ) || attendanceData[0] || null;
+
+  const myPayrollRecord = payrollList.find(
+    (p) => p.employeeId === myStaff?.id || (myStaff && p.employeeName === myStaff.name)
+  ) || payrollList[0] || null;
+
+  // Personal faculty compensation figures
+  const staffBasic = myStaff?.basicSalary || 50000;
+  const staffDA = myStaff?.allowances?.da !== undefined ? myStaff.allowances.da : Math.round(staffBasic * 0.20);
+  const staffHRA = myStaff?.allowances?.hra !== undefined ? myStaff.allowances.hra : Math.round(staffBasic * 0.25);
+  const staffConveyance = myStaff?.allowances?.conveyance !== undefined ? myStaff.allowances.conveyance : 3500;
+  const staffGross = staffBasic + staffDA + staffHRA + staffConveyance;
+  const staffPF = myStaff?.deductions?.pf !== undefined ? myStaff.deductions.pf : Math.round(staffBasic * 0.12);
+  const staffESI = myStaff?.deductions?.esi !== undefined ? myStaff.deductions.esi : 0;
+  const staffTax = myStaff?.deductions?.tax !== undefined ? myStaff.deductions.tax : 2500;
+  const staffTotalDeductions = staffPF + staffESI + staffTax;
+  const staffNetPay = staffGross - staffTotalDeductions;
+
+  // Institutional Metrics (for administrators)
   const totalStaff = staffList.length;
   const presentCount = attendanceData.filter((a) => a.status === 'present').length;
   const attendanceRate = attendanceData.length > 0 ? Math.round((presentCount / attendanceData.length) * 100) : 95;
@@ -430,12 +487,28 @@ export default function HRMSDashboard() {
       {/* Main Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-6 rounded-2xl shadow-xl">
         <div className="space-y-1">
-          <div className="flex items-center space-x-3">
-            <span className="text-3xl">👔</span>
-            <h1 className="text-2xl font-black tracking-tight">Human Resource Management System (HRMS)</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-3xl">{isTeacher ? '👨‍🏫' : '👔'}</span>
+            <h1 className="text-2xl font-black tracking-tight">
+              {isTeacher ? 'Faculty Self-Service Portal (HRMS)' : 'Human Resource Management System (HRMS)'}
+            </h1>
+            {currentSchool && (
+              <span className="px-3 py-1 text-xs font-bold rounded-full bg-white/20 text-white border border-white/30 backdrop-blur-xs flex items-center gap-1.5 shadow-xs">
+                <span>📍</span>
+                <span>{currentSchool.shortName || currentSchool.name}</span>
+              </span>
+            )}
+            {isTeacher && (
+              <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1.5 shadow-xs">
+                <span>🔒</span>
+                <span>Personal & Confidential View</span>
+              </span>
+            )}
           </div>
           <p className="text-sm text-blue-200">
-            Faculty & staff directory, leave administration, daily staff attendance, payroll register, and payslips.
+            {isTeacher
+              ? 'Personal faculty employment profile, 7th Pay Commission salary breakdown, leave requests, daily attendance, and monthly payslips.'
+              : 'Faculty & staff directory, leave administration, daily staff attendance, payroll register, and payslips.'}
           </p>
         </div>
 
@@ -451,75 +524,151 @@ export default function HRMSDashboard() {
           )}
 
           <button
-            onClick={() => setShowLeaveModal(true)}
+            onClick={() => {
+              if (isTeacher && myStaff) {
+                setLeaveForm((prev) => ({ ...prev, employeeId: myStaff.id }));
+              }
+              setShowLeaveModal(true);
+            }}
             className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-md transition flex items-center space-x-1.5"
           >
             <span>📝</span>
             <span>Apply for Leave</span>
           </button>
 
-          <button
-            onClick={handleResetDefaults}
-            className="bg-white/10 hover:bg-white/20 text-blue-200 text-xs font-medium px-3 py-2 rounded-xl backdrop-blur-xs transition"
-            title="Reset HRMS demo data"
-          >
-            🔄 Reset Demo Data
-          </button>
+          {!isTeacher && (
+            <button
+              onClick={handleResetDefaults}
+              className="bg-white/10 hover:bg-white/20 text-blue-200 text-xs font-medium px-3 py-2 rounded-xl backdrop-blur-xs transition"
+              title="Reset HRMS demo data"
+            >
+              🔄 Reset Demo Data
+            </button>
+          )}
         </div>
       </div>
 
-      {/* HR Executive Metrics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
-          <div className="w-11 h-11 bg-blue-100 rounded-lg flex items-center justify-center text-xl text-blue-700 flex-shrink-0">
-            👥
+      {/* Metrics Cards */}
+      {isTeacher ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
+            <div className="w-11 h-11 bg-blue-100 rounded-lg flex items-center justify-center text-xl text-blue-700 flex-shrink-0">
+              👤
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">My Faculty ID</p>
+              <p className="text-lg font-black text-gray-900 truncate">{myStaff?.id || 'EMP-101'}</p>
+              <p className="text-[11px] text-gray-400 truncate">{myStaff?.designation || 'Faculty Member'}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Headcount</p>
-            <p className="text-xl font-black text-gray-900">{totalStaff} Staff</p>
-          </div>
-        </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
-          <div className="w-11 h-11 bg-emerald-100 rounded-lg flex items-center justify-center text-xl text-emerald-700 flex-shrink-0">
-            🕒
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
+            <div className="w-11 h-11 bg-emerald-100 rounded-lg flex items-center justify-center text-xl text-emerald-700 flex-shrink-0">
+              🕒
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Today's Attendance</p>
+              <p className="text-lg font-black text-emerald-700 capitalize">
+                {myAttendanceRecord?.status || 'Present'}
+              </p>
+              <p className="text-[11px] text-gray-400 truncate">
+                In: {myAttendanceRecord?.checkIn || '07:55 AM'} ({myStaff?.shift ? 'General' : 'General Shift'})
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Today's Attendance</p>
-            <p className="text-xl font-black text-emerald-700">{attendanceRate}% Present</p>
-          </div>
-        </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
-          <div className="w-11 h-11 bg-amber-100 rounded-lg flex items-center justify-center text-xl text-amber-700 flex-shrink-0">
-            ⏳
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
+            <div className="w-11 h-11 bg-amber-100 rounded-lg flex items-center justify-center text-xl text-amber-700 flex-shrink-0">
+              📝
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">My Leave Balance</p>
+              <p className="text-lg font-black text-amber-600">
+                {myStaff?.leaveBalance?.casual?.remaining ?? 8} CL Remaining
+              </p>
+              <p className="text-[11px] text-gray-400 truncate">
+                {myStaff?.leaveBalance?.medical?.remaining ?? 5} SL • {myStaff?.leaveBalance?.earned?.remaining ?? 10} EL Available
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pending Leaves</p>
-            <p className="text-xl font-black text-amber-600">{pendingLeaves} Requests</p>
-          </div>
-        </div>
 
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
-          <div className="w-11 h-11 bg-purple-100 rounded-lg flex items-center justify-center text-xl text-purple-700 flex-shrink-0">
-            💵
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Monthly Payroll</p>
-            <p className="text-xl font-black text-purple-700">₹{(totalPayrollAmount / 100000).toFixed(2)} Lakhs</p>
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
+            <div className="w-11 h-11 bg-purple-100 rounded-lg flex items-center justify-center text-xl text-purple-700 flex-shrink-0">
+              💵
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Monthly Take-Home</p>
+              <p className="text-lg font-black text-purple-700">
+                ₹{(myPayrollRecord?.netSalary || staffNetPay).toLocaleString('en-IN')}
+              </p>
+              <p className="text-[11px] text-gray-400 truncate">
+                Disbursed to {myStaff?.bankDetails?.bankName || 'HDFC Bank'}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
+            <div className="w-11 h-11 bg-blue-100 rounded-lg flex items-center justify-center text-xl text-blue-700 flex-shrink-0">
+              👥
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Headcount</p>
+              <p className="text-xl font-black text-gray-900">{totalStaff} Staff</p>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
+            <div className="w-11 h-11 bg-emerald-100 rounded-lg flex items-center justify-center text-xl text-emerald-700 flex-shrink-0">
+              🕒
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Today's Attendance</p>
+              <p className="text-xl font-black text-emerald-700">{attendanceRate}% Present</p>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
+            <div className="w-11 h-11 bg-amber-100 rounded-lg flex items-center justify-center text-xl text-amber-700 flex-shrink-0">
+              ⏳
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pending Leaves</p>
+              <p className="text-xl font-black text-amber-600">{pendingLeaves} Requests</p>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex items-center space-x-3">
+            <div className="w-11 h-11 bg-purple-100 rounded-lg flex items-center justify-center text-xl text-purple-700 flex-shrink-0">
+              💵
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Monthly Payroll</p>
+              <p className="text-xl font-black text-purple-700">₹{(totalPayrollAmount / 100000).toFixed(2)} Lakhs</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Module Tabs Header */}
       <div className="bg-white p-2 rounded-2xl border border-gray-200 shadow-xs flex flex-wrap items-center gap-1.5 text-xs font-bold">
-        {[
-          { id: 'directory', label: 'Faculty & Staff Directory', icon: '👥' },
-          { id: 'leaves', label: `Leave Management (${pendingLeaves})`, icon: '📝' },
-          { id: 'attendance', label: 'Staff Attendance Register', icon: '🕒' },
-          { id: 'payroll', label: 'Payroll & Salary Slips', icon: '💵' },
-          { id: 'departments', label: 'Department Org Structure', icon: '🏢' },
-        ].map((tab) => (
+        {(isTeacher
+          ? [
+              { id: 'directory', label: 'My Profile & Compensation', icon: '👤' },
+              { id: 'leaves', label: `My Leaves (${leavesList.length})`, icon: '📝' },
+              { id: 'attendance', label: 'My Attendance Logs', icon: '🕒' },
+              { id: 'payroll', label: 'My Salary Slips', icon: '💵' },
+              { id: 'departments', label: 'Department Org Structure', icon: '🏢' },
+            ]
+          : [
+              { id: 'directory', label: 'Faculty & Staff Directory', icon: '👥' },
+              { id: 'leaves', label: `Leave Management (${pendingLeaves})`, icon: '📝' },
+              { id: 'attendance', label: 'Staff Attendance Register', icon: '🕒' },
+              { id: 'payroll', label: 'Payroll & Salary Slips', icon: '💵' },
+              { id: 'departments', label: 'Department Org Structure', icon: '🏢' },
+            ]
+        ).map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -535,170 +684,422 @@ export default function HRMSDashboard() {
         ))}
       </div>
 
-      {/* TAB 1: FACULTY & STAFF DIRECTORY */}
+      {/* TAB 1: FACULTY & STAFF DIRECTORY (ADMIN) / MY PROFILE & COMPENSATION (TEACHER) */}
       {activeTab === 'directory' && (
-        <div className="space-y-4">
-          {/* Filters Bar */}
-          <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between">
-            <div className="relative w-full sm:w-80">
-              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 text-sm">
-                🔍
-              </span>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search staff by name, emp id, designation..."
-                className="w-full pl-9 pr-8 py-2 text-xs border border-gray-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              />
-              {search && (
-                <button
-                  onClick={() => setSearch('')}
-                  className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600 text-xs"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
-              <select
-                value={selectedDept}
-                onChange={(e) => setSelectedDept(e.target.value)}
-                className="text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-              >
-                {DEPARTMENTS.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                className="text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="on-leave">On Leave</option>
-                <option value="resigned">Resigned</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Staff Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {staffList.map((staff) => (
-              <div
-                key={staff.id}
-                className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs hover:shadow-md transition space-y-3 flex flex-col justify-between"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-11 h-11 bg-gradient-to-tr from-blue-700 to-indigo-700 text-white rounded-xl flex items-center justify-center font-bold text-base shadow-xs">
-                        {staff.name.charAt(0)}
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-gray-900 leading-tight">
-                          {staff.name}
-                        </h3>
-                        <p className="text-[11px] text-gray-500 font-medium">
-                          {staff.designation}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-bold">
-                      {staff.id}
-                    </span>
+        isTeacher ? (
+          <div className="space-y-5 animate-in fade-in duration-200">
+            {/* Faculty Employment Profile Card */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-white p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-white/20 backdrop-blur-xs rounded-2xl flex items-center justify-center text-3xl font-black border border-white/30 shadow-inner">
+                    {myStaff?.name?.charAt(0) || '👨‍🏫'}
                   </div>
-
-                  <div className="text-xs space-y-1 text-gray-600 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                    <p className="flex justify-between">
-                      <span className="text-gray-400">Department:</span>
-                      <strong className="text-gray-800">{staff.department}</strong>
-                    </p>
-                    <p className="flex justify-between">
-                      <span className="text-gray-400">Qualification:</span>
-                      <span className="text-gray-700 truncate max-w-[170px]" title={staff.qualification}>
-                        {staff.qualification}
-                      </span>
-                    </p>
-                    <p className="flex justify-between">
-                      <span className="text-gray-400">Joining Date:</span>
-                      <span className="text-gray-700">{staff.joiningDate}</span>
-                    </p>
-                    <p className="flex justify-between">
-                      <span className="text-gray-400">Shift:</span>
-                      <span className="text-gray-700 truncate max-w-[180px]">{staff.shift}</span>
-                    </p>
-                  </div>
-
-                  {/* Leave Balances Chips */}
-                  <div className="flex items-center justify-between text-[11px] px-1 pt-1">
-                    <span className="text-gray-500">Leaves Left:</span>
-                    <div className="flex space-x-1.5">
-                      <span className="bg-emerald-50 text-emerald-800 px-1.5 py-0.2 rounded border border-emerald-100 font-semibold" title="Casual Leaves Remaining">
-                        CL: {staff.leaveBalance?.casual?.remaining}
-                      </span>
-                      <span className="bg-blue-50 text-blue-800 px-1.5 py-0.2 rounded border border-blue-100 font-semibold" title="Medical Leaves Remaining">
-                        SL: {staff.leaveBalance?.medical?.remaining}
-                      </span>
-                      <span className="bg-purple-50 text-purple-800 px-1.5 py-0.2 rounded border border-purple-100 font-semibold" title="Earned Leaves Remaining">
-                        EL: {staff.leaveBalance?.earned?.remaining}
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h2 className="text-xl font-black">{myStaff?.name || user?.name || 'Faculty Member'}</h2>
+                      <span className="text-xs bg-white/20 px-2.5 py-0.5 rounded-full font-bold border border-white/30">
+                        {myStaff?.id || 'EMP-101'}
                       </span>
                     </div>
+                    <p className="text-xs text-blue-200 font-medium mt-0.5">
+                      {myStaff?.designation || 'Teacher'} • {myStaff?.department || 'Academics'}
+                    </p>
+                    <p className="text-[11px] text-blue-300 mt-1 flex items-center space-x-3">
+                      <span>📧 {myStaff?.email || user?.email}</span>
+                      <span>📞 {myStaff?.phone || '+91 98765 00000'}</span>
+                    </p>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-700">
-                    Basic: ₹{staff.basicSalary?.toLocaleString('en-IN')}
-                  </span>
-                  <div className="flex items-center space-x-1.5">
-                    <button
-                      onClick={() => setSelectedStaffDetail(staff)}
-                      className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold px-2 py-1.5 rounded-lg transition"
-                    >
-                      Profile
-                    </button>
-                    {canManage && (
-                      <button
-                        onClick={() => handleOpenCompensationModal(staff)}
-                        className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold px-2 py-1.5 rounded-lg border border-emerald-200 transition flex items-center space-x-1"
-                        title="Manage Basic Pay, DA, HRA, and Deductions"
-                      >
-                        <span>💰</span>
-                        <span>Salary & Pay</span>
-                      </button>
-                    )}
-                    {canManage && (
-                      <button
-                        onClick={() => {
-                          const userPayslip = payrollList.find(p => p.employeeId === staff.id);
-                          if (userPayslip) setSelectedPayslip(userPayslip);
-                          else showToast('No payroll generated for this member yet.');
-                        }}
-                        className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-2 py-1.5 rounded-lg border border-blue-200 transition"
-                      >
-                        Payslip
-                      </button>
-                    )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (myPayrollRecord) setSelectedPayslip(myPayrollRecord);
+                      else if (payrollList.length > 0) setSelectedPayslip(payrollList[0]);
+                      else showToast('Payslip generation in progress.');
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-xs transition flex items-center space-x-1.5"
+                  >
+                    <span>📄</span>
+                    <span>View Latest Payslip</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setLeaveForm((prev) => ({ ...prev, employeeId: myStaff?.id || 'EMP-101' }));
+                      setShowLeaveModal(true);
+                    }}
+                    className="bg-white/20 hover:bg-white/30 text-white font-bold text-xs px-4 py-2 rounded-xl border border-white/30 transition flex items-center space-x-1.5"
+                  >
+                    <span>📝</span>
+                    <span>Apply for Leave</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Profile Details Grid */}
+              <div className="p-6 grid grid-cols-2 sm:grid-cols-4 gap-4 bg-gray-50/50 border-b border-gray-100 text-xs">
+                <div>
+                  <span className="text-gray-400 font-semibold block text-[11px]">Employment Type</span>
+                  <strong className="text-gray-800 text-sm">{myStaff?.employmentType || 'Full-Time Permanent'}</strong>
+                </div>
+                <div>
+                  <span className="text-gray-400 font-semibold block text-[11px]">Academic Qualification</span>
+                  <strong className="text-gray-800 text-sm">{myStaff?.qualification || 'M.Sc, B.Ed'}</strong>
+                </div>
+                <div>
+                  <span className="text-gray-400 font-semibold block text-[11px]">Joining Date</span>
+                  <strong className="text-gray-800 text-sm">{myStaff?.joiningDate || '2023-06-15'}</strong>
+                </div>
+                <div>
+                  <span className="text-gray-400 font-semibold block text-[11px]">Work Shift</span>
+                  <strong className="text-gray-800 text-sm">{myStaff?.shift || 'General (08:00 AM - 03:30 PM)'}</strong>
+                </div>
+              </div>
+
+              {/* Annual Leave Entitlement Summary */}
+              <div className="p-6 bg-white space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center space-x-1.5">
+                    <span>🗓️</span>
+                    <span>Annual Leave Entitlement (Academic Year 2026-2027)</span>
+                  </h4>
+                  <span className="text-[11px] text-gray-500">Subject to School Leave Rules</span>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-100">
+                    <p className="text-xs font-bold text-emerald-900">Casual Leave (CL)</p>
+                    <p className="text-xl font-black text-emerald-700 my-0.5">
+                      {myStaff?.leaveBalance?.casual?.remaining ?? 8}{' '}
+                      <span className="text-xs font-normal text-emerald-600">/ {myStaff?.leaveBalance?.casual?.total ?? 12} days</span>
+                    </p>
+                    <p className="text-[10px] text-emerald-600">Short notice & emergency leave</p>
+                  </div>
+                  <div className="bg-blue-50/80 p-3 rounded-xl border border-blue-100">
+                    <p className="text-xs font-bold text-blue-900">Medical / Sick Leave (SL)</p>
+                    <p className="text-xl font-black text-blue-700 my-0.5">
+                      {myStaff?.leaveBalance?.medical?.remaining ?? 5}{' '}
+                      <span className="text-xs font-normal text-blue-600">/ {myStaff?.leaveBalance?.medical?.total ?? 8} days</span>
+                    </p>
+                    <p className="text-[10px] text-blue-600">Doctor certificate required &gt; 2 days</p>
+                  </div>
+                  <div className="bg-purple-50/80 p-3 rounded-xl border border-purple-100">
+                    <p className="text-xs font-bold text-purple-900">Earned Leave (EL)</p>
+                    <p className="text-xl font-black text-purple-700 my-0.5">
+                      {myStaff?.leaveBalance?.earned?.remaining ?? 10}{' '}
+                      <span className="text-xs font-normal text-purple-600">/ {myStaff?.leaveBalance?.earned?.total ?? 15} days</span>
+                    </p>
+                    <p className="text-[10px] text-purple-600">Annual cumulative earned leave</p>
                   </div>
                 </div>
               </div>
-            ))}
+            </div>
+
+            {/* Indian 7th Pay Commission Salary Structure Breakdown */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-xs p-6 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-gray-100 gap-2">
+                <div>
+                  <h3 className="text-sm font-black text-gray-900 flex items-center space-x-2">
+                    <span>💵</span>
+                    <span>My Salary Structure & Allowances Breakdown</span>
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Structured as per Indian 7th Central Pay Commission guidelines and CBSE institutional norms.
+                  </p>
+                </div>
+                <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-full self-start sm:self-auto">
+                  ✓ Active & Verified Pay Band
+                </span>
+              </div>
+
+              {/* 3-Column Compensation Table */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                {/* Column 1: Earnings & Allowances */}
+                <div className="bg-emerald-50/40 rounded-xl border border-emerald-200 p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-emerald-200 pb-2">
+                    <h4 className="text-xs font-black text-emerald-900 uppercase tracking-wider flex items-center space-x-1">
+                      <span>🟢</span>
+                      <span>Earnings (Allowances)</span>
+                    </h4>
+                    <span className="text-[11px] font-bold text-emerald-700">Monthly</span>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Basic Monthly Pay:</span>
+                      <strong className="text-gray-900">₹{staffBasic.toLocaleString('en-IN')}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Dearness Allowance (DA 20%):</span>
+                      <strong className="text-gray-900">₹{staffDA.toLocaleString('en-IN')}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">House Rent Allowance (HRA 25%):</span>
+                      <strong className="text-gray-900">₹{staffHRA.toLocaleString('en-IN')}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Conveyance Allowance:</span>
+                      <strong className="text-gray-900">₹{staffConveyance.toLocaleString('en-IN')}</strong>
+                    </div>
+                    <div className="pt-2 border-t border-emerald-200 flex justify-between font-bold text-emerald-900 text-sm">
+                      <span>Gross Salary:</span>
+                      <span>₹{staffGross.toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 2: Deductions */}
+                <div className="bg-rose-50/40 rounded-xl border border-rose-200 p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-rose-200 pb-2">
+                    <h4 className="text-xs font-black text-rose-900 uppercase tracking-wider flex items-center space-x-1">
+                      <span>🔴</span>
+                      <span>Statutory Deductions</span>
+                    </h4>
+                    <span className="text-[11px] font-bold text-rose-700">Monthly</span>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Provident Fund (EPF 12%):</span>
+                      <strong className="text-rose-700">-₹{staffPF.toLocaleString('en-IN')}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">ESI Health Contribution:</span>
+                      <strong className="text-rose-700">-₹{staffESI.toLocaleString('en-IN')}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Professional Tax & TDS:</span>
+                      <strong className="text-rose-700">-₹{staffTax.toLocaleString('en-IN')}</strong>
+                    </div>
+                    <div className="pt-2 border-t border-rose-200 flex justify-between font-bold text-rose-900 text-sm">
+                      <span>Total Deductions:</span>
+                      <span>-₹{staffTotalDeductions.toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 3: Net Take-Home & Bank Details */}
+                <div className="bg-blue-50/40 rounded-xl border border-blue-200 p-4 space-y-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between border-b border-blue-200 pb-2">
+                      <h4 className="text-xs font-black text-blue-900 uppercase tracking-wider flex items-center space-x-1">
+                        <span>🏦</span>
+                        <span>Net Take-Home Pay</span>
+                      </h4>
+                      <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold">Disbursal</span>
+                    </div>
+                    <div className="pt-3 space-y-1">
+                      <p className="text-[11px] font-bold text-blue-800 uppercase tracking-wider">Net Monthly Take-Home</p>
+                      <p className="text-2xl font-black text-blue-900">
+                        ₹{staffNetPay.toLocaleString('en-IN')}
+                      </p>
+                      <p className="text-[10px] text-gray-500 italic leading-snug">
+                        {numberToWords(staffNetPay)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-blue-100 space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Disbursal Bank:</span>
+                      <strong className="text-gray-800">{myStaff?.bankDetails?.bankName || 'HDFC Bank'}</strong>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Account No:</span>
+                      <div className="flex items-center space-x-1.5">
+                        <strong className="text-gray-800 font-mono text-[11px]">
+                          {maskAccount(myStaff?.bankDetails?.accountNumber)}
+                        </strong>
+                        <button
+                          type="button"
+                          onClick={() => setShowBankAccount(!showBankAccount)}
+                          className="text-[10px] text-blue-600 hover:text-blue-800 font-bold px-1 py-0.5 rounded bg-blue-50 hover:bg-blue-100 transition"
+                          title={showBankAccount ? 'Hide Account Number' : 'Show Account Number'}
+                        >
+                          {showBankAccount ? '🙈 Hide' : '👁️ Show'}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">IFSC Code:</span>
+                      <strong className="text-gray-800 font-mono text-[11px]">{myStaff?.bankDetails?.ifsc || 'HDFC0001420'}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Privacy Footer Notice */}
+              <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 flex items-center justify-between text-xs text-gray-500">
+                <span className="flex items-center space-x-1.5">
+                  <span>🔒</span>
+                  <span>This compensation schedule is strictly confidential and protected under organizational data privacy policy.</span>
+                </span>
+                <span className="text-[11px] text-gray-400">School ID: {currentSchool?.shortName || activeSchoolId}</span>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Filters Bar */}
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="relative w-full sm:w-80">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400 text-sm">
+                  🔍
+                </span>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search staff by name, emp id, designation..."
+                  className="w-full pl-9 pr-8 py-2 text-xs border border-gray-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                />
+                {search && (
+                  <button
+                    onClick={() => setSearch('')}
+                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-gray-600 text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+                <select
+                  value={selectedDept}
+                  onChange={(e) => setSelectedDept(e.target.value)}
+                  className="text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                >
+                  {DEPARTMENTS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="on-leave">On Leave</option>
+                  <option value="resigned">Resigned</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Staff Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {staffList.map((staff) => (
+                <div
+                  key={staff.id}
+                  className="bg-white rounded-2xl border border-gray-200 p-5 shadow-xs hover:shadow-md transition space-y-3 flex flex-col justify-between"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-11 h-11 bg-gradient-to-tr from-blue-700 to-indigo-700 text-white rounded-xl flex items-center justify-center font-bold text-base shadow-xs">
+                          {staff.name.charAt(0)}
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-gray-900 leading-tight">
+                            {staff.name}
+                          </h3>
+                          <p className="text-[11px] text-gray-500 font-medium">
+                            {staff.designation}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-bold">
+                        {staff.id}
+                      </span>
+                    </div>
+
+                    <div className="text-xs space-y-1 text-gray-600 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                      <p className="flex justify-between">
+                        <span className="text-gray-400">Department:</span>
+                        <strong className="text-gray-800">{staff.department}</strong>
+                      </p>
+                      <p className="flex justify-between">
+                        <span className="text-gray-400">Qualification:</span>
+                        <span className="text-gray-700 truncate max-w-[170px]" title={staff.qualification}>
+                          {staff.qualification}
+                        </span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span className="text-gray-400">Joining Date:</span>
+                        <span className="text-gray-700">{staff.joiningDate}</span>
+                      </p>
+                      <p className="flex justify-between">
+                        <span className="text-gray-400">Shift:</span>
+                        <span className="text-gray-700 truncate max-w-[180px]">{staff.shift}</span>
+                      </p>
+                    </div>
+
+                    {/* Leave Balances Chips */}
+                    <div className="flex items-center justify-between text-[11px] px-1 pt-1">
+                      <span className="text-gray-500">Leaves Left:</span>
+                      <div className="flex space-x-1.5">
+                        <span className="bg-emerald-50 text-emerald-800 px-1.5 py-0.2 rounded border border-emerald-100 font-semibold" title="Casual Leaves Remaining">
+                          CL: {staff.leaveBalance?.casual?.remaining}
+                        </span>
+                        <span className="bg-blue-50 text-blue-800 px-1.5 py-0.2 rounded border border-blue-100 font-semibold" title="Medical Leaves Remaining">
+                          SL: {staff.leaveBalance?.medical?.remaining}
+                        </span>
+                        <span className="bg-purple-50 text-purple-800 px-1.5 py-0.2 rounded border border-purple-100 font-semibold" title="Earned Leaves Remaining">
+                          EL: {staff.leaveBalance?.earned?.remaining}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-700">
+                      Basic: ₹{staff.basicSalary?.toLocaleString('en-IN')}
+                    </span>
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        onClick={() => setSelectedStaffDetail(staff)}
+                        className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold px-2 py-1.5 rounded-lg transition"
+                      >
+                        Profile
+                      </button>
+                      {canManage && (
+                        <button
+                          onClick={() => handleOpenCompensationModal(staff)}
+                          className="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold px-2 py-1.5 rounded-lg border border-emerald-200 transition flex items-center space-x-1"
+                          title="Manage Basic Pay, DA, HRA, and Deductions"
+                        >
+                          <span>💰</span>
+                          <span>Salary & Pay</span>
+                        </button>
+                      )}
+                      {canManage && (
+                        <button
+                          onClick={() => {
+                            const userPayslip = payrollList.find(p => p.employeeId === staff.id);
+                            if (userPayslip) setSelectedPayslip(userPayslip);
+                            else showToast('No payroll generated for this member yet.');
+                          }}
+                          className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-2 py-1.5 rounded-lg border border-blue-200 transition"
+                        >
+                          Payslip
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
       )}
 
-      {/* TAB 2: LEAVE MANAGEMENT & APPROVAL WORKFLOW */}
+      {/* TAB 2: LEAVE MANAGEMENT & APPROVAL WORKFLOW (ADMIN) / MY LEAVES (TEACHER) */}
       {activeTab === 'leaves' && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-xl border border-gray-200 shadow-xs">
             <div className="flex items-center space-x-2 text-xs font-medium text-gray-600">
-              <span className="font-bold text-gray-500">Filter Status:</span>
+              <span className="font-bold text-gray-500">{isTeacher ? 'Filter My Leaves:' : 'Filter Status:'}</span>
               {['all', 'pending', 'approved', 'rejected'].map((st) => (
                 <button
                   key={st}
@@ -715,7 +1116,12 @@ export default function HRMSDashboard() {
             </div>
 
             <button
-              onClick={() => setShowLeaveModal(true)}
+              onClick={() => {
+                if (isTeacher && myStaff) {
+                  setLeaveForm((prev) => ({ ...prev, employeeId: myStaff.id }));
+                }
+                setShowLeaveModal(true);
+              }}
               className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition flex items-center space-x-1"
             >
               <span>➕</span>
@@ -728,19 +1134,19 @@ export default function HRMSDashboard() {
               <table className="w-full text-left text-xs text-gray-600 divide-y divide-gray-200">
                 <thead className="bg-gray-50 text-gray-700 font-bold uppercase tracking-wider text-[11px]">
                   <tr>
-                    <th className="px-4 py-3">Applicant & Dept</th>
+                    <th className="px-4 py-3">{isTeacher ? 'Employee' : 'Applicant & Dept'}</th>
                     <th className="px-4 py-3">Leave Type</th>
                     <th className="px-4 py-3">Duration & Dates</th>
                     <th className="px-4 py-3">Reason / Justification</th>
                     <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Actions / Workflow</th>
+                    <th className="px-4 py-3 text-right">{isTeacher ? 'Approval Info' : 'Actions / Workflow'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {leavesList.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                        No leave records found matching filter.
+                        {isTeacher ? 'You have no leave records matching this filter.' : 'No leave records found matching filter.'}
                       </td>
                     </tr>
                   ) : (
@@ -802,7 +1208,7 @@ export default function HRMSDashboard() {
                             </div>
                           ) : (
                             <span className="text-[11px] text-gray-400">
-                              {leave.reviewedBy ? `Reviewed by ${leave.reviewedBy}` : 'Completed'}
+                              {leave.reviewedBy ? `Reviewed by ${leave.reviewedBy}` : leave.status === 'pending' ? 'Pending Approval' : 'Completed'}
                             </span>
                           )}
                         </td>
@@ -816,7 +1222,7 @@ export default function HRMSDashboard() {
         </div>
       )}
 
-      {/* TAB 3: STAFF DAILY ATTENDANCE REGISTER */}
+      {/* TAB 3: STAFF DAILY ATTENDANCE REGISTER (ADMIN) / MY ATTENDANCE LOGS (TEACHER) */}
       {activeTab === 'attendance' && (
         <div className="space-y-4">
           <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -846,6 +1252,12 @@ export default function HRMSDashboard() {
                 </button>
               </div>
             )}
+            {isTeacher && (
+              <div className="text-xs font-medium text-gray-500 flex items-center space-x-1.5">
+                <span>📍</span>
+                <span>Campus Biometric Register: <strong>{currentSchool?.shortName || currentSchool?.name || 'Main Campus'}</strong></span>
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden">
@@ -857,7 +1269,7 @@ export default function HRMSDashboard() {
                     <th className="px-4 py-3">Department & Designation</th>
                     <th className="px-4 py-3">Shift Timing</th>
                     <th className="px-4 py-3">Check-In / Out</th>
-                    <th className="px-4 py-3 text-center">Status Toggle</th>
+                    <th className="px-4 py-3 text-center">{isTeacher ? 'My Status' : 'Status Toggle'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
@@ -877,28 +1289,45 @@ export default function HRMSDashboard() {
                         <span className="font-medium text-gray-800">{record.checkOut}</span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <div className="inline-flex bg-gray-100 p-0.5 rounded-lg text-[11px]">
-                          {['present', 'late', 'absent', 'on-leave'].map((st) => (
-                            <button
-                              key={st}
-                              disabled={!canManage}
-                              onClick={() => handleAttendanceChange(record.employeeId, st)}
-                              className={`px-2.5 py-1 rounded-md capitalize font-semibold transition ${
-                                record.status === st
-                                  ? st === 'present'
-                                    ? 'bg-emerald-600 text-white shadow-2xs'
-                                    : st === 'late'
-                                    ? 'bg-amber-600 text-white shadow-2xs'
-                                    : st === 'absent'
-                                    ? 'bg-red-600 text-white shadow-2xs'
-                                    : 'bg-blue-600 text-white shadow-2xs'
-                                  : 'text-gray-600 hover:text-gray-900'
-                              } ${!canManage ? 'cursor-default opacity-80' : ''}`}
-                            >
-                              {st}
-                            </button>
-                          ))}
-                        </div>
+                        {isTeacher ? (
+                          <span
+                            className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-bold capitalize ${
+                              record.status === 'present'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                : record.status === 'late'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : record.status === 'on-leave'
+                                ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                : 'bg-red-100 text-red-800 border border-red-200'
+                            }`}
+                          >
+                            <span>✓</span>
+                            <span>{record.status}</span>
+                          </span>
+                        ) : (
+                          <div className="inline-flex bg-gray-100 p-0.5 rounded-lg text-[11px]">
+                            {['present', 'late', 'absent', 'on-leave'].map((st) => (
+                              <button
+                                key={st}
+                                disabled={!canManage}
+                                onClick={() => handleAttendanceChange(record.employeeId, st)}
+                                className={`px-2.5 py-1 rounded-md capitalize font-semibold transition ${
+                                  record.status === st
+                                    ? st === 'present'
+                                      ? 'bg-emerald-600 text-white shadow-2xs'
+                                      : st === 'late'
+                                      ? 'bg-amber-600 text-white shadow-2xs'
+                                      : st === 'absent'
+                                      ? 'bg-red-600 text-white shadow-2xs'
+                                      : 'bg-blue-600 text-white shadow-2xs'
+                                    : 'text-gray-600 hover:text-gray-900'
+                                } ${!canManage ? 'cursor-default opacity-80' : ''}`}
+                              >
+                                {st}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -909,7 +1338,7 @@ export default function HRMSDashboard() {
         </div>
       )}
 
-      {/* TAB 4: PAYROLL & SALARY SLIPS */}
+      {/* TAB 4: PAYROLL & SALARY SLIPS (ADMIN) / MY SALARY SLIPS (TEACHER) */}
       {activeTab === 'payroll' && (
         <div className="space-y-4">
           <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -935,7 +1364,9 @@ export default function HRMSDashboard() {
             </div>
 
             <div className="text-xs text-gray-500 font-semibold">
-              Showing {payrollList.length} staff compensation records
+              {isTeacher
+                ? `Showing your personal payslip records for ${payrollMonth}/${payrollYear}`
+                : `Showing ${payrollList.length} staff compensation records`}
             </div>
           </div>
 
@@ -991,9 +1422,10 @@ export default function HRMSDashboard() {
                         <div className="flex items-center justify-end space-x-1.5">
                           <button
                             onClick={() => setSelectedPayslip(p)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1 rounded-lg text-xs shadow-xs transition"
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1 rounded-lg text-xs shadow-xs transition flex items-center space-x-1"
                           >
-                            📄 Payslip
+                            <span>📄</span>
+                            <span>Payslip</span>
                           </button>
                           {canManage && (
                             <button
@@ -1055,7 +1487,7 @@ export default function HRMSDashboard() {
 
               <div className="pt-2 border-t border-gray-100 flex justify-between text-xs font-semibold">
                 <span className="text-gray-500">Faculty Count: <strong className="text-gray-800">{d.count} Members</strong></span>
-                <span className="text-emerald-700">{d.budget}</span>
+                {!isTeacher && <span className="text-emerald-700">{d.budget}</span>}
               </div>
             </div>
           ))}
@@ -1297,17 +1729,24 @@ export default function HRMSDashboard() {
             <form onSubmit={handleApplyLeave} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">Applying Staff Member</label>
-                <select
-                  value={leaveForm.employeeId}
-                  onChange={(e) => setLeaveForm({ ...leaveForm, employeeId: e.target.value })}
-                  className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden font-semibold"
-                >
-                  {staffList.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.designation} - {s.department})
-                    </option>
-                  ))}
-                </select>
+                {isTeacher ? (
+                  <div className="bg-gray-100 border border-gray-300 rounded-lg p-2.5 text-xs font-bold text-gray-800 flex items-center justify-between">
+                    <span>{myStaff?.name || user?.name || 'Faculty Member'} ({myStaff?.id || 'EMP-101'})</span>
+                    <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">Locked</span>
+                  </div>
+                ) : (
+                  <select
+                    value={leaveForm.employeeId}
+                    onChange={(e) => setLeaveForm({ ...leaveForm, employeeId: e.target.value })}
+                    className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-hidden font-semibold"
+                  >
+                    {staffList.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.designation} - {s.department})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div>
@@ -1773,11 +2212,11 @@ export default function HRMSDashboard() {
                 <div className="flex justify-center items-center space-x-2">
                   <span className="text-2xl">🎓</span>
                   <h1 className="text-lg font-black tracking-tight text-blue-950 uppercase">
-                    Twinkling Toddlers Senior Secondary School
+                    {currentSchool?.name || 'Twinkling Toddlers Senior Secondary School'}
                   </h1>
                 </div>
                 <p className="text-[11px] text-gray-500 font-medium">
-                  Affiliated to Central Board of Secondary Education • Deshbandhu Para, Siliguri, WB
+                  Affiliated to Central Board of Secondary Education • {currentSchool?.address || 'Deshbandhu Para, Siliguri, WB'}
                 </p>
                 <p className="text-xs font-bold text-gray-800 pt-1 tracking-wide uppercase">
                   Pay Slip for the Month of {['October', 'November', 'December'][parseInt(selectedPayslip.month, 10) - 10] || 'November'} {selectedPayslip.year}

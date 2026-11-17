@@ -52,7 +52,9 @@ const Login = () => {
   const handleDemoLogin = async (role) => {
     const roleKey = role.toLowerCase();
     const credentials = {
+      superadmin: { email: 'superadmin@school.com', password: 'password' },
       admin: { email: 'admin@school.com', password: 'password' },
+      admin_kolkata: { email: 'admin.kolkata@school.com', password: 'password' },
       teacher: { email: 'teacher@school.com', password: 'password' },
       student: { email: 'student@school.com', password: 'password' },
       parent: { email: 'suresh.sharma@parent.school.com', password: 'password' },
@@ -201,31 +203,49 @@ const Login = () => {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => handleDemoLogin('Admin')}
-                className="text-xs py-2 px-3 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition"
+                onClick={() => handleDemoLogin('SuperAdmin')}
+                className="text-xs py-2 px-3 bg-indigo-50 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100 transition flex items-center justify-center gap-1"
+                title="Group HQ Director - Full Access to all school campuses"
               >
-                Admin
+                <span>👑</span> Super Admin (HQ)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('Admin')}
+                className="text-xs py-2 px-3 bg-blue-50 text-blue-700 font-bold rounded-lg hover:bg-blue-100 transition flex items-center justify-center gap-1"
+                title="Siliguri Main Campus Administrator"
+              >
+                <span>🏫</span> Siliguri Admin
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('Admin_Kolkata')}
+                className="text-xs py-2 px-3 bg-emerald-50 text-emerald-700 font-bold rounded-lg hover:bg-emerald-100 transition flex items-center justify-center gap-1"
+                title="Kolkata Campus Administrator (Isolated Tenant)"
+              >
+                <span>🏛️</span> Kolkata Admin
               </button>
               <button
                 type="button"
                 onClick={() => handleDemoLogin('Teacher')}
-                className="text-xs py-2 px-3 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition"
+                className="text-xs py-2 px-3 bg-green-50 text-green-700 font-bold rounded-lg hover:bg-green-100 transition flex items-center justify-center gap-1"
+                title="Siliguri Campus Faculty"
               >
-                Teacher
+                <span>👨‍🏫</span> Teacher
               </button>
               <button
                 type="button"
                 onClick={() => handleDemoLogin('Student')}
-                className="text-xs py-2 px-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition"
+                className="text-xs py-2 px-3 bg-purple-50 text-purple-700 font-bold rounded-lg hover:bg-purple-100 transition flex items-center justify-center gap-1"
               >
-                Student
+                <span>👨‍🎓</span> Student
               </button>
               <button
                 type="button"
                 onClick={() => handleDemoLogin('Parent')}
-                className="text-xs py-2 px-3 bg-orange-50 text-orange-700 rounded-lg hover:bg-orange-100 transition"
+                className="text-xs py-2 px-3 bg-orange-50 text-orange-700 font-bold rounded-lg hover:bg-orange-100 transition flex items-center justify-center gap-1"
               >
-                Parent
+                <span>👨‍👩‍👧</span> Parent
               </button>
             </div>
           </div>

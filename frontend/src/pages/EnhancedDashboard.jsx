@@ -5,6 +5,7 @@ import { studentAPI, teacherAPI, classAPI, attendanceAPI, examAPI, feeAPI, assig
 import Badge from '../components/common/Badge';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
+import { useSchool } from '../context/SchoolContext';
 
 // Isolated clock component so second-by-second ticks only re-render this badge
 const LiveClock = memo(({ formatDateTime }) => {
@@ -28,6 +29,7 @@ LiveClock.displayName = 'LiveClock';
 const EnhancedDashboard = () => {
   const navigate = useNavigate();
   const { formatDateTime } = useSettings();
+  const { activeSchoolId, currentSchool } = useSchool();
   const {
     isStudent,
     isParent,
@@ -64,7 +66,13 @@ const EnhancedDashboard = () => {
 
   useEffect(() => {
     fetchDashboardData(false);
-  }, [activeChild?.id, parentChildren?.length]);
+
+    const handleSchoolSwitched = () => {
+      fetchDashboardData(false);
+    };
+    window.addEventListener('sms:school-switched', handleSchoolSwitched);
+    return () => window.removeEventListener('sms:school-switched', handleSchoolSwitched);
+  }, [activeChild?.id, parentChildren?.length, activeSchoolId]);
 
   const fetchDashboardData = async (isManual = false) => {
     if (isManual) {
@@ -107,12 +115,12 @@ const EnhancedDashboard = () => {
 
       if (isTeacher()) {
         const [classesRes, sectionsRes, studentsRes, attendanceRes, assignmentsRes, examsRes] = await Promise.allSettled([
-          classAPI.getAll({ per_page: 100 }),
-          sectionAPI.getAll({ per_page: 100 }),
-          studentAPI.getAll({ per_page: 'all' }),
-          attendanceAPI.getAll({ per_page: 100, date: new Date().toISOString().split('T')[0] }),
-          assignmentAPI.getAll({ per_page: 100 }),
-          examAPI.getAll({ per_page: 100 }),
+          classAPI.getAll({ per_page: 100, school_id: activeSchoolId }),
+          sectionAPI.getAll({ per_page: 100, school_id: activeSchoolId }),
+          studentAPI.getAll({ per_page: 'all', school_id: activeSchoolId }),
+          attendanceAPI.getAll({ per_page: 100, date: new Date().toISOString().split('T')[0], school_id: activeSchoolId }),
+          assignmentAPI.getAll({ per_page: 100, school_id: activeSchoolId }),
+          examAPI.getAll({ per_page: 100, school_id: activeSchoolId }),
         ]);
 
         const rawClasses = classesRes.status === 'fulfilled' ? classesRes.value?.data || [] : [];
@@ -175,13 +183,13 @@ const EnhancedDashboard = () => {
 
       // Fetch all statistics in parallel using allSettled to ensure resilient loading
       const results = await Promise.allSettled([
-        studentAPI.getAll({ per_page: 1 }),
-        teacherAPI.getAll({ per_page: 1 }),
-        classAPI.getAll({ per_page: 1 }),
-        attendanceAPI.getAll({ per_page: 1, date: new Date().toISOString().split('T')[0] }),
-        examAPI.getAll({ per_page: 1 }),
-        feeAPI.getAll({ per_page: 1 }),
-        assignmentAPI.getAll({ per_page: 1 }),
+        studentAPI.getAll({ per_page: 1, school_id: activeSchoolId }),
+        teacherAPI.getAll({ per_page: 1, school_id: activeSchoolId }),
+        classAPI.getAll({ per_page: 1, school_id: activeSchoolId }),
+        attendanceAPI.getAll({ per_page: 1, date: new Date().toISOString().split('T')[0], school_id: activeSchoolId }),
+        examAPI.getAll({ per_page: 1, school_id: activeSchoolId }),
+        feeAPI.getAll({ per_page: 1, school_id: activeSchoolId }),
+        assignmentAPI.getAll({ per_page: 1, school_id: activeSchoolId }),
       ]);
 
       const [
@@ -312,7 +320,14 @@ const EnhancedDashboard = () => {
       {/* Header */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            {currentSchool && (
+              <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 border border-blue-200">
+                📍 {currentSchool.shortName || currentSchool.name}
+              </span>
+            )}
+          </div>
           <p className="text-gray-600 mt-1">Welcome back! Here's what's happening today.</p>
         </div>
         <div className="mt-3 md:mt-0 flex items-center gap-3">

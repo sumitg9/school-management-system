@@ -6,10 +6,12 @@ import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
+import { useSchool } from '../../context/SchoolContext';
 
 const StudentList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const { activeSchoolId, currentSchool } = useSchool();
   const {
     isStudent,
     isParent,
@@ -39,11 +41,11 @@ const StudentList = () => {
   const [allSections, setAllSections] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Fetch classes and all sections once on mount
+  // Fetch classes and all sections on mount and when active school changes
   useEffect(() => {
     fetchClasses();
     fetchAllSections();
-  }, []);
+  }, [activeSchoolId]);
 
   // Debounce search input changes
   useEffect(() => {
@@ -57,14 +59,14 @@ const StudentList = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Fetch students on filter/page changes
+  // Fetch students on filter/page or active school changes
   useEffect(() => {
     fetchStudents();
-  }, [filters]);
+  }, [filters, activeSchoolId]);
 
   const fetchClasses = async () => {
     try {
-      const response = await classAPI.getAll({ per_page: 'all' });
+      const response = await classAPI.getAll({ per_page: 'all', school_id: activeSchoolId });
       if (response.success) {
         const raw = response.data || [];
         setClasses(isTeacher() ? filterTeacherClasses(raw) : raw);
@@ -76,7 +78,7 @@ const StudentList = () => {
 
   const fetchAllSections = async () => {
     try {
-      const response = await sectionAPI.getAll({ per_page: 'all' });
+      const response = await sectionAPI.getAll({ per_page: 'all', school_id: activeSchoolId });
       if (response.success) {
         const raw = response.data || [];
         setAllSections(isTeacher() ? filterTeacherSections(raw, classes) : raw);
@@ -109,7 +111,7 @@ const StudentList = () => {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const response = await studentAPI.getAll(filters);
+      const response = await studentAPI.getAll({ ...filters, school_id: activeSchoolId });
       if (response.success) {
         const raw = response.data || [];
         const scoped = isTeacher() ? filterTeacherStudents(raw, classes, allSections) : raw;
@@ -507,7 +509,14 @@ Ananya,Patel,ananya.patel@example.com,+91 98765 11002,ADM2026002,2026-04-01,1,1,
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Students</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900">Students</h1>
+              {currentSchool && (
+                <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 border border-blue-200">
+                  📍 {currentSchool.shortName || currentSchool.name}
+                </span>
+              )}
+            </div>
             <p className="text-gray-600 mt-1">Manage student records</p>
           </div>
           {!isStudent() && (

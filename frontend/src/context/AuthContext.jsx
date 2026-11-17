@@ -183,6 +183,8 @@ export const AuthProvider = ({ children }) => {
     const normalized = normalizeRole(newRole);
     setActiveRole(normalized);
     localStorage.setItem('sms_active_role', normalized);
+    window.dispatchEvent(new CustomEvent('sms:role-switched', { detail: { role: normalized } }));
+    window.dispatchEvent(new CustomEvent('sms:hrms-updated', { detail: { role: normalized } }));
     const roleObj = SYSTEM_ROLES.find(r => r.id === normalized);
     toast.info(`Switched view to ${roleObj?.name || normalized}`);
   };
@@ -191,6 +193,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('sms_active_role');
     const defaultR = user?.roles?.[0] ? normalizeRole(user.roles[0]) : 'admin';
     setActiveRole(defaultR);
+    window.dispatchEvent(new CustomEvent('sms:role-switched', { detail: { role: defaultR } }));
+    window.dispatchEvent(new CustomEvent('sms:hrms-updated', { detail: { role: defaultR } }));
     toast.info(`Reset view to assigned role: ${defaultR}`);
   };
 

@@ -7,12 +7,14 @@ import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
+import { useSchool } from '../../context/SchoolContext';
 
 const ExamList = () => {
   const navigate = useNavigate();
   const confirm = useConfirm();
   const { formatDate } = useSettings();
   const { isStudent, isParent, hasPermission } = useAuth();
+  const { activeSchoolId, currentSchool } = useSchool();
   const [exams, setExams] = useState([]);
   const [academicYears, setAcademicYears] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,10 +45,10 @@ const ExamList = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Fetch exams when filters change
+  // Fetch exams when filters or active school change
   useEffect(() => {
     fetchExams();
-  }, [filters]);
+  }, [filters, activeSchoolId]);
 
   const fetchAcademicYears = async () => {
     try {
@@ -62,7 +64,7 @@ const ExamList = () => {
   const fetchExams = async () => {
     setLoading(true);
     try {
-      const response = await examAPI.getAll(filters);
+      const response = await examAPI.getAll({ ...filters, school_id: activeSchoolId });
       if (response.success) {
         setExams(response.data);
         setPagination(response.meta);
@@ -215,7 +217,14 @@ const ExamList = () => {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{isParent() ? "Child's Examinations" : "Examinations"}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900">{isParent() ? "Child's Examinations" : "Examinations"}</h1>
+              {currentSchool && (
+                <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 border border-blue-200">
+                  📍 {currentSchool.shortName || currentSchool.name}
+                </span>
+              )}
+            </div>
             <p className="text-gray-600 mt-1">{isParent() ? "View examination schedules and assessments" : "Manage exams and assessments"}</p>
           </div>
           {!isStudent() && !isParent() && hasPermission('create-exams') && (

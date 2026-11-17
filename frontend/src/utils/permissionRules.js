@@ -240,6 +240,16 @@ export const PERMISSION_MODULES = [
       { id: 'manage-hrms', label: 'Manage HRMS & Payroll', description: 'Manage staff profiles, approve/reject leaves, mark staff attendance, and process payroll' },
     ],
   },
+  {
+    id: 'schools',
+    name: 'Schools & Campuses',
+    icon: '🏛️',
+    description: 'Multi-school governance, campus branch provisioning, board affiliation, and branch settings',
+    permissions: [
+      { id: 'view-schools', label: 'View Schools & Campuses', description: 'Browse institutional campuses and branch directory' },
+      { id: 'manage-schools', label: 'Manage Schools & Campuses', description: 'Create, provision, configure, and manage branches and campus settings' },
+    ],
+  },
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS = {
@@ -260,6 +270,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-communication', 'manage-communication',
     'view-events', 'manage-events',
     'view-hrms', 'manage-hrms',
+    'view-schools', 'manage-schools',
   ],
   'admin': [
     'view-dashboard',
@@ -277,6 +288,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-communication', 'manage-communication',
     'view-events', 'manage-events',
     'view-hrms', 'manage-hrms',
+    'view-schools',
   ],
   'teacher': [
     'view-dashboard',

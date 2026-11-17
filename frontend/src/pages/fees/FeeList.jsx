@@ -7,6 +7,7 @@ import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
+import { useSchool } from '../../context/SchoolContext';
 import { getAllFeeTypes, formatFeeTypeLabel, getFeeTypeBadgeVariant } from '../../utils/feeTypes';
 import FeeTabs from './FeeTabs';
 import StudentFeesView from './StudentFeesView';
@@ -16,6 +17,7 @@ const FeeList = () => {
   const confirm = useConfirm();
   const { formatDate, formatCurrency } = useSettings();
   const { isStudent, isParent, hasPermission } = useAuth();
+  const { activeSchoolId, currentSchool } = useSchool();
 
   if (isStudent() || isParent()) {
     return <StudentFeesView />;
@@ -35,11 +37,11 @@ const FeeList = () => {
     type: '',
   });
 
-  // Fetch academic years & classes once on mount
+  // Fetch academic years & classes on mount and campus switch
   useEffect(() => {
     fetchAcademicYears();
     fetchClasses();
-  }, []);
+  }, [activeSchoolId]);
 
   // Debounce search input
   useEffect(() => {
@@ -53,10 +55,10 @@ const FeeList = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Fetch fees when filters change
+  // Fetch fees when filters or active school change
   useEffect(() => {
     fetchFees();
-  }, [filters]);
+  }, [filters, activeSchoolId]);
 
   const fetchAcademicYears = async () => {
     try {
@@ -71,7 +73,7 @@ const FeeList = () => {
 
   const fetchClasses = async () => {
     try {
-      const response = await classAPI.getAll({ per_page: 100 });
+      const response = await classAPI.getAll({ per_page: 100, school_id: activeSchoolId });
       if (response.success) {
         setClasses(response.data);
       }
@@ -83,7 +85,7 @@ const FeeList = () => {
   const fetchFees = async () => {
     setLoading(true);
     try {
-      const response = await feeAPI.getAll(filters);
+      const response = await feeAPI.getAll({ ...filters, school_id: activeSchoolId });
       if (response.success) {
         setFees(response.data);
         setPagination(response.meta);
@@ -253,7 +255,14 @@ const FeeList = () => {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Fee Structures</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900">Fee Structures</h1>
+              {currentSchool && (
+                <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 border border-blue-200">
+                  📍 {currentSchool.shortName || currentSchool.name}
+                </span>
+              )}
+            </div>
             <p className="text-gray-600 mt-1">Configure and manage tuition and school fee structures</p>
           </div>
           <div className="flex items-center gap-3">

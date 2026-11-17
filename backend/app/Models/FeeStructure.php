@@ -11,6 +11,7 @@ class FeeStructure extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'school_id',
         'academic_year_id',
         'class_id',
         'name',

@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { SYSTEM_ROLES } from '../../utils/permissionRules';
 import NotificationDropdown from './NotificationDropdown';
+import SchoolSwitcher from './SchoolSwitcher';
+import { useSchool } from '../../context/SchoolContext';
 
 const Layout = ({ children }) => {
   const navigate = useNavigate();
@@ -25,11 +27,14 @@ const Layout = ({ children }) => {
     parentLoading,
   } = useAuth();
   const { settings } = useSettings();
+  const { currentSchool, activeSchoolId } = useSchool();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const schoolName = settings?.school_name && settings.school_name !== 'null' ? settings.school_name : 'SMS';
-  const schoolTagline = settings?.school_tagline && settings.school_tagline !== 'null' ? settings.school_tagline : 'School Management';
-  const schoolLogo = settings?.school_logo && settings.school_logo !== 'null' ? settings.school_logo : '';
+  const schoolName = currentSchool?.name || (settings?.school_name && settings.school_name !== 'null' ? settings.school_name : 'SMS');
+  const schoolTagline = currentSchool?.city
+    ? `${currentSchool.city} • ${currentSchool.curriculum || 'CBSE'}`
+    : (settings?.school_tagline && settings.school_tagline !== 'null' ? settings.school_tagline : 'School Management');
+  const schoolLogo = currentSchool?.logo || (settings?.school_logo && settings.school_logo !== 'null' ? settings.school_logo : '');
 
   const handleLogout = async () => {
     await logout();
@@ -87,6 +92,7 @@ const Layout = ({ children }) => {
       label: 'Administration',
       icon: '⚙️',
       items: [
+        { path: '/schools', icon: '🏛️', label: 'Campuses & Branches', permission: 'view-schools' },
         { path: '/hrms', icon: '👔', label: 'HRMS & Staff', permission: 'view-hrms' },
         { path: '/reports', icon: '📈', label: 'Reports & Analytics', permission: 'view-reports' },
         { path: '/tools/bulk', icon: '🔧', label: 'Bulk Operations', permission: 'manage-tools' },
@@ -362,6 +368,9 @@ const Layout = ({ children }) => {
                 </div>
               )}
 
+              {/* Multi-Campus / School Branch Switcher */}
+              <SchoolSwitcher />
+
               {/* Role Preview Switcher for Admins */}
               {user && (user?.roles?.includes('admin') || user?.roles?.includes('super-admin')) && (
                 <div className="hidden sm:flex items-center gap-1.5 bg-blue-50/80 border border-blue-200 rounded-xl px-2.5 py-1 text-xs">
@@ -431,8 +440,8 @@ const Layout = ({ children }) => {
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="flex-1 overflow-y-auto">
+        {/* Page Content - Keyed by activeSchoolId to guarantee immediate unmount/remount on campus switch */}
+        <main key={activeSchoolId} className="flex-1 overflow-y-auto">
           {children}
         </main>
       </div>

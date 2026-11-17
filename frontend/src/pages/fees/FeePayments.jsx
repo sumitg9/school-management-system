@@ -7,6 +7,7 @@ import Badge from '../../components/common/Badge';
 import { useSettings } from '../../context/SettingsContext';
 import { useAlert } from '../../context/AlertContext';
 import { useAuth } from '../../context/AuthContext';
+import { useSchool } from '../../context/SchoolContext';
 import { formatFeeTypeLabel, getFeeTypeBadgeVariant } from '../../utils/feeTypes';
 import { numberToWords } from '../../utils/numberToWords';
 import FeeTabs from './FeeTabs';
@@ -34,6 +35,7 @@ const FeePayments = () => {
   const { formatDate, formatCurrency, settings } = useSettings();
   const { showValidationError } = useAlert();
   const { isStudent, isParent, currentStudent, studentLoading, hasPermission } = useAuth();
+  const { activeSchoolId, currentSchool } = useSchool();
   const isPersonalView = isStudent() || isParent();
 
   const [feeStructure, setFeeStructure] = useState(null);
@@ -71,7 +73,7 @@ const FeePayments = () => {
   useEffect(() => {
     fetchFeeStructure();
     fetchPayments();
-  }, [id, methodFilter, statusFilter, isPersonalView, currentStudent?.id, studentLoading]);
+  }, [id, methodFilter, statusFilter, isPersonalView, currentStudent?.id, studentLoading, activeSchoolId]);
 
   const fetchFeeStructure = async () => {
     if (!id) return;
@@ -95,6 +97,7 @@ const FeePayments = () => {
     try {
       const params = {
         per_page: 50,
+        school_id: activeSchoolId,
       };
 
       // Strict student/parent enforcement: only fetch this child's payment records
@@ -134,7 +137,7 @@ const FeePayments = () => {
     setShowCollectModal(true);
     setLoadingStudents(true);
     try {
-      const params = { per_page: 100 };
+      const params = { per_page: 100, school_id: activeSchoolId };
       if (feeStructure?.class_id) {
         params.class_id = feeStructure.class_id;
       }
@@ -467,6 +470,11 @@ const FeePayments = () => {
                 <h1 className="text-2xl font-bold text-gray-900">
                   {feeStructure ? `Payments: ${feeStructure.name}` : 'Fee Payments Management'}
                 </h1>
+                {currentSchool && (
+                  <span className="px-2.5 py-0.5 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 border border-blue-200">
+                    📍 {currentSchool.shortName || currentSchool.name}
+                  </span>
+                )}
                 {feeStructure?.type && (
                   <Badge variant={getFeeTypeBadgeVariant(feeStructure.type)}>
                     {formatFeeTypeLabel(feeStructure.type)}

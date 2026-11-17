@@ -3,6 +3,7 @@ import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
 import { useSettings } from '../../context/SettingsContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useSchool } from '../../context/SchoolContext';
 import { userAPI } from '../../services/api';
 import { SYSTEM_ROLES } from '../../utils/permissionRules';
 import Modal from '../../components/common/Modal';
@@ -10,6 +11,7 @@ import Badge from '../../components/common/Badge';
 
 const UserList = () => {
   const { user: currentUser, activeRole, isSuperAdmin, hasPermission } = useAuth();
+  const { activeSchoolId, currentSchool } = useSchool();
   const { formatDate } = useSettings();
   const confirm = useConfirm();
 
@@ -71,6 +73,7 @@ const UserList = () => {
         role: selectedRoleFilter,
         status: selectedStatusFilter,
         per_page: 'all',
+        school_id: activeSchoolId,
       });
       if (res && res.data) {
         setUsers(res.data);
@@ -88,7 +91,7 @@ const UserList = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [searchQuery, selectedRoleFilter, selectedStatusFilter]);
+  }, [searchQuery, selectedRoleFilter, selectedStatusFilter, activeSchoolId]);
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
@@ -271,7 +274,14 @@ const UserList = () => {
           <div className="flex items-center gap-3">
             <span className="text-3xl p-2.5 bg-blue-50 rounded-2xl text-blue-600 shadow-xs">👥</span>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">User Management</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">User Management</h1>
+                {currentSchool && (
+                  <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-blue-50 text-blue-700 border border-blue-200">
+                    📍 {currentSchool.shortName || currentSchool.name}
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-gray-500 mt-0.5">
                 Manage system users, assign access roles, and control administrative clearances
               </p>

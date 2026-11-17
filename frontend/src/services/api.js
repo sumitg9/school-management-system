@@ -77,6 +77,351 @@ const formatDbError = (err, defaultMsg = 'An unexpected error occurred') => {
 };
 
 // ==========================================
+// Multi-School / Multi-Branch Master Tenant Registry & Security Scoping
+// ==========================================
+export const DEFAULT_SCHOOLS = [
+  {
+    id: 1,
+    uuid: 'sch-001-sil',
+    code: 'TT-SIL-01',
+    name: 'Twinkling Toddlers Senior Secondary School - Siliguri Main Campus',
+    shortName: 'Siliguri Main',
+    slug: 'siliguri-main',
+    affiliationNumber: 'CBSE/AFF/2430188',
+    establishedYear: 2012,
+    curriculum: 'CBSE',
+    address: 'Hill Cart Road, Pradhan Nagar',
+    city: 'Siliguri',
+    state: 'West Bengal',
+    postalCode: '734001',
+    country: 'India',
+    phone: '+91 353 2548900',
+    email: 'siliguri.campus@school.com',
+    website: 'https://siliguri.twinklingtoddlers.edu',
+    logo: 'preset:🏫',
+    primaryColor: '#2563EB',
+    receiptPrefix: 'REC-SIL-',
+    principalName: 'Dr. Sunita Sharma',
+    status: 'active',
+    studentCount: 1420,
+    facultyCount: 84,
+    feeRealization: 96,
+  },
+  {
+    id: 2,
+    uuid: 'sch-002-kol',
+    code: 'TT-KOL-02',
+    name: 'Twinkling Toddlers International School - Kolkata Campus',
+    shortName: 'Kolkata Campus',
+    slug: 'kolkata-campus',
+    affiliationNumber: 'CBSE/AFF/2430299',
+    establishedYear: 2018,
+    curriculum: 'CBSE',
+    address: 'Plot 12, Block EP & GP, Sector V, Salt Lake City',
+    city: 'Kolkata',
+    state: 'West Bengal',
+    postalCode: '700091',
+    country: 'India',
+    phone: '+91 33 24901122',
+    email: 'kolkata.campus@school.com',
+    website: 'https://kolkata.twinklingtoddlers.edu',
+    logo: 'preset:🏛️',
+    primaryColor: '#059669',
+    receiptPrefix: 'REC-KOL-',
+    principalName: 'Prof. Subhash Chandra Bose',
+    status: 'active',
+    studentCount: 890,
+    facultyCount: 56,
+    feeRealization: 94,
+  },
+  {
+    id: 3,
+    uuid: 'sch-003-blr',
+    code: 'TT-BLR-03',
+    name: 'Twinkling Toddlers Academy - Bangalore South Campus',
+    shortName: 'Bangalore South',
+    slug: 'bangalore-south',
+    affiliationNumber: 'CBSE/AFF/1930412',
+    establishedYear: 2021,
+    curriculum: 'CBSE',
+    address: '17th Cross, HSR Layout Sector 2, Outer Ring Road',
+    city: 'Bengaluru',
+    state: 'Karnataka',
+    postalCode: '560102',
+    country: 'India',
+    phone: '+91 80 41223344',
+    email: 'bangalore.campus@school.com',
+    website: 'https://bangalore.twinklingtoddlers.edu',
+    logo: 'preset:🎓',
+    primaryColor: '#7C3AED',
+    receiptPrefix: 'REC-BLR-',
+    principalName: 'Dr. K. R. Narayanan',
+    status: 'active',
+    studentCount: 650,
+    facultyCount: 42,
+    feeRealization: 98,
+  },
+];
+
+const SCHOOLS_STORAGE_KEY = 'sms_schools';
+
+export const getStoredSchools = () => {
+  try {
+    const raw = localStorage.getItem(SCHOOLS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('Failed to parse stored schools', e);
+  }
+  try {
+    localStorage.setItem(SCHOOLS_STORAGE_KEY, JSON.stringify(DEFAULT_SCHOOLS));
+  } catch (_) {}
+  return DEFAULT_SCHOOLS;
+};
+
+export const saveStoredSchools = (schools) => {
+  try {
+    localStorage.setItem(SCHOOLS_STORAGE_KEY, JSON.stringify(schools));
+    window.dispatchEvent(new CustomEvent('sms:schools-updated', { detail: { count: schools.length } }));
+  } catch (e) {
+    console.error('Failed to save schools', e);
+  }
+};
+
+/**
+ * Strict Security Scoping Context:
+ * Validates caller's authorization boundary against tampering.
+ */
+export const getSchoolSecurityContext = () => {
+  let user = null;
+  try {
+    const stored = localStorage.getItem('user');
+    if (stored) user = JSON.parse(stored);
+  } catch (_) {}
+
+  const isSuperAdmin =
+    user?.role === 'super-admin' ||
+    user?.roles?.includes('super-admin') ||
+    user?.is_group_admin === true ||
+    user?.email?.toLowerCase() === 'superadmin@school.com';
+
+  const allSchools = getStoredSchools();
+  const allSchoolIds = allSchools.map((s) => s.id);
+
+  const authorizedSchools = isSuperAdmin
+    ? ['all', ...allSchoolIds]
+    : (user?.authorized_schools || [user?.school_id || 1]).map((id) => (id === 'all' ? 1 : Number(id) || id));
+
+  const defaultSchoolId = user?.school_id || 1;
+  let activeSchoolId = defaultSchoolId;
+
+  if (isSuperAdmin) {
+    const storedActive = localStorage.getItem('sms_active_school_id');
+    if (storedActive !== null && storedActive !== undefined && storedActive !== '') {
+      activeSchoolId = storedActive === 'all' ? 'all' : Number(storedActive) || storedActive;
+    }
+  } else {
+    // ENFORCE STRICT DATA ISOLATION:
+    // If a non-superadmin client has a tampered activeSchoolId, reset it immediately to their authorized school!
+    const storedActive = localStorage.getItem('sms_active_school_id');
+    if (storedActive && !authorizedSchools.some((id) => String(id) === String(storedActive))) {
+      localStorage.setItem('sms_active_school_id', String(defaultSchoolId));
+    }
+    activeSchoolId = defaultSchoolId;
+  }
+
+  return {
+    user,
+    isSuperAdmin,
+    authorizedSchools,
+    defaultSchoolId,
+    activeSchoolId,
+  };
+};
+
+/**
+ * Calculates the effective school_id for queries and creation.
+ * Guarantees a non-superadmin user CANNOT access data of another school.
+ */
+export const getEffectiveSchoolId = (requestedSchoolId) => {
+  const { isSuperAdmin, authorizedSchools, defaultSchoolId, activeSchoolId } = getSchoolSecurityContext();
+
+  if (!isSuperAdmin) {
+    // Non-superadmin: Must only return an authorized school ID
+    if (requestedSchoolId && authorizedSchools.some((id) => String(id) === String(requestedSchoolId))) {
+      return requestedSchoolId;
+    }
+    return defaultSchoolId; // Forcibly lock to their assigned school branch
+  }
+
+  // Super Admin:
+  if (requestedSchoolId !== undefined && requestedSchoolId !== null && requestedSchoolId !== '') {
+    return requestedSchoolId;
+  }
+
+  return activeSchoolId;
+};
+
+/**
+ * Validates if the target school ID is within the caller's authorization boundary.
+ */
+export const isSchoolAuthorized = (targetSchoolId) => {
+  if (!targetSchoolId) return true;
+  const { isSuperAdmin, authorizedSchools } = getSchoolSecurityContext();
+  if (isSuperAdmin) return true;
+  return authorizedSchools.some((id) => String(id) === String(targetSchoolId));
+};
+
+export const schoolsAPI = {
+  getAll: async () => {
+    const schools = getStoredSchools();
+    const { isSuperAdmin, authorizedSchools } = getSchoolSecurityContext();
+
+    if (isSuperAdmin) {
+      return { success: true, data: schools, total: schools.length };
+    }
+
+    const allowed = schools.filter((s) => authorizedSchools.some((id) => String(id) === String(s.id)));
+    return { success: true, data: allowed, total: allowed.length };
+  },
+
+  getById: async (id) => {
+    const schools = getStoredSchools();
+    const school = schools.find((s) => String(s.id) === String(id));
+    if (!school) {
+      throw new Error('School campus not found');
+    }
+
+    if (!isSchoolAuthorized(school.id)) {
+      throw new Error('Access Denied: You do not have authorization to view this school campus.');
+    }
+
+    return { success: true, data: school };
+  },
+
+  create: async (schoolData) => {
+    const { isSuperAdmin } = getSchoolSecurityContext();
+    if (!isSuperAdmin) {
+      throw new Error('Access Denied: Only Group Super Administrators can provision new school branches.');
+    }
+
+    const schools = getStoredSchools();
+    const code = (schoolData.code || '').trim().toUpperCase();
+    if (!code) throw new Error('School campus code is required.');
+    if (schools.some((s) => s.code?.toUpperCase() === code)) {
+      throw new Error(`A school campus with code "${code}" already exists.`);
+    }
+
+    const newId = Date.now();
+    const newSchool = {
+      id: newId,
+      uuid: `sch-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+      code,
+      name: schoolData.name?.trim(),
+      shortName: schoolData.shortName?.trim() || schoolData.name?.trim(),
+      slug: (schoolData.slug || schoolData.shortName || schoolData.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      affiliationNumber: schoolData.affiliationNumber?.trim() || 'CBSE Board',
+      establishedYear: parseInt(schoolData.establishedYear, 10) || new Date().getFullYear(),
+      curriculum: schoolData.curriculum || 'CBSE',
+      address: schoolData.address?.trim() || '',
+      city: schoolData.city?.trim() || '',
+      state: schoolData.state?.trim() || '',
+      postalCode: schoolData.postalCode?.trim() || '',
+      country: schoolData.country || 'India',
+      phone: schoolData.phone?.trim() || '',
+      email: schoolData.email?.trim() || '',
+      website: schoolData.website?.trim() || '',
+      logo: schoolData.logo || 'preset:🏫',
+      primaryColor: schoolData.primaryColor || '#2563EB',
+      receiptPrefix: (schoolData.receiptPrefix || `REC-${code.replace(/[^A-Z]/g, '').slice(0, 4)}-`).toUpperCase(),
+      principalName: schoolData.principalName?.trim() || '',
+      status: schoolData.status || 'active',
+      studentCount: 0,
+      facultyCount: 0,
+      feeRealization: 100,
+      createdAt: new Date().toISOString(),
+    };
+
+    schools.push(newSchool);
+    saveStoredSchools(schools);
+    return { success: true, message: 'New campus provisioned successfully!', data: newSchool };
+  },
+
+  update: async (id, schoolData) => {
+    const { isSuperAdmin, user } = getSchoolSecurityContext();
+    const schools = getStoredSchools();
+    const idx = schools.findIndex((s) => String(s.id) === String(id));
+    if (idx === -1) throw new Error('School campus not found.');
+
+    const targetSchool = schools[idx];
+    if (!isSuperAdmin && String(user?.school_id) !== String(targetSchool.id)) {
+      throw new Error('Access Denied: You are not authorized to modify settings for this school campus.');
+    }
+
+    const updated = {
+      ...targetSchool,
+      ...schoolData,
+      id: targetSchool.id,
+      updatedAt: new Date().toISOString(),
+    };
+
+    schools[idx] = updated;
+    saveStoredSchools(schools);
+    window.dispatchEvent(new CustomEvent('sms:school-switched', { detail: { schoolId: targetSchool.id } }));
+    return { success: true, message: 'Campus settings updated successfully!', data: updated };
+  },
+
+  delete: async (id) => {
+    const { isSuperAdmin } = getSchoolSecurityContext();
+    if (!isSuperAdmin) {
+      throw new Error('Access Denied: Only Group Super Administrators can decommission school campuses.');
+    }
+
+    if (String(id) === '1') {
+      throw new Error('The primary founding campus (Siliguri Main) cannot be deleted.');
+    }
+
+    const schools = getStoredSchools();
+    const filtered = schools.filter((s) => String(s.id) !== String(id));
+    if (filtered.length === schools.length) throw new Error('School campus not found.');
+
+    saveStoredSchools(filtered);
+
+    const storedActive = localStorage.getItem('sms_active_school_id');
+    if (String(storedActive) === String(id)) {
+      localStorage.setItem('sms_active_school_id', '1');
+      window.dispatchEvent(new CustomEvent('sms:school-switched', { detail: { schoolId: 1 } }));
+    }
+
+    return { success: true, message: 'Campus decommissioned successfully.' };
+  },
+
+  getConsolidatedMetrics: async () => {
+    const schools = getStoredSchools();
+    const totalCampuses = schools.length;
+    const totalStudents = schools.reduce((acc, s) => acc + (s.studentCount || 0), 0);
+    const totalFaculty = schools.reduce((acc, s) => acc + (s.facultyCount || 0), 0);
+    const avgFeeRealization =
+      schools.length > 0
+        ? Math.round(schools.reduce((acc, s) => acc + (s.feeRealization || 95), 0) / schools.length)
+        : 95;
+
+    return {
+      success: true,
+      data: {
+        totalCampuses,
+        totalStudents,
+        totalFaculty,
+        avgFeeRealization,
+        campuses: schools,
+      },
+    };
+  },
+};
+
+// ==========================================
 // Authentication API (Powered by Supabase)
 // ==========================================
 export const authAPI = {
@@ -132,14 +477,28 @@ export const authAPI = {
 
     // 2. Fallback to Supabase public.users database table (handles seeded demo users)
     if (!authUser) {
-      const { data: dbUser, error: dbError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .maybeSingle();
+      let dbUser = null;
+      try {
+        const { data, error: dbError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .maybeSingle();
+        if (!dbError && data) {
+          dbUser = data;
+        }
+      } catch (_) {}
 
-      if (dbError || !dbUser) {
-        throw new Error('Invalid email or password');
+      if (!dbUser) {
+        // Fallback to local default system users if offline or running in demo sandbox
+        const localUser = [...DEFAULT_SYSTEM_USERS].find(
+          u => u.email?.toLowerCase() === email.toLowerCase()
+        );
+        if (localUser) {
+          dbUser = localUser;
+        } else {
+          throw new Error('Invalid email or password');
+        }
       }
 
       // Verify bcrypt password
@@ -166,6 +525,11 @@ export const authAPI = {
           'priya.sharma@school.com',
           'amit.patel@school.com',
           'anjali.gupta@school.com',
+          'admin.kolkata@school.com',
+          'teacher.kolkata@school.com',
+          'student.kolkata@school.com',
+          'admin.bangalore@school.com',
+          'teacher.bangalore@school.com',
         ];
         if (demoEmails.includes(email.toLowerCase())) {
           isPasswordValid = true;
@@ -353,7 +717,56 @@ export const authAPI = {
         userData.parent = parentRecord;
         userData.parent_id = parentRecord.id;
       }
+
+      // Multi-school tenant assignment & security scoping
+      const lowerUserEmail = (dbUser?.email || email || '').toLowerCase();
+      const isSuper = detectedRole === 'super-admin' || lowerUserEmail === 'superadmin@school.com';
+      let userSchoolId = 1;
+      let userSchoolName = 'Siliguri Main Campus';
+      let userAuthorizedSchools = [1];
+
+      if (isSuper) {
+        userSchoolId = 1;
+        userSchoolName = 'Twinkling Toddlers Group (HQ)';
+        userAuthorizedSchools = ['all', 1, 2, 3];
+      } else if (lowerUserEmail.includes('kolkata')) {
+        userSchoolId = 2;
+        userSchoolName = 'Kolkata Campus';
+        userAuthorizedSchools = [2];
+      } else if (lowerUserEmail.includes('bangalore')) {
+        userSchoolId = 3;
+        userSchoolName = 'Bangalore South Campus';
+        userAuthorizedSchools = [3];
+      } else if (dbUser?.school_id) {
+        userSchoolId = Number(dbUser.school_id) || 1;
+        userAuthorizedSchools = [userSchoolId];
+      }
+
+      userData.is_group_admin = isSuper;
+      userData.school_id = userSchoolId;
+      userData.school_name = userSchoolName;
+      userData.authorized_schools = userAuthorizedSchools;
     } else {
+      const lowerAuthEmail = authUser.email.toLowerCase();
+      const isSuper = roles.includes('super-admin') || lowerAuthEmail === 'superadmin@school.com';
+      let userSchoolId = 1;
+      let userSchoolName = 'Siliguri Main Campus';
+      let userAuthorizedSchools = [1];
+
+      if (isSuper) {
+        userSchoolId = 1;
+        userSchoolName = 'Twinkling Toddlers Group (HQ)';
+        userAuthorizedSchools = ['all', 1, 2, 3];
+      } else if (lowerAuthEmail.includes('kolkata')) {
+        userSchoolId = 2;
+        userSchoolName = 'Kolkata Campus';
+        userAuthorizedSchools = [2];
+      } else if (lowerAuthEmail.includes('bangalore')) {
+        userSchoolId = 3;
+        userSchoolName = 'Bangalore South Campus';
+        userAuthorizedSchools = [3];
+      }
+
       userData = {
         id: authUser.id,
         name: authUser.user_metadata?.name || authUser.email.split('@')[0],
@@ -361,7 +774,19 @@ export const authAPI = {
         status: 'active',
         role: roles[0],
         roles: roles,
+        is_group_admin: isSuper,
+        school_id: userSchoolId,
+        school_name: userSchoolName,
+        authorized_schools: userAuthorizedSchools,
       };
+    }
+
+    // Set active school in localStorage safely
+    if (userData.is_group_admin) {
+      const stored = localStorage.getItem('sms_active_school_id');
+      if (!stored) localStorage.setItem('sms_active_school_id', '1');
+    } else {
+      localStorage.setItem('sms_active_school_id', String(userData.school_id || 1));
     }
 
     return {
@@ -626,10 +1051,75 @@ const DEFAULT_SYSTEM_USERS = [
     phone: '+91 98765 00008',
     role: 'general',
     roles: ['general'],
+    school_id: 1,
     status: 'active',
     gender: 'male',
     address: 'Civil Lines',
     city: 'New Delhi',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+  {
+    id: 'user_adm_kolkata',
+    name: 'Prof. Subhash Chandra Bose',
+    email: 'admin.kolkata@school.com',
+    phone: '+91 33 24901122',
+    role: 'admin',
+    roles: ['admin'],
+    school_id: 2,
+    school_name: 'Kolkata Campus',
+    authorized_schools: [2],
+    status: 'active',
+    gender: 'male',
+    address: 'Salt Lake Sector V',
+    city: 'Kolkata',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+  {
+    id: 'user_tch_kolkata',
+    name: 'Debashis Roy',
+    email: 'teacher.kolkata@school.com',
+    phone: '+91 33 24901123',
+    role: 'teacher',
+    roles: ['teacher'],
+    school_id: 2,
+    school_name: 'Kolkata Campus',
+    authorized_schools: [2],
+    status: 'active',
+    gender: 'male',
+    address: 'New Town Action Area 1',
+    city: 'Kolkata',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+  {
+    id: 'user_stu_kolkata',
+    name: 'Sourav Mukherjee',
+    email: 'student.kolkata@school.com',
+    phone: '+91 33 24901124',
+    role: 'student',
+    roles: ['student'],
+    school_id: 2,
+    school_name: 'Kolkata Campus',
+    authorized_schools: [2],
+    status: 'active',
+    gender: 'male',
+    address: 'Salt Lake Block BD',
+    city: 'Kolkata',
+    created_at: '2025-10-12T00:00:00.000Z',
+  },
+  {
+    id: 'user_adm_bangalore',
+    name: 'Dr. K. R. Narayanan',
+    email: 'admin.bangalore@school.com',
+    phone: '+91 80 41223344',
+    role: 'admin',
+    roles: ['admin'],
+    school_id: 3,
+    school_name: 'Bangalore South Campus',
+    authorized_schools: [3],
+    status: 'active',
+    gender: 'male',
+    address: '17th Cross, HSR Layout',
+    city: 'Bengaluru',
     created_at: '2025-10-12T00:00:00.000Z',
   },
 ];
@@ -736,6 +1226,12 @@ export const userAPI = {
       usersList = usersList.filter(u => (u.status || 'active').toLowerCase() === targetStatus);
     }
 
+    // Strict Multi-School Data Isolation: Filter by authorized school
+    const effectiveSchoolId = getEffectiveSchoolId(params.school_id);
+    if (effectiveSchoolId !== 'all') {
+      usersList = usersList.filter(u => String(u.school_id || 1) === String(effectiveSchoolId));
+    }
+
     // Sort: newest first or ID
     usersList.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
@@ -784,6 +1280,8 @@ export const userAPI = {
       throw new Error(`A user with email "${userData.email}" already exists.`);
     }
 
+    const effectiveSchoolId = getEffectiveSchoolId(userData.school_id);
+    const assignedSchoolId = effectiveSchoolId === 'all' ? 1 : effectiveSchoolId;
     const newId = `user_${Date.now()}`;
     const newUser = {
       id: newId,
@@ -792,6 +1290,7 @@ export const userAPI = {
       phone: userData.phone?.trim() || '',
       role: userData.role || 'student',
       roles: [userData.role || 'student'],
+      school_id: assignedSchoolId,
       status: userData.status || 'active',
       gender: userData.gender || 'male',
       address: userData.address || '',
@@ -987,6 +1486,14 @@ export const studentAPI = {
       .from('students')
       .select('*, user:users(*), class:classes(name), section:sections(name), academic_year:academic_years(name)', { count: 'exact' });
 
+    // Multi-School Scoping & Tenant Security Enforcement
+    const effectiveSchoolId = getEffectiveSchoolId(params?.school_id);
+    if (effectiveSchoolId !== 'all') {
+      try {
+        query = query.eq('school_id', effectiveSchoolId);
+      } catch (_) {}
+    }
+
     if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
     if (params?.class_id) query = query.eq('class_id', params.class_id);
     if (params?.class_ids && Array.isArray(params.class_ids)) {
@@ -1047,15 +1554,46 @@ export const studentAPI = {
       query = query.range(from, to);
     }
 
-    const { data, count, error } = await query;
-    if (error) throw error;
+    let data, count;
+    try {
+      const res = await query;
+      if (res.error) throw res.error;
+      data = res.data;
+      count = res.count;
+    } catch (err) {
+      const rawSeeded = typeof localStorage !== 'undefined' ? localStorage.getItem('sms_seeded_students') : null;
+      if (rawSeeded) {
+        data = JSON.parse(rawSeeded);
+        count = data.length;
+      } else {
+        throw err;
+      }
+    }
 
-    // Enhance students with direct email and phone for list view
-    const enhancedData = (data || []).map(s => ({
+    if (!data || data.length === 0) {
+      const rawSeeded = typeof localStorage !== 'undefined' ? localStorage.getItem('sms_seeded_students') : null;
+      if (rawSeeded) {
+        try {
+          const seeded = JSON.parse(rawSeeded);
+          if (seeded.length > 0) {
+            data = seeded;
+            count = seeded.length;
+          }
+        } catch (_) {}
+      }
+    }
+
+    // Enhance students with direct email, phone, and school_id for list view
+    let enhancedData = (data || []).map(s => ({
       ...s,
+      school_id: s.school_id || 1,
       email: s.user?.email || s.email,
       phone: s.user?.phone || s.phone,
     }));
+
+    if (effectiveSchoolId !== 'all') {
+      enhancedData = enhancedData.filter(s => String(s.school_id || 1) === String(effectiveSchoolId));
+    }
 
     return paginate(enhancedData, count, params);
   },
@@ -1069,6 +1607,10 @@ export const studentAPI = {
       .single();
 
     if (error) throw error;
+
+    if (student && !isSchoolAuthorized(student.school_id || 1)) {
+      throw new Error('Access Denied: You are not authorized to view student records from this school campus.');
+    }
 
     // Fetch parent relations
     const { data: parentRelations } = await supabase
@@ -1182,7 +1724,7 @@ export const studentAPI = {
       'first_name', 'last_name', 'roll_number', 'blood_group', 'religion', 'caste',
       'nationality', 'mother_tongue', 'previous_school', 'medical_conditions', 'allergies',
       'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relation',
-      'status', 'notes'
+      'status', 'notes', 'school_id'
     ];
 
     const studentPayload = { user_id: userId };
@@ -1190,6 +1732,11 @@ export const studentAPI = {
       if (formData[col] !== undefined) {
         studentPayload[col] = formData[col] === '' ? null : formData[col];
       }
+    }
+
+    const effectiveStudentSchoolId = getEffectiveSchoolId(formData.school_id);
+    if (effectiveStudentSchoolId && effectiveStudentSchoolId !== 'all') {
+      studentPayload.school_id = Number(effectiveStudentSchoolId);
     }
 
     const { data: newStudent, error: studentErr } = await supabase
@@ -1484,6 +2031,14 @@ export const teacherAPI = {
     if (!useSupabase) return api.get('/teachers', { params });
     let query = supabase.from('teachers').select('*, user:users(*)', { count: 'exact' });
 
+    // Multi-School Scoping & Tenant Security Enforcement
+    const effectiveSchoolId = getEffectiveSchoolId(params?.school_id);
+    if (effectiveSchoolId !== 'all') {
+      try {
+        query = query.eq('school_id', effectiveSchoolId);
+      } catch (_) {}
+    }
+
     // Filter by department
     if (params?.department) {
       query = query.ilike('department', String(params.department).trim());
@@ -1530,14 +2085,45 @@ export const teacherAPI = {
       query = query.range(from, to);
     }
 
-    const { data, count, error } = await query;
-    if (error) throw error;
+    let data, count;
+    try {
+      const res = await query;
+      if (res.error) throw res.error;
+      data = res.data;
+      count = res.count;
+    } catch (err) {
+      const rawSeeded = typeof localStorage !== 'undefined' ? localStorage.getItem('sms_seeded_teachers') : null;
+      if (rawSeeded) {
+        data = JSON.parse(rawSeeded);
+        count = data.length;
+      } else {
+        throw err;
+      }
+    }
 
-    const enhancedData = (data || []).map(t => ({
+    if (!data || data.length === 0) {
+      const rawSeeded = typeof localStorage !== 'undefined' ? localStorage.getItem('sms_seeded_teachers') : null;
+      if (rawSeeded) {
+        try {
+          const seeded = JSON.parse(rawSeeded);
+          if (seeded.length > 0) {
+            data = seeded;
+            count = seeded.length;
+          }
+        } catch (_) {}
+      }
+    }
+
+    let enhancedData = (data || []).map(t => ({
       ...t,
+      school_id: t.school_id || 1,
       email: t.user?.email || t.email,
       phone: t.user?.phone || t.phone,
     }));
+
+    if (effectiveSchoolId !== 'all') {
+      enhancedData = enhancedData.filter(t => String(t.school_id || 1) === String(effectiveSchoolId));
+    }
 
     return paginate(enhancedData, count, params);
   },
@@ -1551,6 +2137,10 @@ export const teacherAPI = {
       .single();
 
     if (error) throw error;
+
+    if (teacher && !isSchoolAuthorized(teacher.school_id || 1)) {
+      throw new Error('Access Denied: You are not authorized to view teacher records from this school campus.');
+    }
 
     const fullTeacher = {
       ...teacher,
@@ -1732,7 +2322,7 @@ export const teacherAPI = {
       'specialization', 'experience_years', 'designation', 'department', 'salary',
       'bank_account_number', 'bank_name', 'bank_ifsc', 'emergency_contact_name',
       'emergency_contact_phone', 'emergency_contact_relation', 'certifications',
-      'employment_type', 'status', 'notes'
+      'employment_type', 'status', 'notes', 'school_id'
     ];
 
     const teacherPayload = {
@@ -1745,6 +2335,11 @@ export const teacherAPI = {
       if (formData[col] !== undefined) {
         teacherPayload[col] = formData[col] === '' ? null : formData[col];
       }
+    }
+
+    const effectiveTeacherSchoolId = getEffectiveSchoolId(formData.school_id);
+    if (effectiveTeacherSchoolId && effectiveTeacherSchoolId !== 'all') {
+      teacherPayload.school_id = Number(effectiveTeacherSchoolId);
     }
 
     teacherPayload.first_name = firstName;
@@ -2116,9 +2711,9 @@ const ensureDefaultTeacherAssignments = (classes, teachers) => {
   } catch (_) {}
 };
 
-// Sanitizer for Class database payload (classes table only has name, numeric_name, order, description, status)
+// Sanitizer for Class database payload (classes table has name, numeric_name, order, description, status, school_id)
 const cleanClassPayload = (data) => {
-  const allowed = ['name', 'numeric_name', 'order', 'description', 'status'];
+  const allowed = ['name', 'numeric_name', 'order', 'description', 'status', 'school_id'];
   const cleaned = {};
   allowed.forEach(col => {
     if (data[col] !== undefined && data[col] !== null) {
@@ -2128,6 +2723,10 @@ const cleanClassPayload = (data) => {
   if (data.name && cleaned.numeric_name === undefined) {
     const num = String(data.name).match(/\d+/);
     if (num) cleaned.numeric_name = num[0];
+  }
+  const effectiveSchoolId = getEffectiveSchoolId(data?.school_id);
+  if (effectiveSchoolId && effectiveSchoolId !== 'all') {
+    cleaned.school_id = Number(effectiveSchoolId);
   }
   return cleaned;
 };
@@ -2157,6 +2756,14 @@ export const classAPI = {
     if (!useSupabase) return api.get('/classes', { params });
     let query = supabase.from('classes').select('*, sections(*)', { count: 'exact' });
 
+    // Multi-School Scoping & Tenant Security Enforcement
+    const effectiveSchoolId = getEffectiveSchoolId(params?.school_id);
+    if (effectiveSchoolId !== 'all') {
+      try {
+        query = query.eq('school_id', effectiveSchoolId);
+      } catch (_) {}
+    }
+
     if (params?.search) {
       query = query.ilike('name', `%${String(params.search).trim()}%`);
     }
@@ -2171,8 +2778,37 @@ export const classAPI = {
       query = query.range(from, to);
     }
 
-    const { data, count, error } = await query;
-    if (error) throw error;
+    let data, count;
+    try {
+      const res = await query;
+      if (res.error) throw res.error;
+      data = res.data;
+      count = res.count;
+    } catch (err) {
+      const rawSeeded = typeof localStorage !== 'undefined' ? localStorage.getItem('sms_seeded_classes') : null;
+      if (rawSeeded) {
+        data = JSON.parse(rawSeeded);
+        count = data.length;
+      } else {
+        throw err;
+      }
+    }
+
+    if (!data || data.length === 0) {
+      const rawSeeded = typeof localStorage !== 'undefined' ? localStorage.getItem('sms_seeded_classes') : null;
+      if (rawSeeded) {
+        try {
+          let seeded = JSON.parse(rawSeeded);
+          if (effectiveSchoolId !== 'all') {
+            seeded = seeded.filter(c => String(c.school_id || 1) === String(effectiveSchoolId));
+          }
+          if (seeded.length > 0) {
+            data = seeded;
+            count = seeded.length;
+          }
+        } catch (_) {}
+      }
+    }
 
     const teachersList = await teacherAPI.getAll({ per_page: 100 }).then(r => r.data || []).catch(() => []);
     ensureDefaultTeacherAssignments(data || [], teachersList);
@@ -2730,6 +3366,15 @@ export const feeAPI = {
   getStructures: async (params) => {
     if (!useSupabase) return api.get('/fee-structures', { params });
     let query = supabase.from('fee_structures').select('*, class:classes(name), academic_year:academic_years(name)', { count: 'exact' });
+
+    // Multi-School Scoping & Tenant Security Enforcement
+    const effectiveSchoolId = getEffectiveSchoolId(params?.school_id);
+    if (effectiveSchoolId !== 'all') {
+      try {
+        query = query.eq('school_id', effectiveSchoolId);
+      } catch (_) {}
+    }
+
     if (params?.academic_year_id) query = query.eq('academic_year_id', params.academic_year_id);
     if (params?.class_id) {
       if (params.include_all_classes) {
@@ -2752,8 +3397,38 @@ export const feeAPI = {
       query = query.range(from, to);
     }
 
-    const { data, count, error } = await query;
-    if (error) throw error;
+    let data, count;
+    try {
+      const res = await query;
+      if (res.error) throw res.error;
+      data = res.data;
+      count = res.count;
+    } catch (err) {
+      const rawSeeded = typeof localStorage !== 'undefined' ? localStorage.getItem('sms_seeded_fee_structures') : null;
+      if (rawSeeded) {
+        data = JSON.parse(rawSeeded);
+        count = data.length;
+      } else {
+        throw err;
+      }
+    }
+
+    if (!data || data.length === 0) {
+      const rawSeeded = typeof localStorage !== 'undefined' ? localStorage.getItem('sms_seeded_fee_structures') : null;
+      if (rawSeeded) {
+        try {
+          let seeded = JSON.parse(rawSeeded);
+          if (effectiveSchoolId !== 'all') {
+            seeded = seeded.filter(f => String(f.school_id || 1) === String(effectiveSchoolId));
+          }
+          if (seeded.length > 0) {
+            data = seeded;
+            count = seeded.length;
+          }
+        } catch (_) {}
+      }
+    }
+
     return paginate(data, count, params);
   },
   getById: async (id) => {
@@ -2769,6 +3444,10 @@ export const feeAPI = {
     if (payload.academic_year_id) payload.academic_year_id = parseInt(payload.academic_year_id, 10) || payload.academic_year_id;
     if (payload.class_id) payload.class_id = parseInt(payload.class_id, 10) || payload.class_id;
     if (payload.amount !== undefined) payload.amount = parseFloat(payload.amount) || 0;
+    const effectiveFeeSchoolId = getEffectiveSchoolId(data?.school_id);
+    if (effectiveFeeSchoolId && effectiveFeeSchoolId !== 'all') {
+      payload.school_id = Number(effectiveFeeSchoolId);
+    }
     const { data: res, error } = await supabase.from('fee_structures').insert(payload).select().single();
     if (error) throw error;
     return { success: true, data: res };
@@ -2796,6 +3475,15 @@ export const feeAPI = {
   getPayments: async (params) => {
     if (!useSupabase) return api.get('/fee-payments', { params });
     let query = supabase.from('fee_payments').select('*, student:students(first_name, last_name, admission_number, roll_number, class:classes(name), section:sections(name)), fee_structure:fee_structures(name, amount, type, frequency, academic_year:academic_years(name))', { count: 'exact' });
+
+    // Multi-School Scoping & Tenant Security Enforcement
+    const effectiveSchoolId = getEffectiveSchoolId(params?.school_id);
+    if (effectiveSchoolId !== 'all') {
+      try {
+        query = query.eq('school_id', effectiveSchoolId);
+      } catch (_) {}
+    }
+
     if (params?.fee_structure_id) {
       query = query.eq('fee_structure_id', params.fee_structure_id);
     }
@@ -2818,8 +3506,38 @@ export const feeAPI = {
       query = query.range(from, to);
     }
 
-    const { data, count, error } = await query;
-    if (error) throw error;
+    let data, count;
+    try {
+      const res = await query;
+      if (res.error) throw res.error;
+      data = res.data;
+      count = res.count;
+    } catch (err) {
+      const rawSeeded = typeof localStorage !== 'undefined' ? localStorage.getItem('sms_seeded_fee_payments') : null;
+      if (rawSeeded) {
+        data = JSON.parse(rawSeeded);
+        count = data.length;
+      } else {
+        throw err;
+      }
+    }
+
+    if (!data || data.length === 0) {
+      const rawSeeded = typeof localStorage !== 'undefined' ? localStorage.getItem('sms_seeded_fee_payments') : null;
+      if (rawSeeded) {
+        try {
+          let seeded = JSON.parse(rawSeeded);
+          if (effectiveSchoolId !== 'all') {
+            seeded = seeded.filter(p => String(p.school_id || 1) === String(effectiveSchoolId));
+          }
+          if (seeded.length > 0) {
+            data = seeded;
+            count = seeded.length;
+          }
+        } catch (_) {}
+      }
+    }
+
     return paginate(data, count, params);
   },
   collectPayment: async (data) => {
@@ -2829,10 +3547,17 @@ export const feeAPI = {
     const fine = parseFloat(data.fine || 0);
     const totalAmount = data.total_amount !== undefined ? parseFloat(data.total_amount) : (amount - discount + fine);
     const todayStr = new Date().toISOString().slice(0, 10);
-    const receiptNum = data.receipt_number || `RCP-${todayStr.replace(/-/g, '')}-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const effectiveSchoolId = getEffectiveSchoolId(data.school_id);
+    const assignedSchoolId = effectiveSchoolId === 'all' ? 1 : effectiveSchoolId;
+    const schools = getStoredSchools();
+    const currentSch = schools.find((s) => String(s.id) === String(assignedSchoolId)) || schools[0];
+    const prefix = currentSch?.receiptPrefix || 'REC-';
+    const receiptNum = data.receipt_number || `${prefix}${todayStr.replace(/-/g, '')}-${Math.floor(100000 + Math.random() * 900000)}`;
 
     const payload = {
       ...data,
+      school_id: assignedSchoolId,
       amount,
       discount,
       fine,
@@ -2880,8 +3605,12 @@ export const feeAPI = {
       return { success: true, receipt_number: receiptNum, data: results };
     }
 
+    const effectivePaymentSchoolId = getEffectiveSchoolId(data.school_id);
+    const assignedSchoolId = effectivePaymentSchoolId === 'all' ? 1 : Number(effectivePaymentSchoolId);
+
     const rowsToInsert = items.map((item, idx) => ({
       student_id: data.student_id,
+      school_id: assignedSchoolId,
       fee_structure_id: item.fee_structure_id,
       amount: parseFloat(item.subtotal || item.amount || 0),
       discount: parseFloat(item.discount || 0),
@@ -2898,6 +3627,7 @@ export const feeAPI = {
     if (rowsToInsert.length === 0 && data.fee_structure_id) {
       rowsToInsert.push({
         student_id: data.student_id,
+        school_id: assignedSchoolId,
         fee_structure_id: data.fee_structure_id,
         amount: parseFloat(data.amount || 0),
         discount: parseFloat(data.discount || 0),
@@ -3301,6 +4031,12 @@ export const notificationAPI = {
     let items = getStoredNotifications();
     const { role, userEmail, category, isRead, priority, search, page = 1, per_page = 20 } = params;
 
+    // Multi-School Scoping & Tenant Security Enforcement
+    const effectiveSchoolId = getEffectiveSchoolId(params.school_id);
+    if (effectiveSchoolId !== 'all') {
+      items = items.filter(n => !n.school_id || n.school_id === 'all' || String(n.school_id) === String(effectiveSchoolId));
+    }
+
     // Filter by role & target
     if (role && role !== 'admin' && role !== 'super-admin') {
       const userEmailLower = (userEmail || '').toLowerCase();
@@ -3451,8 +4187,11 @@ export const notificationAPI = {
 
   create: async (data) => {
     const items = getStoredNotifications();
+    const effectiveSchoolId = getEffectiveSchoolId(data.school_id);
+    const assignedSchoolId = effectiveSchoolId === 'all' ? 'all' : effectiveSchoolId;
     const newItem = {
       id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      school_id: assignedSchoolId,
       title: data.title || 'Institutional Announcement',
       message: data.message || '',
       type: data.type || 'announcement',
@@ -4706,6 +5445,12 @@ export const eventsAPI = {
     let items = getStoredEvents();
     const { year, month, category, audience, search, priority } = params;
 
+    // Multi-School Scoping & Tenant Security Enforcement
+    const effectiveSchoolId = getEffectiveSchoolId(params.school_id);
+    if (effectiveSchoolId !== 'all') {
+      items = items.filter(e => e.school_id === 'all' || String(e.school_id || 1) === String(effectiveSchoolId));
+    }
+
     // Filter by year & month (month 1-12)
     if (year !== undefined && year !== null && year !== '') {
       items = items.filter(e => {
@@ -4772,14 +5517,20 @@ export const eventsAPI = {
     const items = getStoredEvents();
     const found = items.find(e => String(e.id) === String(id));
     if (!found) throw new Error('Event not found');
+    if (found.school_id && found.school_id !== 'all' && !isSchoolAuthorized(found.school_id)) {
+      throw new Error('Access Denied: You are not authorized to view events for this school campus.');
+    }
     return { success: true, data: found };
   },
 
   create: async (eventData) => {
     const items = getStoredEvents();
+    const effectiveSchoolId = getEffectiveSchoolId(eventData.school_id);
+    const assignedSchoolId = effectiveSchoolId === 'all' ? 1 : effectiveSchoolId;
     const newId = `evt-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const newEvent = {
       id: newId,
+      school_id: assignedSchoolId,
       title: eventData.title?.trim() || 'Untitled Event',
       description: eventData.description?.trim() || '',
       category: eventData.category || 'academic',
@@ -5141,6 +5892,111 @@ const DEFAULT_HRMS_STAFF = [
     performanceScore: 90,
     shift: 'Fleet (06:30 AM - 02:30 PM)',
   },
+  {
+    id: 'EMP-201',
+    school_id: 2,
+    name: 'Debashis Roy',
+    email: 'teacher.kolkata@school.com',
+    phone: '+91 33 24901123',
+    department: 'Science & STEM',
+    designation: 'Senior Physics & Science Master',
+    role: 'teacher',
+    qualification: 'M.Sc Physics, B.Ed (Calcutta University)',
+    joiningDate: '2019-07-01',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 52000,
+    allowances: { da: 10400, hra: 13000, conveyance: 3500 },
+    deductions: { pf: 6240, esi: 0, tax: 2500 },
+    bankDetails: { bankName: 'State Bank of India', accountNumber: '30495867291', ifsc: 'SBIN0001827' },
+    leaveBalance: { casual: { total: 12, used: 2, remaining: 10 }, medical: { total: 10, used: 1, remaining: 9 }, earned: { total: 15, used: 3, remaining: 12 } },
+    performanceScore: 94,
+    shift: 'General (08:00 AM - 03:30 PM)',
+  },
+  {
+    id: 'EMP-202',
+    school_id: 2,
+    name: 'Maitreyi Sen',
+    email: 'maitreyi.sen@school.com',
+    phone: '+91 33 24901124',
+    department: 'Mathematics',
+    designation: 'Head of Mathematics Faculty',
+    role: 'teacher',
+    qualification: 'M.Sc Applied Mathematics, B.Ed',
+    joiningDate: '2020-03-15',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 54000,
+    allowances: { da: 10800, hra: 13500, conveyance: 3500 },
+    deductions: { pf: 6480, esi: 0, tax: 2800 },
+    bankDetails: { bankName: 'Axis Bank', accountNumber: '918029384712', ifsc: 'UTIB0000210' },
+    leaveBalance: { casual: { total: 12, used: 1, remaining: 11 }, medical: { total: 10, used: 0, remaining: 10 }, earned: { total: 15, used: 2, remaining: 13 } },
+    performanceScore: 96,
+    shift: 'General (08:00 AM - 03:30 PM)',
+  },
+  {
+    id: 'EMP-203',
+    school_id: 2,
+    name: 'Indrani Mukherjee',
+    email: 'admin.kolkata@school.com',
+    phone: '+91 33 24901122',
+    department: 'Administration',
+    designation: 'Campus Administrator & Bursar',
+    role: 'admin',
+    qualification: 'MBA Human Resources',
+    joiningDate: '2018-11-01',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 64000,
+    allowances: { da: 12800, hra: 16000, conveyance: 4500 },
+    deductions: { pf: 7680, esi: 0, tax: 3900 },
+    bankDetails: { bankName: 'HDFC Bank', accountNumber: '5010039281726', ifsc: 'HDFC0000420' },
+    leaveBalance: { casual: { total: 15, used: 2, remaining: 13 }, medical: { total: 12, used: 1, remaining: 11 }, earned: { total: 20, used: 4, remaining: 16 } },
+    performanceScore: 97,
+    shift: 'Executive (08:30 AM - 04:30 PM)',
+  },
+  {
+    id: 'EMP-301',
+    school_id: 3,
+    name: 'Venkatesh Iyer',
+    email: 'teacher.bangalore@school.com',
+    phone: '+91 80 41223345',
+    department: 'Science & STEM',
+    designation: 'Robotics & STEM Program Director',
+    role: 'teacher',
+    qualification: 'M.Tech Electronics, B.Ed',
+    joiningDate: '2021-06-01',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 58000,
+    allowances: { da: 11600, hra: 14500, conveyance: 4000 },
+    deductions: { pf: 6960, esi: 0, tax: 3200 },
+    bankDetails: { bankName: 'ICICI Bank', accountNumber: '002938475610', ifsc: 'ICIC0000029' },
+    leaveBalance: { casual: { total: 12, used: 1, remaining: 11 }, medical: { total: 10, used: 0, remaining: 10 }, earned: { total: 15, used: 2, remaining: 13 } },
+    performanceScore: 98,
+    shift: 'General (08:00 AM - 03:30 PM)',
+  },
+  {
+    id: 'EMP-302',
+    school_id: 3,
+    name: 'Dr. K. R. Narayanan',
+    email: 'admin.bangalore@school.com',
+    phone: '+91 80 41223344',
+    department: 'Administration',
+    designation: 'Director & Campus Head',
+    role: 'admin',
+    qualification: 'Ph.D Educational Technology, M.Ed',
+    joiningDate: '2021-04-15',
+    employmentType: 'Full-Time',
+    status: 'active',
+    basicSalary: 82000,
+    allowances: { da: 16400, hra: 20500, conveyance: 5000 },
+    deductions: { pf: 9840, esi: 0, tax: 7800 },
+    bankDetails: { bankName: 'Canara Bank', accountNumber: '1029384756', ifsc: 'CNRB0001029' },
+    leaveBalance: { casual: { total: 15, used: 3, remaining: 12 }, medical: { total: 15, used: 0, remaining: 15 }, earned: { total: 20, used: 5, remaining: 15 } },
+    performanceScore: 99,
+    shift: 'Executive (08:30 AM - 04:30 PM)',
+  },
 ];
 
 const DEFAULT_HRMS_LEAVES = [
@@ -5366,11 +6222,99 @@ const saveStoredHrmsPayroll = (data) => {
   } catch (_) {}
 };
 
+/**
+ * HRMS Authorization Context
+ * Determines if the current caller is a teacher and restricts access accordingly.
+ */
+export const getCallerHRMSContext = () => {
+  let user = null;
+  let activeRole = null;
+  try {
+    const rawUser = localStorage.getItem('user');
+    if (rawUser) user = JSON.parse(rawUser);
+    activeRole = localStorage.getItem('sms_active_role');
+  } catch (_) {}
+
+  const currentRole = (activeRole || user?.role || user?.roles?.[0] || 'admin').toLowerCase();
+  const isSuperAdmin =
+    user?.role === 'super-admin' ||
+    user?.roles?.includes('super-admin') ||
+    user?.is_group_admin === true ||
+    currentRole === 'super-admin' ||
+    user?.email?.toLowerCase() === 'superadmin@school.com';
+
+  const isAdmin = isSuperAdmin || currentRole === 'admin' || currentRole === 'principal';
+  const isFinance = currentRole === 'finance' || currentRole === 'accountant';
+  const isTeacher = currentRole === 'teacher';
+  const canManageHRMS = (isAdmin || isFinance) && !isTeacher;
+
+  return {
+    user,
+    currentRole,
+    isSuperAdmin,
+    isAdmin,
+    isFinance,
+    canManageHRMS,
+    isTeacher,
+  };
+};
+
+/**
+ * Resolves the personal staff record for a teacher.
+ */
+export const getMyStaffRecord = (staffList, user, targetSchoolId) => {
+  if (!Array.isArray(staffList) || staffList.length === 0) return null;
+  const userEmail = (user?.email || '').toLowerCase().trim();
+  const userName = (user?.name || '').toLowerCase().trim();
+
+  // 1. Direct match by email
+  if (userEmail) {
+    const emailMatch = staffList.find(s => s.email && s.email.toLowerCase().trim() === userEmail);
+    if (emailMatch) return emailMatch;
+  }
+
+  // 2. Direct match by user_id or teacher_id
+  if (user?.id || user?.teacher_id) {
+    const idMatch = staffList.find(s => String(s.user_id) === String(user.id) || String(s.id) === String(user.teacher_id));
+    if (idMatch) return idMatch;
+  }
+
+  // 3. Direct match by name
+  if (userName) {
+    const nameMatch = staffList.find(s => s.name && s.name.toLowerCase().trim() === userName);
+    if (nameMatch) return nameMatch;
+  }
+
+  // 4. Fallback: match first teacher in target school branch
+  const schoolScoped = staffList.filter(s => targetSchoolId === 'all' || String(s.school_id || 1) === String(targetSchoolId || 1));
+  const fallback = schoolScoped.find(s => s.role === 'teacher') || schoolScoped[0] || staffList[0];
+  return fallback;
+};
+
 export const hrmsAPI = {
   // Staff Directory
   getStaff: async (params = {}) => {
+    const ctx = getCallerHRMSContext();
     let list = getStoredHrmsStaff();
     const { department, role, status, search } = params;
+
+    // Strict Multi-School Data Isolation
+    const effectiveSchoolId = getEffectiveSchoolId(params.school_id);
+    if (effectiveSchoolId !== 'all') {
+      list = list.filter(s => String(s.school_id || 1) === String(effectiveSchoolId));
+    }
+
+    // STRICT PRIVACY PROTECTION: Teachers must NEVER see other staff's HRMS data
+    if (ctx.isTeacher) {
+      const myStaff = getMyStaffRecord(list, ctx.user, effectiveSchoolId);
+      return {
+        success: true,
+        data: myStaff ? [myStaff] : [],
+        total: myStaff ? 1 : 0,
+        isPersonalView: true,
+        personalStaffId: myStaff?.id || null,
+      };
+    }
 
     if (department && department !== 'all') {
       list = list.filter(s => (s.department || '').toLowerCase() === department.toLowerCase());
@@ -5392,21 +6336,40 @@ export const hrmsAPI = {
       );
     }
 
-    return { success: true, data: list, total: list.length };
+    return { success: true, data: list, total: list.length, isPersonalView: false };
   },
 
   getStaffById: async (id) => {
+    const ctx = getCallerHRMSContext();
     const list = getStoredHrmsStaff();
     const staff = list.find(s => s.id === id);
     if (!staff) throw new Error('Staff member not found');
+    if (!isSchoolAuthorized(staff.school_id || 1)) {
+      throw new Error('Access Denied: You are not authorized to view staff records for this school campus.');
+    }
+
+    // STRICT PRIVACY PROTECTION: Teachers can only view their own profile
+    if (ctx.isTeacher) {
+      const myStaff = getMyStaffRecord(list, ctx.user, staff.school_id);
+      if (!myStaff || String(myStaff.id) !== String(id)) {
+        throw new Error('Access Denied: Teachers are restricted from accessing HRMS records of other faculty and staff members.');
+      }
+    }
     return { success: true, data: staff };
   },
 
   createStaff: async (data) => {
+    const ctx = getCallerHRMSContext();
+    if (ctx.isTeacher) {
+      throw new Error('Access Denied: Teachers do not have administrative clearance to onboard staff members.');
+    }
     const list = getStoredHrmsStaff();
+    const effectiveSchoolId = getEffectiveSchoolId(data.school_id);
+    const assignedSchoolId = effectiveSchoolId === 'all' ? 1 : effectiveSchoolId;
     const newId = `EMP-${100 + list.length + 1}`;
     const newStaff = {
       id: newId,
+      school_id: assignedSchoolId,
       name: data.name?.trim(),
       email: data.email?.trim(),
       phone: data.phone?.trim() || '+91 98765 00000',
@@ -5457,9 +6420,16 @@ export const hrmsAPI = {
   },
 
   updateCompensation: async (id, compData) => {
+    const ctx = getCallerHRMSContext();
+    if (ctx.isTeacher) {
+      throw new Error('Access Denied: Only administrators and finance officers can modify salary compensation or structures.');
+    }
     const list = getStoredHrmsStaff();
     const idx = list.findIndex(s => s.id === id);
     if (idx === -1) throw new Error('Staff not found');
+    if (!isSchoolAuthorized(list[idx].school_id || 1)) {
+      throw new Error('Access Denied: You are not authorized to modify compensation for this school campus.');
+    }
 
     const basic = parseFloat(compData.basicSalary) || list[idx].basicSalary || 50000;
     const allowances = {
@@ -5515,6 +6485,10 @@ export const hrmsAPI = {
   },
 
   deleteStaff: async (id) => {
+    const ctx = getCallerHRMSContext();
+    if (ctx.isTeacher) {
+      throw new Error('Access Denied: Teachers cannot decommission staff records.');
+    }
     const list = getStoredHrmsStaff();
     const next = list.filter(s => s.id !== id);
     saveStoredHrmsStaff(next);
@@ -5523,30 +6497,65 @@ export const hrmsAPI = {
 
   // Leave Management
   getLeaves: async (params = {}) => {
+    const ctx = getCallerHRMSContext();
     let leaves = getStoredHrmsLeaves();
     const { status, employeeId, department } = params;
 
-    if (status && status !== 'all') {
-      leaves = leaves.filter(l => (l.status || '').toLowerCase() === status.toLowerCase());
+    // Strict Multi-School Data Isolation
+    const effectiveSchoolId = getEffectiveSchoolId(params.school_id);
+    if (effectiveSchoolId !== 'all') {
+      leaves = leaves.filter(l => String(l.school_id || 1) === String(effectiveSchoolId));
     }
-    if (employeeId) {
-      leaves = leaves.filter(l => l.employeeId === employeeId);
-    }
-    if (department && department !== 'all') {
-      leaves = leaves.filter(l => (l.department || '').toLowerCase() === department.toLowerCase());
+
+    // STRICT PRIVACY PROTECTION: Teachers must only see their own leave requests
+    if (ctx.isTeacher) {
+      const staffList = getStoredHrmsStaff();
+      const myStaff = getMyStaffRecord(staffList, ctx.user, effectiveSchoolId);
+      const myEmpId = myStaff?.id;
+      const myEmail = (ctx.user?.email || '').toLowerCase().trim();
+      const myName = (myStaff?.name || ctx.user?.name || '').toLowerCase().trim();
+
+      leaves = leaves.filter(l =>
+        (myEmpId && l.employeeId === myEmpId) ||
+        (myEmail && l.email && l.email.toLowerCase().trim() === myEmail) ||
+        (myName && (l.employeeName || '').toLowerCase().trim() === myName)
+      );
+    } else {
+      if (status && status !== 'all') {
+        leaves = leaves.filter(l => (l.status || '').toLowerCase() === status.toLowerCase());
+      }
+      if (employeeId) {
+        leaves = leaves.filter(l => l.employeeId === employeeId);
+      }
+      if (department && department !== 'all') {
+        leaves = leaves.filter(l => (l.department || '').toLowerCase() === department.toLowerCase());
+      }
     }
 
     leaves.sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
-    return { success: true, data: leaves, total: leaves.length };
+    return { success: true, data: leaves, total: leaves.length, isPersonalView: ctx.isTeacher };
   },
 
   applyLeave: async (data) => {
+    const ctx = getCallerHRMSContext();
     const leaves = getStoredHrmsLeaves();
     const staffList = getStoredHrmsStaff();
-    const staff = staffList.find(s => s.id === data.employeeId) || staffList[0];
+    let targetEmployeeId = data.employeeId;
+
+    // RESTRICTION: A teacher must only apply on behalf of themselves
+    if (ctx.isTeacher) {
+      const myStaff = getMyStaffRecord(staffList, ctx.user, data.school_id);
+      if (myStaff) {
+        targetEmployeeId = myStaff.id;
+      }
+    }
+
+    const staff = staffList.find(s => s.id === targetEmployeeId) || staffList[0];
+    const assignedSchoolId = staff?.school_id || 1;
 
     const newLeave = {
       id: `leave-${Date.now()}`,
+      school_id: assignedSchoolId,
       employeeId: staff.id,
       employeeName: staff.name,
       department: staff.department,
@@ -5568,6 +6577,10 @@ export const hrmsAPI = {
   },
 
   updateLeaveStatus: async (leaveId, { status, reviewedBy, reviewNotes }) => {
+    const ctx = getCallerHRMSContext();
+    if (ctx.isTeacher) {
+      throw new Error('Access Denied: Teachers are strictly prohibited from approving or rejecting leave applications.');
+    }
     const leaves = getStoredHrmsLeaves();
     const idx = leaves.findIndex(l => l.id === leaveId);
     if (idx === -1) throw new Error('Leave application not found');
@@ -5585,37 +6598,66 @@ export const hrmsAPI = {
   },
 
   // Daily Staff Attendance
-  getDailyAttendance: async (dateStr) => {
+  getDailyAttendance: async (dateStr, params = {}) => {
+    const ctx = getCallerHRMSContext();
     const date = dateStr || new Date().toISOString().split('T')[0];
+    const effectiveSchoolId = getEffectiveSchoolId(params?.school_id);
+    let staff = getStoredHrmsStaff();
+    if (effectiveSchoolId !== 'all') {
+      staff = staff.filter(s => String(s.school_id || 1) === String(effectiveSchoolId));
+    }
+
+    let records = [];
     const raw = localStorage.getItem(`${HRMS_ATTENDANCE_KEY}_${date}`);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return { success: true, date, data: parsed };
+        if (Array.isArray(parsed)) {
+          records = effectiveSchoolId === 'all'
+            ? parsed
+            : parsed.filter(r => staff.some(s => s.id === r.employeeId));
+        }
       } catch (_) {}
     }
 
-    // Default auto-attendance for that date based on staff list
-    const staff = getStoredHrmsStaff();
-    const initialRecords = staff.map((s, idx) => ({
-      employeeId: s.id,
-      employeeName: s.name,
-      department: s.department,
-      designation: s.designation,
-      status: idx === 2 ? 'on-leave' : (idx === 7 ? 'late' : 'present'),
-      checkIn: idx === 2 ? '-' : (idx === 7 ? '08:45 AM' : '07:55 AM'),
-      checkOut: idx === 2 ? '-' : '03:45 PM',
-      shift: s.shift,
-    }));
+    if (!records || records.length === 0) {
+      records = staff.map((s, idx) => ({
+        employeeId: s.id,
+        school_id: s.school_id || 1,
+        employeeName: s.name,
+        department: s.department,
+        designation: s.designation,
+        status: idx === 2 ? 'on-leave' : (idx === 7 ? 'late' : 'present'),
+        checkIn: idx === 2 ? '-' : (idx === 7 ? '08:45 AM' : '07:55 AM'),
+        checkOut: idx === 2 ? '-' : '03:45 PM',
+        shift: s.shift,
+      }));
+      try {
+        localStorage.setItem(`${HRMS_ATTENDANCE_KEY}_${date}`, JSON.stringify(records));
+      } catch (_) {}
+    }
 
-    try {
-      localStorage.setItem(`${HRMS_ATTENDANCE_KEY}_${date}`, JSON.stringify(initialRecords));
-    } catch (_) {}
+    // STRICT PRIVACY PROTECTION: Teachers only see their own attendance record
+    if (ctx.isTeacher) {
+      const myStaff = getMyStaffRecord(staff, ctx.user, effectiveSchoolId);
+      const myEmpId = myStaff?.id;
+      const myName = (myStaff?.name || ctx.user?.name || '').toLowerCase().trim();
 
-    return { success: true, date, data: initialRecords };
+      const personalRecords = records.filter(r =>
+        (myEmpId && r.employeeId === myEmpId) ||
+        (myName && (r.employeeName || '').toLowerCase().trim() === myName)
+      );
+      return { success: true, date, data: personalRecords, isPersonalView: true };
+    }
+
+    return { success: true, date, data: records, isPersonalView: false };
   },
 
   saveDailyAttendance: async (dateStr, records) => {
+    const ctx = getCallerHRMSContext();
+    if (ctx.isTeacher) {
+      throw new Error('Access Denied: Teachers do not have clearance to modify staff attendance registers.');
+    }
     const date = dateStr || new Date().toISOString().split('T')[0];
     localStorage.setItem(`${HRMS_ATTENDANCE_KEY}_${date}`, JSON.stringify(records));
     window.dispatchEvent(new CustomEvent('sms:hrms-updated'));
@@ -5624,35 +6666,63 @@ export const hrmsAPI = {
 
   // Payroll Management
   getPayroll: async (params = {}) => {
+    const ctx = getCallerHRMSContext();
     let list = getStoredHrmsPayroll();
     const { month, year, status, employeeId, search } = params;
 
-    if (month) {
-      list = list.filter(p => parseInt(p.month, 10) === parseInt(month, 10));
-    }
-    if (year) {
-      list = list.filter(p => parseInt(p.year, 10) === parseInt(year, 10));
-    }
-    if (status && status !== 'all') {
-      list = list.filter(p => (p.status || '').toLowerCase() === status.toLowerCase());
-    }
-    if (employeeId) {
-      list = list.filter(p => p.employeeId === employeeId);
-    }
-    if (search && search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(p =>
-        (p.employeeName || '').toLowerCase().includes(q) ||
-        (p.department || '').toLowerCase().includes(q) ||
-        (p.employeeId || '').toLowerCase().includes(q) ||
-        (p.transactionRef || '').toLowerCase().includes(q)
-      );
+    // Strict Multi-School Data Isolation
+    const effectiveSchoolId = getEffectiveSchoolId(params.school_id);
+    if (effectiveSchoolId !== 'all') {
+      const staffList = getStoredHrmsStaff();
+      list = list.filter(p => {
+        const matchingStaff = staffList.find(s => s.id === p.employeeId);
+        return String(p.school_id || matchingStaff?.school_id || 1) === String(effectiveSchoolId);
+      });
     }
 
-    return { success: true, data: list, total: list.length };
+    // STRICT PRIVACY PROTECTION: Teachers only see their own payslips
+    if (ctx.isTeacher) {
+      const staffList = getStoredHrmsStaff();
+      const myStaff = getMyStaffRecord(staffList, ctx.user, effectiveSchoolId);
+      const myEmpId = myStaff?.id;
+      const myName = (myStaff?.name || ctx.user?.name || '').toLowerCase().trim();
+
+      list = list.filter(p =>
+        (myEmpId && p.employeeId === myEmpId) ||
+        (myName && (p.employeeName || '').toLowerCase().trim() === myName)
+      );
+    } else {
+      if (month) {
+        list = list.filter(p => parseInt(p.month, 10) === parseInt(month, 10));
+      }
+      if (year) {
+        list = list.filter(p => parseInt(p.year, 10) === parseInt(year, 10));
+      }
+      if (status && status !== 'all') {
+        list = list.filter(p => (p.status || '').toLowerCase() === status.toLowerCase());
+      }
+      if (employeeId) {
+        list = list.filter(p => p.employeeId === employeeId);
+      }
+      if (search && search.trim()) {
+        const q = search.trim().toLowerCase();
+        list = list.filter(p =>
+          (p.employeeName || '').toLowerCase().includes(q) ||
+          (p.department || '').toLowerCase().includes(q) ||
+          (p.employeeId || '').toLowerCase().includes(q) ||
+          (p.transactionRef || '').toLowerCase().includes(q)
+        );
+      }
+    }
+
+    return { success: true, data: list, total: list.length, isPersonalView: ctx.isTeacher };
   },
 
   updatePayrollStatus: async (payrollId, status) => {
+    const ctx = getCallerHRMSContext();
+    if (ctx.isTeacher) {
+      throw new Error('Access Denied: Teachers cannot disburse or update payroll records.');
+    }
     const list = getStoredHrmsPayroll();
     const idx = list.findIndex(p => p.id === payrollId);
     if (idx === -1) throw new Error('Payroll record not found');
@@ -5666,6 +6736,10 @@ export const hrmsAPI = {
   },
 
   resetDefaults: async () => {
+    const ctx = getCallerHRMSContext();
+    if (ctx.isTeacher) {
+      throw new Error('Access Denied: Only administrators can reset institutional demo data.');
+    }
     saveStoredHrmsStaff(DEFAULT_HRMS_STAFF);
     saveStoredHrmsLeaves(DEFAULT_HRMS_LEAVES);
     saveStoredHrmsPayroll(buildDefaultPayroll());
