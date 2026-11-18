@@ -1325,7 +1325,7 @@ export const exportReportToCSV = (reportName, columns, data) => {
 export const generateMasterSchoolExport = (liveData = {}) => {
   const sections = [
     '=========================================================================',
-    'TWINKLING TODDLERS SENIOR ACADEMIC CAMPUS - MASTER INSTITUTIONAL REPORT',
+    'DELHI PUBLIC ACADEMY - MASTER INSTITUTIONAL REPORT',
     `Generated At: ${new Date().toLocaleString('en-IN')}`,
     'Academic Year: 2024-25 | Accreditation: CBSE Autonomous',
     '=========================================================================\r\n',

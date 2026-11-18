@@ -30,7 +30,17 @@ const Layout = ({ children }) => {
   const { currentSchool, activeSchoolId } = useSchool();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const schoolName = currentSchool?.name || (settings?.school_name && settings.school_name !== 'null' ? settings.school_name : 'SMS');
+  const isLegacyOrPlaceholder = (name) => {
+    if (!name || name === 'null') return true;
+    const lower = String(name).trim().toLowerCase();
+    return lower.includes('twinkling') || lower.includes('toddler') || lower === 'sms' || lower === 'school management system';
+  };
+
+  const schoolName = !isLegacyOrPlaceholder(currentSchool?.name)
+    ? currentSchool.name
+    : (!isLegacyOrPlaceholder(settings?.school_name)
+        ? settings.school_name
+        : 'Delhi Public Academy');
   const schoolTagline = currentSchool?.city
     ? `${currentSchool.city} • ${currentSchool.curriculum || 'CBSE'}`
     : (settings?.school_tagline && settings.school_tagline !== 'null' ? settings.school_tagline : 'School Management');
@@ -49,6 +59,14 @@ const Layout = ({ children }) => {
       icon: '🏠',
       label: 'Dashboard',
       permission: 'view-dashboard',
+    },
+    {
+      id: 'admissions_direct',
+      type: 'item',
+      path: '/admissions/manage',
+      icon: '📝',
+      label: 'Online Admissions',
+      permission: 'view-admissions',
     },
     {
       id: 'academics',
@@ -93,6 +111,7 @@ const Layout = ({ children }) => {
       label: 'Administration',
       icon: '⚙️',
       items: [
+        { path: '/admissions/manage', icon: '📝', label: 'Online Admissions', permission: 'view-admissions' },
         { path: '/schools', icon: '🏛️', label: 'Campuses & Branches', permission: 'view-schools' },
         { path: '/hrms', icon: '👔', label: 'HRMS & Staff', permission: 'view-hrms' },
         { path: '/reports', icon: '📈', label: 'Reports & Analytics', permission: 'view-reports' },
@@ -140,6 +159,9 @@ const Layout = ({ children }) => {
   const isActive = (path) => {
     if (path === '/') {
       return location.pathname === '/';
+    }
+    if (path === '/admissions/manage') {
+      return location.pathname.startsWith('/admissions') || location.pathname.startsWith('/admission');
     }
     if (path === '/fees') {
       return (

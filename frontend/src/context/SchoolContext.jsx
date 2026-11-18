@@ -92,9 +92,9 @@ export const SchoolProvider = ({ children }) => {
     if (targetId === 'all') {
       setCurrentSchool({
         id: 'all',
-        name: 'Twinkling Toddlers Group of Schools (HQ)',
+        name: 'Delhi Public Academy Group of Schools (HQ)',
         shortName: 'All Campuses (HQ)',
-        code: 'TT-GROUP-HQ',
+        code: 'DPA-GROUP-HQ',
         city: 'All Regions',
         primaryColor: '#1E3A8A',
         logo: 'preset:🌐',
@@ -130,9 +130,9 @@ export const SchoolProvider = ({ children }) => {
       localStorage.setItem('sms_active_school_id', 'all');
       setCurrentSchool({
         id: 'all',
-        name: 'Twinkling Toddlers Group of Schools (HQ)',
+        name: 'Delhi Public Academy Group of Schools (HQ)',
         shortName: 'All Campuses (HQ)',
-        code: 'TT-GROUP-HQ',
+        code: 'DPA-GROUP-HQ',
         city: 'All Regions',
         primaryColor: '#1E3A8A',
         logo: 'preset:🌐',

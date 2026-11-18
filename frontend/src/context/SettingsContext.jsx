@@ -119,7 +119,17 @@ const normalizeSettings = (raw) => {
   merged.fee_late_fine_max_cap = Math.max(0, parseFloat(merged.fee_late_fine_max_cap ?? 1000) || 0);
 
   // School Identity normalization
-  merged.school_name = raw?.school_name && raw.school_name !== 'null' ? String(raw.school_name).trim() : DEFAULT_SETTINGS.school_name;
+  let candidateName = raw?.school_name && raw.school_name !== 'null' ? String(raw.school_name).trim() : DEFAULT_SETTINGS.school_name;
+  if (
+    !candidateName ||
+    candidateName.toLowerCase().includes('twinkling') ||
+    candidateName.toLowerCase().includes('toddler') ||
+    candidateName.toLowerCase() === 'school management system' ||
+    candidateName.toLowerCase() === 'sms'
+  ) {
+    candidateName = DEFAULT_SETTINGS.school_name;
+  }
+  merged.school_name = candidateName;
   merged.school_logo = raw?.school_logo && raw.school_logo !== 'null' ? String(raw.school_logo) : DEFAULT_SETTINGS.school_logo;
   merged.school_tagline = raw?.school_tagline && raw.school_tagline !== 'null' ? String(raw.school_tagline).trim() : DEFAULT_SETTINGS.school_tagline;
   merged.school_email = raw?.school_email && raw.school_email !== 'null' ? String(raw.school_email).trim() : DEFAULT_SETTINGS.school_email;
@@ -135,6 +145,21 @@ export const SettingsProvider = ({ children }) => {
   const [settings, setSettings] = useState(() => {
     try {
       const cached = localStorage.getItem('app_settings');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (
+            parsed.school_name &&
+            (parsed.school_name.toLowerCase().includes('twinkling') ||
+             parsed.school_name.toLowerCase().includes('toddler') ||
+             parsed.school_name.toLowerCase() === 'school management system' ||
+             parsed.school_name.toLowerCase() === 'sms')
+          ) {
+            parsed.school_name = DEFAULT_SETTINGS.school_name;
+            localStorage.setItem('app_settings', JSON.stringify(parsed));
+          }
+        } catch (_) {}
+      }
       const cachedPerms = localStorage.getItem('sms_role_permissions');
       let base = cached ? normalizeSettings(JSON.parse(cached)) : DEFAULT_SETTINGS;
       if (cachedPerms) {

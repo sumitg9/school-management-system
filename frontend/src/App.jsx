@@ -58,6 +58,15 @@ import EventManagement from './pages/events/EventManagement';
 import HRMSDashboard from './pages/hrms/HRMSDashboard';
 import SchoolsManagement from './pages/schools/SchoolsManagement';
 import { SchoolProvider } from './context/SchoolContext';
+
+// Online Admissions
+import AdmissionPortal from './pages/admissions/AdmissionPortal';
+import AdmissionWizard from './pages/admissions/AdmissionWizard';
+import AdmissionTracker from './pages/admissions/AdmissionTracker';
+import AdmissionAcknowledgement from './pages/admissions/AdmissionAcknowledgement';
+import AdmissionDashboard from './pages/admissions/admin/AdmissionDashboard';
+import ApplicationReview from './pages/admissions/admin/ApplicationReview';
+import AdmissionSettings from './pages/admissions/admin/AdmissionSettings';
 import PermissionRoute from './components/common/PermissionRoute';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
@@ -84,6 +93,15 @@ function AppRoutes() {
     <>
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* Public Online Admission Registration Portal */}
+        <Route path="/admissions" element={<AdmissionPortal />} />
+        <Route path="/admissions/apply" element={<AdmissionWizard />} />
+        <Route path="/admissions/track" element={<AdmissionTracker />} />
+        <Route path="/admissions/acknowledgement/:appNumber" element={<AdmissionAcknowledgement />} />
+        {/* Aliases for /admission (singular) */}
+        <Route path="/admission" element={<Navigate to="/admissions" replace />} />
+        <Route path="/admission/apply" element={<Navigate to="/admissions/apply" replace />} />
+        <Route path="/admission/track" element={<Navigate to="/admissions/track" replace />} />
         <Route
           path="/*"
           element={
@@ -142,6 +160,13 @@ function AppRoutes() {
                     <Route path="/calendar" element={<Navigate to="/events" replace />} />
                     <Route path="/hrms" element={<PermissionRoute permission="view-hrms"><HRMSDashboard /></PermissionRoute>} />
                     <Route path="/schools" element={<PermissionRoute permission="view-schools"><SchoolsManagement /></PermissionRoute>} />
+                    {/* Online Admissions Management */}
+                    <Route path="/admissions/manage" element={<PermissionRoute permission="view-admissions"><AdmissionDashboard /></PermissionRoute>} />
+                    <Route path="/admissions/manage/:id" element={<PermissionRoute permission="manage-admissions"><ApplicationReview /></PermissionRoute>} />
+                    <Route path="/admissions/settings" element={<PermissionRoute permission="manage-admissions"><AdmissionSettings /></PermissionRoute>} />
+                    <Route path="/admission/manage" element={<Navigate to="/admissions/manage" replace />} />
+                    <Route path="/admission/manage/:id" element={<Navigate to="/admissions/manage/:id" replace />} />
+                    <Route path="/admission/settings" element={<Navigate to="/admissions/settings" replace />} />
                     <Route path="/notifications" element={<NotificationCenter />} />
                     <Route path="/users" element={<PermissionRoute permission="manage-users"><UserList /></PermissionRoute>} />
                     <Route path="/settings" element={<PermissionRoute permission="manage-settings"><Settings /></PermissionRoute>} />

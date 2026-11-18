@@ -2212,7 +2212,7 @@ export default function HRMSDashboard() {
                 <div className="flex justify-center items-center space-x-2">
                   <span className="text-2xl">🎓</span>
                   <h1 className="text-lg font-black tracking-tight text-blue-950 uppercase">
-                    {currentSchool?.name || 'Twinkling Toddlers Senior Secondary School'}
+                    {currentSchool?.name || 'Delhi Public Academy'}
                   </h1>
                 </div>
                 <p className="text-[11px] text-gray-500 font-medium">

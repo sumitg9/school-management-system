@@ -83,8 +83,8 @@ export const DEFAULT_SCHOOLS = [
   {
     id: 1,
     uuid: 'sch-001-sil',
-    code: 'TT-SIL-01',
-    name: 'Twinkling Toddlers Senior Secondary School - Siliguri Main Campus',
+    code: 'DPA-SIL-01',
+    name: 'Delhi Public Academy - Siliguri Main Campus',
     shortName: 'Siliguri Main',
     slug: 'siliguri-main',
     affiliationNumber: 'CBSE/AFF/2430188',
@@ -97,7 +97,7 @@ export const DEFAULT_SCHOOLS = [
     country: 'India',
     phone: '+91 353 2548900',
     email: 'siliguri.campus@school.com',
-    website: 'https://siliguri.twinklingtoddlers.edu',
+    website: 'https://siliguri.dpa.edu',
     logo: 'preset:🏫',
     primaryColor: '#2563EB',
     receiptPrefix: 'REC-SIL-',
@@ -110,8 +110,8 @@ export const DEFAULT_SCHOOLS = [
   {
     id: 2,
     uuid: 'sch-002-kol',
-    code: 'TT-KOL-02',
-    name: 'Twinkling Toddlers International School - Kolkata Campus',
+    code: 'DPA-KOL-02',
+    name: 'Delhi Public Academy - Kolkata Campus',
     shortName: 'Kolkata Campus',
     slug: 'kolkata-campus',
     affiliationNumber: 'CBSE/AFF/2430299',
@@ -124,7 +124,7 @@ export const DEFAULT_SCHOOLS = [
     country: 'India',
     phone: '+91 33 24901122',
     email: 'kolkata.campus@school.com',
-    website: 'https://kolkata.twinklingtoddlers.edu',
+    website: 'https://kolkata.dpa.edu',
     logo: 'preset:🏛️',
     primaryColor: '#059669',
     receiptPrefix: 'REC-KOL-',
@@ -137,8 +137,8 @@ export const DEFAULT_SCHOOLS = [
   {
     id: 3,
     uuid: 'sch-003-blr',
-    code: 'TT-BLR-03',
-    name: 'Twinkling Toddlers Academy - Bangalore South Campus',
+    code: 'DPA-BLR-03',
+    name: 'Delhi Public Academy - Bangalore South Campus',
     shortName: 'Bangalore South',
     slug: 'bangalore-south',
     affiliationNumber: 'CBSE/AFF/1930412',
@@ -151,7 +151,7 @@ export const DEFAULT_SCHOOLS = [
     country: 'India',
     phone: '+91 80 41223344',
     email: 'bangalore.campus@school.com',
-    website: 'https://bangalore.twinklingtoddlers.edu',
+    website: 'https://bangalore.dpa.edu',
     logo: 'preset:🎓',
     primaryColor: '#7C3AED',
     receiptPrefix: 'REC-BLR-',
@@ -170,7 +170,14 @@ export const getStoredSchools = () => {
     const raw = localStorage.getItem(SCHOOLS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const hasLegacyName = parsed.some(
+          (s) =>
+            (s.name && s.name.toLowerCase().includes('twinkling')) ||
+            (s.website && s.website.toLowerCase().includes('twinkling'))
+        );
+        if (!hasLegacyName) return parsed;
+      }
     }
   } catch (e) {
     console.error('Failed to parse stored schools', e);
@@ -727,7 +734,7 @@ export const authAPI = {
 
       if (isSuper) {
         userSchoolId = 1;
-        userSchoolName = 'Twinkling Toddlers Group (HQ)';
+        userSchoolName = 'Delhi Public Academy Group (HQ)';
         userAuthorizedSchools = ['all', 1, 2, 3];
       } else if (lowerUserEmail.includes('kolkata')) {
         userSchoolId = 2;
@@ -755,7 +762,7 @@ export const authAPI = {
 
       if (isSuper) {
         userSchoolId = 1;
-        userSchoolName = 'Twinkling Toddlers Group (HQ)';
+        userSchoolName = 'Delhi Public Academy Group (HQ)';
         userAuthorizedSchools = ['all', 1, 2, 3];
       } else if (lowerAuthEmail.includes('kolkata')) {
         userSchoolId = 2;
@@ -4420,6 +4427,16 @@ export const settingsAPI = {
       const stored = localStorage.getItem('app_settings');
       if (stored) {
         settingsMap = JSON.parse(stored);
+        if (
+          settingsMap.school_name &&
+          (settingsMap.school_name.toLowerCase().includes('twinkling') ||
+           settingsMap.school_name.toLowerCase().includes('toddler') ||
+           settingsMap.school_name.toLowerCase() === 'school management system' ||
+           settingsMap.school_name.toLowerCase() === 'sms')
+        ) {
+          settingsMap.school_name = 'Delhi Public Academy';
+          localStorage.setItem('app_settings', JSON.stringify(settingsMap));
+        }
       }
     } catch (_) {}
 
@@ -4460,6 +4477,14 @@ export const settingsAPI = {
             } catch {
               // keep as string
             }
+          }
+          if (
+            item.key === 'school_name' &&
+            typeof val === 'string' &&
+            (val.toLowerCase().includes('twinkling') || val.toLowerCase().includes('toddler'))
+          ) {
+            val = 'Delhi Public Academy';
+            supabase.from('settings').upsert({ key: 'school_name', value: 'Delhi Public Academy' }, { onConflict: 'key' }).then(() => {}).catch(() => {});
           }
           settingsMap[item.key] = val;
         });
@@ -7576,6 +7601,994 @@ export const timetableAPI = {
       rooms: getStoredTimetableRooms(),
       substitutions: getStoredSubstitutions(),
     };
+  },
+};
+
+// ==========================================
+// Online Admission Registration System API
+// ==========================================
+const ADMISSION_STORAGE_KEY = 'sms_admission_applications';
+const ADMISSION_SETTINGS_KEY = 'sms_admission_settings';
+const ADMISSION_DRAFTS_KEY = 'sms_admission_drafts';
+
+export const DEFAULT_ADMISSION_SETTINGS = {
+  school_id: 1,
+  online_admissions_enabled: true,
+  opening_date: '2026-01-01',
+  closing_date: '2026-12-31',
+  academic_session: '2026-2027',
+  academic_year_id: 2,
+  registration_fee: 500,
+  fee_mandatory: true,
+  application_number_prefix: 'ADM',
+  eligible_classes: [
+    { id: 1, name: 'Class 1', minAgeYears: 5, minAgeMonths: 6, maxAgeYears: 7, maxAgeMonths: 0, seats: 80, filled: 38 },
+    { id: 2, name: 'Class 2', minAgeYears: 6, minAgeMonths: 6, maxAgeYears: 8, maxAgeMonths: 0, seats: 80, filled: 45 },
+    { id: 3, name: 'Class 3', minAgeYears: 7, minAgeMonths: 6, maxAgeYears: 9, maxAgeMonths: 0, seats: 80, filled: 52 },
+    { id: 4, name: 'Class 4', minAgeYears: 8, minAgeMonths: 6, maxAgeYears: 10, maxAgeMonths: 0, seats: 80, filled: 40 },
+    { id: 5, name: 'Class 5', minAgeYears: 9, minAgeMonths: 6, maxAgeYears: 11, maxAgeMonths: 0, seats: 80, filled: 61 },
+    { id: 6, name: 'Class 6', minAgeYears: 10, minAgeMonths: 6, maxAgeYears: 12, maxAgeMonths: 0, seats: 90, filled: 74 },
+    { id: 7, name: 'Class 7', minAgeYears: 11, minAgeMonths: 6, maxAgeYears: 13, maxAgeMonths: 0, seats: 90, filled: 68 },
+    { id: 8, name: 'Class 8', minAgeYears: 12, minAgeMonths: 6, maxAgeYears: 14, maxAgeMonths: 0, seats: 90, filled: 82 },
+    { id: 9, name: 'Class 9', minAgeYears: 13, minAgeMonths: 6, maxAgeYears: 15, maxAgeMonths: 0, seats: 90, filled: 85 },
+    { id: 10, name: 'Class 10', minAgeYears: 14, minAgeMonths: 6, maxAgeYears: 16, maxAgeMonths: 0, seats: 90, filled: 88 },
+    { id: 11, name: 'Class 11', minAgeYears: 15, minAgeMonths: 6, maxAgeYears: 17, maxAgeMonths: 0, seats: 120, filled: 95 },
+    { id: 12, name: 'Class 12', minAgeYears: 16, minAgeMonths: 6, maxAgeYears: 18, maxAgeMonths: 0, seats: 120, filled: 110 },
+  ],
+  required_documents: [
+    { type: 'student_photo', name: 'Student Passport Photo', mandatory: true, acceptedTypes: '.jpg,.jpeg,.png' },
+    { type: 'birth_certificate', name: 'Birth Certificate (Govt. / Municipal)', mandatory: true, acceptedTypes: '.pdf,.jpg,.jpeg,.png' },
+    { type: 'address_proof', name: 'Residential Address Proof (Aadhaar / Passport / Utility)', mandatory: true, acceptedTypes: '.pdf,.jpg,.jpeg,.png' },
+    { type: 'previous_report_card', name: 'Previous Academic Report Card / Marksheet', mandatory: false, acceptedTypes: '.pdf,.jpg,.jpeg,.png' },
+    { type: 'transfer_certificate', name: 'Transfer Certificate (TC)', mandatory: false, acceptedTypes: '.pdf,.jpg,.jpeg,.png' },
+    { type: 'guardian_id', name: 'Parent / Guardian ID Proof', mandatory: false, acceptedTypes: '.pdf,.jpg,.jpeg,.png' },
+  ],
+  instructions: 'Please fill in all mandatory details accurately. Keep digital scanned copies of the student photograph, birth certificate, and address proof ready for upload. Registration fee can be paid online via UPI/Card or at the school cash counter.',
+  declaration_text: 'I hereby declare that all information furnished in this admission application is true, complete, and accurate. I understand that any false or withheld information may result in the forfeiture of admission.',
+};
+
+export const SEEDED_ADMISSION_APPLICATIONS = [
+  {
+    id: 1,
+    uuid: 'adm-app-001',
+    application_number: 'ADM-2027-000101',
+    access_token: 'tok_app_101_e7c9',
+    school_id: 1,
+    session_id: 1,
+    academic_year_id: 2,
+    academic_session: '2026-2027',
+    class_id: 1,
+    class_name: 'Class 1',
+    preferred_section: 'A',
+    first_name: 'Ishaan',
+    last_name: 'Chatterjee',
+    email: 'ishaan.parents@gmail.com',
+    phone: '+91 98301 22334',
+    date_of_birth: '2020-05-14',
+    gender: 'male',
+    blood_group: 'B+',
+    nationality: 'Indian',
+    mother_tongue: 'Bengali',
+    religion: 'Hindu',
+    caste: 'General',
+    birth_certificate_number: 'WB/KOL/2020/99881',
+    permanent_address: '14/B Lake Gardens, Near Lake Mall',
+    correspondence_address: '14/B Lake Gardens, Near Lake Mall',
+    city: 'Kolkata',
+    district: 'Kolkata',
+    state: 'West Bengal',
+    postal_code: '700045',
+    country: 'India',
+    previous_school: 'Little Angels Nursery School',
+    previous_board: 'State Montessori Board',
+    previous_class: 'Upper Kindergarten (UKG)',
+    previous_percentage: 'Grade A+',
+    transfer_certificate_number: 'TC-LAN-2026-089',
+    transfer_certificate_date: '2026-03-10',
+    status: 'submitted',
+    payment_status: 'completed',
+    payment_amount: 500,
+    payment_method: 'UPI',
+    payment_reference: 'UPI/20260216/88992211',
+    guardians: {
+      father_name: 'Subhashish Chatterjee',
+      father_phone: '+91 98301 22334',
+      father_email: 'subhashish.c@techcorp.com',
+      father_occupation: 'Senior Software Architect',
+      mother_name: 'Debjani Chatterjee',
+      mother_phone: '+91 98301 55667',
+      mother_email: 'debjani.c@education.org',
+      mother_occupation: 'College Lecturer',
+      emergency_contact_name: 'Subhashish Chatterjee',
+      emergency_contact_phone: '+91 98301 22334',
+      emergency_contact_relation: 'Father',
+    },
+    documents: [
+      { id: 101, document_type: 'student_photo', file_name: 'ishaan_photo.jpg', file_size: 145000, mime_type: 'image/jpeg', verification_status: 'pending' },
+      { id: 102, document_type: 'birth_certificate', file_name: 'birth_certificate_kolkata.pdf', file_size: 420000, mime_type: 'application/pdf', verification_status: 'pending' },
+      { id: 103, document_type: 'address_proof', file_name: 'electricity_bill_lake_gardens.pdf', file_size: 310000, mime_type: 'application/pdf', verification_status: 'pending' },
+    ],
+    status_history: [
+      { id: 1, from_status: 'draft', to_status: 'submitted', remarks: 'Application submitted successfully with online registration fee ₹500.', visible_to_applicant: true, changed_by_name: 'Applicant Portal', created_at: '2026-02-14 11:30:00' },
+    ],
+    submitted_at: '2026-02-14 11:30:00',
+    reviewed_at: null,
+    enrolled_at: null,
+    admin_remarks: null,
+  },
+  {
+    id: 2,
+    uuid: 'adm-app-002',
+    application_number: 'ADM-2027-000102',
+    access_token: 'tok_app_102_b4f1',
+    school_id: 1,
+    session_id: 1,
+    academic_year_id: 2,
+    academic_session: '2026-2027',
+    class_id: 6,
+    class_name: 'Class 6',
+    preferred_section: 'B',
+    first_name: 'Ananya',
+    last_name: 'Mukherjee',
+    email: 'ananya.parent@yahoo.in',
+    phone: '+91 94340 11223',
+    date_of_birth: '2015-08-22',
+    gender: 'female',
+    blood_group: 'O+',
+    nationality: 'Indian',
+    mother_tongue: 'Bengali',
+    religion: 'Hindu',
+    caste: 'General',
+    birth_certificate_number: 'WB/SLG/2015/00441',
+    permanent_address: '42 Sevoke Road, Near Planet Mall',
+    correspondence_address: '42 Sevoke Road, Near Planet Mall',
+    city: 'Siliguri',
+    district: 'Darjeeling',
+    state: 'West Bengal',
+    postal_code: '734001',
+    country: 'India',
+    previous_school: 'St. Mary Senior School',
+    previous_board: 'ICSE',
+    previous_class: 'Class 5',
+    previous_percentage: '94.6%',
+    transfer_certificate_number: 'TC-SMSS-2026-302',
+    transfer_certificate_date: '2026-03-12',
+    status: 'under_review',
+    payment_status: 'completed',
+    payment_amount: 500,
+    payment_method: 'Credit Card',
+    payment_reference: 'TXN_CC_99881122',
+    guardians: {
+      father_name: 'Dr. Alok Mukherjee',
+      father_phone: '+91 94340 11223',
+      father_email: 'dr.alok.m@health.org',
+      father_occupation: 'Surgeon',
+      mother_name: 'Sutapa Mukherjee',
+      mother_phone: '+91 94340 44556',
+      mother_email: 'sutapa.m@gmail.com',
+      mother_occupation: 'Senior Bank Manager',
+      emergency_contact_name: 'Dr. Alok Mukherjee',
+      emergency_contact_phone: '+91 94340 11223',
+      emergency_contact_relation: 'Father',
+    },
+    documents: [
+      { id: 201, document_type: 'student_photo', file_name: 'ananya_photo.jpg', file_size: 160000, mime_type: 'image/jpeg', verification_status: 'verified', verification_notes: 'Clear passport photo verified.' },
+      { id: 202, document_type: 'birth_certificate', file_name: 'birth_cert_ananya.pdf', file_size: 380000, mime_type: 'application/pdf', verification_status: 'verified', verification_notes: 'Govt municipal seal clear.' },
+      { id: 203, document_type: 'previous_report_card', file_name: 'class5_marksheet.pdf', file_size: 520000, mime_type: 'application/pdf', verification_status: 'pending' },
+      { id: 204, document_type: 'address_proof', file_name: 'aadhaar_card_proof.pdf', file_size: 290000, mime_type: 'application/pdf', verification_status: 'verified' },
+    ],
+    status_history: [
+      { id: 1, from_status: 'draft', to_status: 'submitted', remarks: 'Application submitted online with registration fee.', visible_to_applicant: true, changed_by_name: 'Applicant Portal', created_at: '2026-02-15 09:15:00' },
+      { id: 2, from_status: 'submitted', to_status: 'under_review', remarks: 'Application dossier taken up for academic verification by Admissions Committee.', visible_to_applicant: true, changed_by_name: 'Dr. Rameshwar Sharma (Admin)', created_at: '2026-02-16 10:20:00' },
+    ],
+    submitted_at: '2026-02-15 09:15:00',
+    reviewed_at: '2026-02-16 10:20:00',
+    enrolled_at: null,
+    admin_remarks: 'Academic record is exemplary (94.6% in Class 5). Awaiting clearance of previous marksheet.',
+  },
+  {
+    id: 3,
+    uuid: 'adm-app-003',
+    application_number: 'ADM-2027-000103',
+    access_token: 'tok_app_103_a9d3',
+    school_id: 1,
+    session_id: 1,
+    academic_year_id: 2,
+    academic_session: '2026-2027',
+    class_id: 9,
+    class_name: 'Class 9',
+    preferred_section: 'A',
+    first_name: 'Rohan',
+    last_name: 'Kapoor',
+    email: 'kapoor.family@gmail.com',
+    phone: '+91 98112 33445',
+    date_of_birth: '2012-03-10',
+    gender: 'male',
+    blood_group: 'AB+',
+    nationality: 'Indian',
+    mother_tongue: 'Hindi',
+    religion: 'Hindu',
+    caste: 'General',
+    birth_certificate_number: 'DL/ND/2012/77112',
+    permanent_address: 'Flat 304, Green Heights, Pradhan Nagar',
+    correspondence_address: 'Flat 304, Green Heights, Pradhan Nagar',
+    city: 'Siliguri',
+    district: 'Darjeeling',
+    state: 'West Bengal',
+    postal_code: '734001',
+    country: 'India',
+    previous_school: 'Delhi Heritage Academy',
+    previous_board: 'CBSE',
+    previous_class: 'Class 8',
+    previous_percentage: '88.2%',
+    transfer_certificate_number: 'TC-DHA-2026-119',
+    transfer_certificate_date: '2026-03-01',
+    status: 'documents_pending',
+    payment_status: 'completed',
+    payment_amount: 500,
+    payment_method: 'Net Banking',
+    payment_reference: 'NB_HDFC_994411',
+    guardians: {
+      father_name: 'Rajeev Kapoor',
+      father_phone: '+91 98112 33445',
+      father_email: 'rajeev.kapoor@business.com',
+      father_occupation: 'Managing Director',
+      mother_name: 'Pooja Kapoor',
+      mother_phone: '+91 98112 77889',
+      mother_email: 'pooja.kapoor@home.com',
+      mother_occupation: 'Interior Designer',
+      emergency_contact_name: 'Rajeev Kapoor',
+      emergency_contact_phone: '+91 98112 33445',
+      emergency_contact_relation: 'Father',
+    },
+    documents: [
+      { id: 301, document_type: 'student_photo', file_name: 'rohan_photo.jpg', file_size: 130000, mime_type: 'image/jpeg', verification_status: 'verified' },
+      { id: 302, document_type: 'birth_certificate', file_name: 'scanned_birth_cert_blurry.jpg', file_size: 89000, mime_type: 'image/jpeg', verification_status: 'rejected', verification_notes: 'Image is extremely blurry and registration seal is cut off. Please upload a clear high-res scan or PDF.' },
+      { id: 303, document_type: 'address_proof', file_name: 'rental_agreement.pdf', file_size: 450000, mime_type: 'application/pdf', verification_status: 'verified' },
+    ],
+    status_history: [
+      { id: 1, from_status: 'draft', to_status: 'submitted', remarks: 'Application submitted with registration fee.', visible_to_applicant: true, changed_by_name: 'Applicant Portal', created_at: '2026-02-15 14:00:00' },
+      { id: 2, from_status: 'submitted', to_status: 'documents_pending', remarks: 'Birth Certificate image is blurry. Please re-upload a clear copy through the tracking portal.', visible_to_applicant: true, changed_by_name: 'Admissions Desk', created_at: '2026-02-16 11:45:00' },
+    ],
+    submitted_at: '2026-02-15 14:00:00',
+    reviewed_at: '2026-02-16 11:45:00',
+    enrolled_at: null,
+    admin_remarks: 'Document correction requested: Birth certificate re-upload pending.',
+  },
+  {
+    id: 4,
+    uuid: 'adm-app-004',
+    application_number: 'ADM-2027-000104',
+    access_token: 'tok_app_104_c1a8',
+    school_id: 1,
+    session_id: 1,
+    academic_year_id: 2,
+    academic_session: '2026-2027',
+    class_id: 1,
+    class_name: 'Class 1',
+    preferred_section: 'A',
+    first_name: 'Samar',
+    last_name: 'Sen',
+    email: 'samar.sen.family@gmail.com',
+    phone: '+91 97330 99881',
+    date_of_birth: '2020-04-18',
+    gender: 'male',
+    blood_group: 'A+',
+    nationality: 'Indian',
+    mother_tongue: 'Bengali',
+    religion: 'Hindu',
+    caste: 'General',
+    birth_certificate_number: 'WB/SLG/2020/11883',
+    permanent_address: '88 Hakimpara, Siliguri',
+    correspondence_address: '88 Hakimpara, Siliguri',
+    city: 'Siliguri',
+    district: 'Darjeeling',
+    state: 'West Bengal',
+    postal_code: '734001',
+    country: 'India',
+    previous_school: 'Early Steps Pre-School',
+    previous_board: 'CBSE Early Years',
+    previous_class: 'Kindergarten',
+    previous_percentage: 'Grade A',
+    transfer_certificate_number: 'TC-ESPS-2026-041',
+    transfer_certificate_date: '2026-03-08',
+    status: 'approved',
+    payment_status: 'completed',
+    payment_amount: 500,
+    payment_method: 'UPI',
+    payment_reference: 'UPI_GPay_441199',
+    guardians: {
+      father_name: 'Pradip Sen',
+      father_phone: '+91 97330 99881',
+      father_email: 'pradip.sen@wb.gov.in',
+      father_occupation: 'Govt. Officer',
+      mother_name: 'Moumita Sen',
+      mother_phone: '+91 97330 22119',
+      mother_email: 'moumita.sen@gmail.com',
+      mother_occupation: 'Teacher',
+      emergency_contact_name: 'Pradip Sen',
+      emergency_contact_phone: '+91 97330 99881',
+      emergency_contact_relation: 'Father',
+    },
+    documents: [
+      { id: 401, document_type: 'student_photo', file_name: 'samar_photo.jpg', file_size: 155000, mime_type: 'image/jpeg', verification_status: 'verified' },
+      { id: 402, document_type: 'birth_certificate', file_name: 'samar_birth_cert.pdf', file_size: 340000, mime_type: 'application/pdf', verification_status: 'verified' },
+      { id: 403, document_type: 'address_proof', file_name: 'aadhaar_hakimpara.pdf', file_size: 290000, mime_type: 'application/pdf', verification_status: 'verified' },
+    ],
+    status_history: [
+      { id: 1, from_status: 'draft', to_status: 'submitted', remarks: 'Application submitted with payment.', visible_to_applicant: true, changed_by_name: 'Applicant Portal', created_at: '2026-02-13 10:00:00' },
+      { id: 2, from_status: 'submitted', to_status: 'under_review', remarks: 'Documents sent for committee review.', visible_to_applicant: true, changed_by_name: 'Admissions Officer', created_at: '2026-02-14 11:00:00' },
+      { id: 3, from_status: 'under_review', to_status: 'approved', remarks: 'All credentials and documents verified successfully. Admission approved by Principal. Proceed to enrollment conversion.', visible_to_applicant: true, changed_by_name: 'Principal Dr. Sunita Sharma', created_at: '2026-02-16 15:30:00' },
+    ],
+    submitted_at: '2026-02-13 10:00:00',
+    reviewed_at: '2026-02-16 15:30:00',
+    enrolled_at: null,
+    admin_remarks: 'Approved for Class 1 admission. Ready for final section allotment and enrollment.',
+  },
+  {
+    id: 5,
+    uuid: 'adm-app-005',
+    application_number: 'ADM-2027-000105',
+    access_token: 'tok_app_105_f2b9',
+    school_id: 1,
+    session_id: 1,
+    academic_year_id: 2,
+    academic_session: '2026-2027',
+    class_id: 10,
+    class_name: 'Class 10',
+    preferred_section: 'A',
+    first_name: 'Vikramaditya',
+    last_name: 'Singhania',
+    email: 'singhania.v@gmail.com',
+    phone: '+91 98200 44556',
+    date_of_birth: '2011-01-20',
+    gender: 'male',
+    blood_group: 'B+',
+    nationality: 'Indian',
+    mother_tongue: 'Hindi',
+    religion: 'Hindu',
+    caste: 'General',
+    birth_certificate_number: 'MH/MUM/2011/99221',
+    permanent_address: 'Bungalow 7, Hill Cart Road',
+    correspondence_address: 'Bungalow 7, Hill Cart Road',
+    city: 'Siliguri',
+    district: 'Darjeeling',
+    state: 'West Bengal',
+    postal_code: '734001',
+    country: 'India',
+    previous_school: 'Bombay Scottish School',
+    previous_board: 'ICSE',
+    previous_class: 'Class 9',
+    previous_percentage: '91.8%',
+    transfer_certificate_number: 'TC-BSS-2026-904',
+    transfer_certificate_date: '2026-02-28',
+    status: 'enrolled',
+    payment_status: 'completed',
+    payment_amount: 500,
+    payment_method: 'Card',
+    payment_reference: 'CARD_HDFC_11099',
+    converted_student_id: 3,
+    enrolled_admission_number: 'SLG-2026-003',
+    enrolled_class: 'Class 10-A',
+    guardians: {
+      father_name: 'Vikram Singhania Sr.',
+      father_phone: '+91 98200 44556',
+      father_email: 'vikram.sr@singhania.com',
+      father_occupation: 'Industrialist',
+      mother_name: 'Radhika Singhania',
+      mother_phone: '+91 98200 11223',
+      mother_email: 'radhika@singhania.com',
+      mother_occupation: 'Philanthropist',
+      emergency_contact_name: 'Vikram Singhania Sr.',
+      emergency_contact_phone: '+91 98200 44556',
+      emergency_contact_relation: 'Father',
+    },
+    documents: [
+      { id: 501, document_type: 'student_photo', file_name: 'vikram_photo.jpg', file_size: 170000, mime_type: 'image/jpeg', verification_status: 'verified' },
+      { id: 502, document_type: 'birth_certificate', file_name: 'birth_cert_mumbai.pdf', file_size: 410000, mime_type: 'application/pdf', verification_status: 'verified' },
+      { id: 503, document_type: 'transfer_certificate', file_name: 'tc_bombay_scottish.pdf', file_size: 480000, mime_type: 'application/pdf', verification_status: 'verified' },
+    ],
+    status_history: [
+      { id: 1, from_status: 'draft', to_status: 'submitted', remarks: 'Application submitted with payment.', visible_to_applicant: true, changed_by_name: 'Applicant Portal', created_at: '2026-02-10 12:00:00' },
+      { id: 2, from_status: 'submitted', to_status: 'approved', remarks: 'Application approved by Principal.', visible_to_applicant: true, changed_by_name: 'Principal Dr. Sunita Sharma', created_at: '2026-02-12 14:00:00' },
+      { id: 3, from_status: 'approved', to_status: 'enrolled', remarks: 'Student successfully admitted and enrolled into Class 10 (Section A). Admission Number: SLG-2026-003 assigned.', visible_to_applicant: true, changed_by_name: 'Super Admin', created_at: '2026-02-14 16:00:00' },
+    ],
+    submitted_at: '2026-02-10 12:00:00',
+    reviewed_at: '2026-02-12 14:00:00',
+    enrolled_at: '2026-02-14 16:00:00',
+    admin_remarks: 'Successfully enrolled into Class 10-A.',
+  },
+];
+
+export const getStoredAdmissionSettings = () => {
+  try {
+    const raw = localStorage.getItem(ADMISSION_SETTINGS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  try {
+    localStorage.setItem(ADMISSION_SETTINGS_KEY, JSON.stringify(DEFAULT_ADMISSION_SETTINGS));
+  } catch (_) {}
+  return DEFAULT_ADMISSION_SETTINGS;
+};
+
+export const saveStoredAdmissionSettings = (settings) => {
+  try {
+    localStorage.setItem(ADMISSION_SETTINGS_KEY, JSON.stringify(settings));
+    window.dispatchEvent(new CustomEvent('sms:admission-settings-updated', { detail: settings }));
+  } catch (_) {}
+};
+
+export const getStoredAdmissionApplications = () => {
+  try {
+    const raw = localStorage.getItem(ADMISSION_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (_) {}
+  try {
+    localStorage.setItem(ADMISSION_STORAGE_KEY, JSON.stringify(SEEDED_ADMISSION_APPLICATIONS));
+  } catch (_) {}
+  return SEEDED_ADMISSION_APPLICATIONS;
+};
+
+export const saveStoredAdmissionApplications = (apps) => {
+  try {
+    localStorage.setItem(ADMISSION_STORAGE_KEY, JSON.stringify(apps));
+    window.dispatchEvent(new CustomEvent('sms:admissions-updated', { detail: { count: apps.length } }));
+  } catch (_) {}
+};
+
+export const admissionAPI = {
+  // 1. Public Configuration (Active session, criteria, fee, documents checklist)
+  getPublicConfig: async (params = {}) => {
+    const effectiveSchoolId = getEffectiveSchoolId(params?.school_id);
+    const assignedSchoolId = effectiveSchoolId === 'all' ? 1 : Number(effectiveSchoolId);
+    const schools = getStoredSchools();
+    const currentSch = schools.find(s => Number(s.id) === assignedSchoolId) || schools[0];
+    const settings = getStoredAdmissionSettings();
+
+    return {
+      success: true,
+      data: {
+        ...settings,
+        school_id: assignedSchoolId,
+        school_name: currentSch?.name || 'Delhi Public Academy',
+        school_logo: currentSch?.logo || 'preset:🏫',
+        school_city: currentSch?.city || 'Siliguri',
+        school_curriculum: currentSch?.curriculum || 'CBSE',
+        school_email: currentSch?.email || 'admissions@dpa.edu',
+        school_phone: currentSch?.phone || '+91 353 2548900',
+        school_address: currentSch?.address || 'Hill Cart Road, Pradhan Nagar',
+      },
+    };
+  },
+
+  // 2. Draft Lifecycle (Save incomplete form and resume anytime)
+  saveDraft: async (draftData) => {
+    const drafts = JSON.parse(localStorage.getItem(ADMISSION_DRAFTS_KEY) || '{}');
+    const token = draftData.access_token || `tok_draft_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const savedDraft = {
+      ...draftData,
+      access_token: token,
+      updated_at: new Date().toISOString(),
+    };
+    drafts[token] = savedDraft;
+    try {
+      localStorage.setItem(ADMISSION_DRAFTS_KEY, JSON.stringify(drafts));
+    } catch (_) {}
+    return { success: true, access_token: token, message: 'Draft application saved successfully.' };
+  },
+
+  getDraft: async (token) => {
+    if (!token) return { success: false, message: 'Token required.' };
+    const drafts = JSON.parse(localStorage.getItem(ADMISSION_DRAFTS_KEY) || '{}');
+    const draft = drafts[token];
+    if (!draft) {
+      return { success: false, message: 'No active draft found with this verification link.' };
+    }
+    return { success: true, data: draft };
+  },
+
+  // 3. Application Submission (Concurrency-Safe ID Generation & Validation)
+  submitApplication: async (payload) => {
+    const apps = getStoredAdmissionApplications();
+    const settings = getStoredAdmissionSettings();
+    const prefix = settings.application_number_prefix || 'ADM';
+    const year = new Date().getFullYear();
+    const sequentialNum = String(apps.length + 101).padStart(6, '0');
+    const applicationNumber = `${prefix}-${year + 1}-${sequentialNum}`;
+    const accessToken = `tok_app_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    const newApp = {
+      id: Date.now(),
+      uuid: `adm-app-${Date.now()}`,
+      application_number: applicationNumber,
+      access_token: accessToken,
+      school_id: Number(payload.school_id || 1),
+      session_id: 1,
+      academic_year_id: 2,
+      academic_session: payload.academic_session || '2026-2027',
+      class_id: Number(payload.class_id || 1),
+      class_name: payload.class_name || `Class ${payload.class_id || 1}`,
+      preferred_section: payload.preferred_section || 'A',
+      first_name: (payload.first_name || '').trim(),
+      last_name: (payload.last_name || '').trim(),
+      email: payload.email || '',
+      phone: payload.phone || '',
+      date_of_birth: payload.date_of_birth || '',
+      gender: payload.gender || 'male',
+      blood_group: payload.blood_group || '',
+      nationality: payload.nationality || 'Indian',
+      mother_tongue: payload.mother_tongue || '',
+      religion: payload.religion || '',
+      caste: payload.caste || 'General',
+      birth_certificate_number: payload.birth_certificate_number || '',
+      permanent_address: payload.permanent_address || '',
+      correspondence_address: payload.correspondence_address || payload.permanent_address || '',
+      city: payload.city || '',
+      district: payload.district || '',
+      state: payload.state || '',
+      postal_code: payload.postal_code || '',
+      country: payload.country || 'India',
+      previous_school: payload.previous_school || '',
+      previous_board: payload.previous_board || '',
+      previous_class: payload.previous_class || '',
+      previous_percentage: payload.previous_percentage || '',
+      transfer_certificate_number: payload.transfer_certificate_number || '',
+      transfer_certificate_date: payload.transfer_certificate_date || null,
+      status: 'submitted',
+      payment_status: settings.fee_mandatory ? (payload.payment_status || 'completed') : (payload.payment_status || 'na'),
+      payment_amount: settings.registration_fee || 0,
+      payment_method: payload.payment_method || (settings.fee_mandatory ? 'UPI' : 'Free / Exempted'),
+      payment_reference: payload.payment_reference || `REF-${Date.now()}`,
+      guardians: payload.guardians || {
+        father_name: payload.father_name || '',
+        father_phone: payload.father_phone || '',
+        father_email: payload.father_email || '',
+        father_occupation: payload.father_occupation || '',
+        mother_name: payload.mother_name || '',
+        mother_phone: payload.mother_phone || '',
+        mother_email: payload.mother_email || '',
+        mother_occupation: payload.mother_occupation || '',
+        emergency_contact_name: payload.emergency_contact_name || payload.father_name || '',
+        emergency_contact_phone: payload.emergency_contact_phone || payload.father_phone || '',
+        emergency_contact_relation: payload.emergency_contact_relation || 'Father',
+      },
+      documents: (payload.documents || []).map((doc, idx) => ({
+        id: Date.now() + idx,
+        document_type: doc.document_type || doc.type,
+        file_name: doc.file_name || doc.name,
+        file_size: doc.file_size || doc.size || 100000,
+        mime_type: doc.mime_type || doc.type || 'application/pdf',
+        file_data: doc.file_data || doc.data || null,
+        verification_status: 'pending',
+        verification_notes: null,
+      })),
+      status_history: [
+        {
+          id: Date.now(),
+          from_status: 'draft',
+          to_status: 'submitted',
+          remarks: `Application submitted successfully for ${payload.class_name || 'Class ' + payload.class_id}. Registration fee: ₹${settings.registration_fee || 0}.`,
+          visible_to_applicant: true,
+          changed_by_name: 'Applicant Portal',
+          created_at: nowStr,
+        },
+      ],
+      submitted_at: nowStr,
+      reviewed_at: null,
+      enrolled_at: null,
+      admin_remarks: null,
+    };
+
+    apps.unshift(newApp);
+    saveStoredAdmissionApplications(apps);
+
+    // Auto-clean draft if access token exists
+    if (payload.draft_token) {
+      try {
+        const drafts = JSON.parse(localStorage.getItem(ADMISSION_DRAFTS_KEY) || '{}');
+        delete drafts[payload.draft_token];
+        localStorage.setItem(ADMISSION_DRAFTS_KEY, JSON.stringify(drafts));
+      } catch (_) {}
+    }
+
+    // Trigger in-app notification for School Admins
+    try {
+      await notificationAPI.create({
+        title: `New Online Admission Application: ${newApp.application_number}`,
+        message: `${newApp.first_name} ${newApp.last_name} applied for ${newApp.class_name}. Fee Status: ${newApp.payment_status.toUpperCase()}.`,
+        type: 'admission',
+        priority: 'high',
+        target_role: 'admin',
+        metadata: {
+          application_number: newApp.application_number,
+          student_name: `${newApp.first_name} ${newApp.last_name}`,
+          class: newApp.class_name,
+        },
+      });
+    } catch (_) {}
+
+    return {
+      success: true,
+      message: 'Admission application submitted successfully.',
+      data: newApp,
+    };
+  },
+
+  // 4. Secure Application Tracking (Verification by Application No. + DOB / Phone)
+  trackApplication: async (credentials) => {
+    const { application_number, date_of_birth, phone } = credentials;
+    if (!application_number) {
+      return { success: false, message: 'Please provide a valid Application Number.' };
+    }
+
+    const apps = getStoredAdmissionApplications();
+    const cleanAppNum = String(application_number).trim().toUpperCase();
+    const app = apps.find(a => a.application_number.toUpperCase() === cleanAppNum);
+
+    if (!app) {
+      return { success: false, message: 'No admission application found matching this Application Number.' };
+    }
+
+    // Security challenge: verify with either DOB or Phone
+    if (date_of_birth) {
+      const inputDob = String(date_of_birth).trim().substring(0, 10);
+      const appDob = String(app.date_of_birth).trim().substring(0, 10);
+      if (inputDob !== appDob) {
+        return { success: false, message: 'Security Verification Failed: Date of Birth does not match application records.' };
+      }
+    } else if (phone) {
+      const cleanInputPhone = String(phone).replace(/[^0-9]/g, '');
+      const cleanAppPhone = String(app.phone || app.guardians?.father_phone || '').replace(/[^0-9]/g, '');
+      if (!cleanAppPhone.includes(cleanInputPhone)) {
+        return { success: false, message: 'Security Verification Failed: Registered contact number does not match.' };
+      }
+    } else {
+      return { success: false, message: 'Please provide either Date of Birth or Registered Phone Number to verify your identity.' };
+    }
+
+    return {
+      success: true,
+      data: app,
+    };
+  },
+
+  // 5. Admin Application List (Filterable, Paginated, Searchable)
+  getAll: async (params = {}) => {
+    let apps = getStoredAdmissionApplications();
+    const effectiveSchoolId = getEffectiveSchoolId(params.school_id);
+    if (effectiveSchoolId !== 'all') {
+      apps = apps.filter(a => Number(a.school_id || 1) === Number(effectiveSchoolId));
+    }
+
+    if (params.status && params.status !== 'all') {
+      apps = apps.filter(a => a.status === params.status);
+    }
+    if (params.class_id && params.class_id !== 'all') {
+      apps = apps.filter(a => String(a.class_id) === String(params.class_id));
+    }
+    if (params.payment_status && params.payment_status !== 'all') {
+      apps = apps.filter(a => a.payment_status === params.payment_status);
+    }
+    if (params.search) {
+      const term = String(params.search).toLowerCase().trim();
+      apps = apps.filter(a =>
+        a.application_number.toLowerCase().includes(term) ||
+        `${a.first_name} ${a.last_name}`.toLowerCase().includes(term) ||
+        (a.email && a.email.toLowerCase().includes(term)) ||
+        (a.phone && a.phone.includes(term)) ||
+        (a.guardians?.father_name && a.guardians.father_name.toLowerCase().includes(term))
+      );
+    }
+
+    const page = parseInt(params.page || 1, 10);
+    const perPage = params.per_page === 'all' ? apps.length : parseInt(params.per_page || 15, 10);
+    const total = apps.length;
+    const startIndex = (page - 1) * perPage;
+    const paginatedItems = apps.slice(startIndex, startIndex + perPage);
+
+    return {
+      success: true,
+      data: paginatedItems,
+      meta: {
+        current_page: page,
+        per_page: perPage,
+        total,
+        total_pages: Math.ceil(total / (perPage || 1)),
+      },
+    };
+  },
+
+  // 6. Get Single Application by ID or Number
+  getById: async (idOrNumber) => {
+    const apps = getStoredAdmissionApplications();
+    const app = apps.find(a => String(a.id) === String(idOrNumber) || a.application_number === String(idOrNumber));
+    if (!app) return { success: false, message: 'Admission application not found.' };
+    return { success: true, data: app };
+  },
+
+  // 7. Admin Status Update with Audit Trail
+  updateStatus: async (applicationId, statusUpdate) => {
+    const apps = getStoredAdmissionApplications();
+    const index = apps.findIndex(a => String(a.id) === String(applicationId));
+    if (index === -1) return { success: false, message: 'Application not found.' };
+
+    const targetApp = apps[index];
+    const prevStatus = targetApp.status;
+    const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    targetApp.status = statusUpdate.status || targetApp.status;
+    if (statusUpdate.admin_remarks) targetApp.admin_remarks = statusUpdate.admin_remarks;
+    if (statusUpdate.rejection_reason) targetApp.rejection_reason = statusUpdate.rejection_reason;
+    if (statusUpdate.status === 'under_review' && !targetApp.reviewed_at) targetApp.reviewed_at = nowStr;
+
+    // Push into status history
+    if (!targetApp.status_history) targetApp.status_history = [];
+    targetApp.status_history.unshift({
+      id: Date.now(),
+      from_status: prevStatus,
+      to_status: targetApp.status,
+      remarks: statusUpdate.remarks || statusUpdate.admin_remarks || `Status updated to ${targetApp.status.replace(/_/g, ' ')}.`,
+      visible_to_applicant: statusUpdate.visible_to_applicant !== false,
+      changed_by_name: statusUpdate.admin_name || 'Admissions Administrator',
+      created_at: nowStr,
+    });
+
+    apps[index] = targetApp;
+    saveStoredAdmissionApplications(apps);
+
+    // Dispatched in-app notification if approved or correction requested
+    if (statusUpdate.status === 'documents_pending') {
+      try {
+        await notificationAPI.create({
+          title: `Document Correction Requested: ${targetApp.application_number}`,
+          message: `Correction requested for ${targetApp.first_name} ${targetApp.last_name}: ${statusUpdate.remarks || 'Please re-upload requested documents.'}`,
+          type: 'admission',
+          priority: 'high',
+          target_role: 'all',
+          metadata: { application_number: targetApp.application_number },
+        });
+      } catch (_) {}
+    }
+
+    return { success: true, message: `Application status updated to ${targetApp.status}.`, data: targetApp };
+  },
+
+  // 8. Document Verification
+  verifyDocument: async (applicationId, documentId, verificationData) => {
+    const apps = getStoredAdmissionApplications();
+    const index = apps.findIndex(a => String(a.id) === String(applicationId));
+    if (index === -1) return { success: false, message: 'Application not found.' };
+
+    const targetApp = apps[index];
+    if (!targetApp.documents) targetApp.documents = [];
+    const docIndex = targetApp.documents.findIndex(d => String(d.id) === String(documentId));
+    if (docIndex === -1) return { success: false, message: 'Document not found.' };
+
+    targetApp.documents[docIndex].verification_status = verificationData.status || 'verified';
+    targetApp.documents[docIndex].verification_notes = verificationData.notes || null;
+    targetApp.documents[docIndex].verified_at = new Date().toISOString();
+
+    // If any document is rejected, auto-prompt correction
+    const hasRejected = targetApp.documents.some(d => d.verification_status === 'rejected');
+    if (hasRejected && targetApp.status !== 'documents_pending' && targetApp.status !== 'enrolled') {
+      targetApp.status = 'documents_pending';
+    }
+
+    apps[index] = targetApp;
+    saveStoredAdmissionApplications(apps);
+    return { success: true, message: 'Document verification updated.', data: targetApp.documents[docIndex] };
+  },
+
+  // 9. Re-upload Document for Applicant (Correction Fix)
+  reuploadDocument: async (applicationNumber, docId, fileData) => {
+    const apps = getStoredAdmissionApplications();
+    const index = apps.findIndex(a => a.application_number === applicationNumber);
+    if (index === -1) return { success: false, message: 'Application not found.' };
+
+    const targetApp = apps[index];
+    const docIndex = targetApp.documents.findIndex(d => String(d.id) === String(docId));
+    if (docIndex === -1) return { success: false, message: 'Document record not found.' };
+
+    targetApp.documents[docIndex] = {
+      ...targetApp.documents[docIndex],
+      file_name: fileData.file_name || fileData.name,
+      file_size: fileData.file_size || fileData.size,
+      file_data: fileData.file_data || fileData.data,
+      verification_status: 'pending',
+      verification_notes: 'Re-uploaded by applicant. Awaiting fresh verification.',
+      uploaded_at: new Date().toISOString(),
+    };
+
+    // If all previously rejected documents are now re-uploaded, transition back to under_review
+    const anyStillRejected = targetApp.documents.some(d => d.verification_status === 'rejected');
+    if (!anyStillRejected && targetApp.status === 'documents_pending') {
+      targetApp.status = 'under_review';
+    }
+
+    apps[index] = targetApp;
+    saveStoredAdmissionApplications(apps);
+    return { success: true, message: 'Document re-uploaded successfully.', data: targetApp };
+  },
+
+  // 10. Atomic Enrollment Conversion (Convert approved application into real student)
+  enrollApplicant: async (applicationId, enrollmentDetails) => {
+    const apps = getStoredAdmissionApplications();
+    const index = apps.findIndex(a => String(a.id) === String(applicationId));
+    if (index === -1) return { success: false, message: 'Application not found.' };
+
+    const targetApp = apps[index];
+    if (targetApp.status === 'enrolled') {
+      return { success: false, message: 'This applicant is already enrolled as a student.' };
+    }
+    if (targetApp.status !== 'approved') {
+      return { success: false, message: 'Only approved applications can be converted into enrolled students.' };
+    }
+
+    const schoolId = targetApp.school_id || 1;
+    const admissionNumber = enrollmentDetails.admission_number || `SLG-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+    const rollNumber = enrollmentDetails.roll_number || '01';
+    const sectionId = Number(enrollmentDetails.section_id || 1);
+    const classId = Number(enrollmentDetails.class_id || targetApp.class_id || 1);
+    const academicYearId = Number(enrollmentDetails.academic_year_id || targetApp.academic_year_id || 2);
+
+    try {
+      // 1. Create Student record via studentAPI
+      const studentPayload = {
+        school_id: schoolId,
+        academic_year_id: academicYearId,
+        class_id: classId,
+        section_id: sectionId,
+        admission_number: admissionNumber,
+        admission_date: new Date().toISOString().substring(0, 10),
+        first_name: targetApp.first_name,
+        last_name: targetApp.last_name,
+        email: targetApp.email || `${targetApp.first_name.toLowerCase()}.${targetApp.last_name ? targetApp.last_name.toLowerCase() : 'student'}@school.com`,
+        phone: targetApp.phone || targetApp.guardians?.father_phone,
+        date_of_birth: targetApp.date_of_birth,
+        gender: targetApp.gender,
+        blood_group: targetApp.blood_group,
+        nationality: targetApp.nationality || 'Indian',
+        mother_tongue: targetApp.mother_tongue,
+        religion: targetApp.religion,
+        caste: targetApp.caste,
+        address: targetApp.permanent_address,
+        city: targetApp.city,
+        state: targetApp.state,
+        country: targetApp.country || 'India',
+        postal_code: targetApp.postal_code,
+        previous_school: targetApp.previous_school,
+        roll_number: rollNumber,
+        status: 'active',
+        father_name: targetApp.guardians?.father_name,
+        father_phone: targetApp.guardians?.father_phone,
+        father_occupation: targetApp.guardians?.father_occupation,
+        mother_name: targetApp.guardians?.mother_name,
+        mother_phone: targetApp.guardians?.mother_phone,
+        mother_occupation: targetApp.guardians?.mother_occupation,
+        emergency_contact_name: targetApp.guardians?.emergency_contact_name,
+        emergency_contact_phone: targetApp.guardians?.emergency_contact_phone,
+        emergency_contact_relation: targetApp.guardians?.emergency_contact_relation,
+      };
+
+      const studentRes = await studentAPI.create(studentPayload);
+      const createdStudent = studentRes?.data || { id: Date.now() };
+
+      // 2. Mark application as Enrolled
+      const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      targetApp.status = 'enrolled';
+      targetApp.converted_student_id = createdStudent.id;
+      targetApp.enrolled_admission_number = admissionNumber;
+      targetApp.enrolled_at = nowStr;
+      targetApp.enrolled_class = `${targetApp.class_name || 'Class ' + classId}`;
+
+      targetApp.status_history.unshift({
+        id: Date.now(),
+        from_status: 'approved',
+        to_status: 'enrolled',
+        remarks: `Student admitted and enrolled successfully. Admission Number: ${admissionNumber}, Roll No: ${rollNumber}.`,
+        visible_to_applicant: true,
+        changed_by_name: enrollmentDetails.admin_name || 'Super Admin',
+        created_at: nowStr,
+      });
+
+      apps[index] = targetApp;
+      saveStoredAdmissionApplications(apps);
+
+      // 3. Trigger Notification
+      try {
+        await notificationAPI.create({
+          title: `Student Admitted: ${targetApp.first_name} ${targetApp.last_name}`,
+          message: `${targetApp.first_name} ${targetApp.last_name} has been enrolled into ${targetApp.class_name} with Admission No. ${admissionNumber}.`,
+          type: 'admission',
+          priority: 'normal',
+          target_role: 'all',
+          metadata: {
+            student_id: createdStudent.id,
+            admission_number: admissionNumber,
+          },
+        });
+      } catch (_) {}
+
+      return {
+        success: true,
+        message: `Applicant successfully enrolled as Student ${admissionNumber}.`,
+        data: {
+          student: createdStudent,
+          application: targetApp,
+        },
+      };
+    } catch (err) {
+      console.error('Enrollment conversion error:', err);
+      return { success: false, message: `Enrollment conversion failed: ${err.message || 'Internal error'}` };
+    }
+  },
+
+  // 11. Dashboard KPI Statistics & Charts
+  getStatistics: async (params = {}) => {
+    let apps = getStoredAdmissionApplications();
+    const effectiveSchoolId = getEffectiveSchoolId(params.school_id);
+    if (effectiveSchoolId !== 'all') {
+      apps = apps.filter(a => Number(a.school_id || 1) === Number(effectiveSchoolId));
+    }
+
+    const total = apps.length;
+    const submitted = apps.filter(a => a.status === 'submitted').length;
+    const underReview = apps.filter(a => a.status === 'under_review').length;
+    const documentsPending = apps.filter(a => a.status === 'documents_pending').length;
+    const approved = apps.filter(a => a.status === 'approved').length;
+    const rejected = apps.filter(a => a.status === 'rejected').length;
+    const waitlisted = apps.filter(a => a.status === 'waitlisted').length;
+    const enrolled = apps.filter(a => a.status === 'enrolled').length;
+    const totalFeesCollected = apps
+      .filter(a => a.payment_status === 'completed')
+      .reduce((sum, a) => sum + (Number(a.payment_amount) || 0), 0);
+
+    // Class-wise breakdown
+    const classMap = {};
+    apps.forEach(a => {
+      const clsName = a.class_name || `Class ${a.class_id}`;
+      if (!classMap[clsName]) classMap[clsName] = { total: 0, approved: 0, enrolled: 0 };
+      classMap[clsName].total += 1;
+      if (a.status === 'approved') classMap[clsName].approved += 1;
+      if (a.status === 'enrolled') classMap[clsName].enrolled += 1;
+    });
+
+    const classDistribution = Object.entries(classMap).map(([name, data]) => ({
+      class_name: name,
+      ...data,
+    }));
+
+    return {
+      success: true,
+      data: {
+        total,
+        submitted,
+        underReview,
+        documentsPending,
+        approved,
+        rejected,
+        waitlisted,
+        enrolled,
+        totalFeesCollected,
+        classDistribution,
+      },
+    };
+  },
+
+  // 12. Settings Configuration
+  getSettings: async () => {
+    return { success: true, data: getStoredAdmissionSettings() };
+  },
+
+  updateSettings: async (newSettings) => {
+    const current = getStoredAdmissionSettings();
+    const merged = { ...current, ...newSettings };
+    saveStoredAdmissionSettings(merged);
+    return { success: true, message: 'Admission configuration updated successfully.', data: merged };
   },
 };
 

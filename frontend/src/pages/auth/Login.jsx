@@ -4,16 +4,36 @@ import { toast } from 'react-toastify';
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
 import { useSettings } from '../../context/SettingsContext';
+import { useSchool } from '../../context/SchoolContext';
 
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const { showValidationError } = useAlert();
   const { settings } = useSettings();
+  const { currentSchool } = useSchool();
 
-  const schoolName = settings?.school_name && settings.school_name !== 'null' ? settings.school_name : 'School Management System';
-  const schoolTagline = settings?.school_tagline && settings.school_tagline !== 'null' ? settings.school_tagline : 'Sign in to your account';
-  const schoolLogo = settings?.school_logo && settings.school_logo !== 'null' ? settings.school_logo : '';
+  const isLegacyOrPlaceholder = (name) => {
+    if (!name || name === 'null') return true;
+    const lower = String(name).trim().toLowerCase();
+    return (
+      lower.includes('twinkling') ||
+      lower.includes('toddler') ||
+      lower === 'school management system' ||
+      lower === 'sms'
+    );
+  };
+
+  const schoolName = !isLegacyOrPlaceholder(settings?.school_name)
+    ? settings.school_name
+    : (!isLegacyOrPlaceholder(currentSchool?.name)
+        ? currentSchool.name
+        : 'Delhi Public Academy');
+
+  const schoolTagline = settings?.school_tagline && settings.school_tagline !== 'null'
+    ? settings.school_tagline
+    : (currentSchool?.city ? `${currentSchool.city} • ${currentSchool.curriculum || 'CBSE'}` : 'Sign in to your account');
+  const schoolLogo = currentSchool?.logo || (settings?.school_logo && settings.school_logo !== 'null' ? settings.school_logo : '');
   const [formData, setFormData] = useState({
     email: 'admin@school.com',
     password: 'password',
@@ -253,7 +273,7 @@ const Login = () => {
 
         {/* Footer */}
         <p className="text-center text-blue-100 text-sm mt-6">
-          © 2025 School Management System. All rights reserved.
+          © {new Date().getFullYear()} {schoolName}. All rights reserved.
         </p>
       </div>
     </div>

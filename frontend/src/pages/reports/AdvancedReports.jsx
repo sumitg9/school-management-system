@@ -568,7 +568,7 @@ const AdvancedReports = () => {
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">{generatedReport.subtitle}</p>
                   <p className="text-[11px] text-gray-400 mt-1">
-                    Campus: {currentSchool?.name || 'Twinkling Toddlers Senior Campus'} • Generated on {new Date().toLocaleString('en-IN')} by {user?.name || 'Super Admin'}
+                    Campus: {currentSchool?.name || 'Delhi Public Academy - Siliguri Main Campus'} • Generated on {new Date().toLocaleString('en-IN')} by {user?.name || 'Super Admin'}
                   </p>
                 </div>
               </div>

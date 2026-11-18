@@ -545,7 +545,7 @@ export default function SchoolsManagement() {
                     required
                     value={addForm.name}
                     onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
-                    placeholder="e.g. Twinkling Toddlers International School - Delhi NCR Campus"
+                    placeholder="e.g. Delhi Public Academy - Delhi NCR Campus"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-hidden"
                   />
                 </div>
@@ -569,7 +569,7 @@ export default function SchoolsManagement() {
                     required
                     value={addForm.code}
                     onChange={(e) => setAddForm({ ...addForm, code: e.target.value.toUpperCase() })}
-                    placeholder="e.g. TT-DEL-04"
+                    placeholder="e.g. DPA-DEL-04"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono focus:ring-2 focus:ring-blue-500 outline-hidden"
                   />
                 </div>

@@ -262,6 +262,17 @@ export const PERMISSION_MODULES = [
       { id: 'manage-schools', label: 'Manage Schools & Campuses', description: 'Create, provision, configure, and manage branches and campus settings' },
     ],
   },
+  {
+    id: 'admissions',
+    name: 'Online Admissions',
+    icon: '📝',
+    description: 'Online applicant portal management, document verification, application approval, rejection, and student enrollment conversion',
+    permissions: [
+      { id: 'view-admissions', label: 'View Admission Applications', description: 'Browse submitted admission applications, tracking timeline, and applicant documents' },
+      { id: 'manage-admissions', label: 'Manage & Verify Applications', description: 'Review applicant dossiers, verify uploaded documents, request corrections, and update status' },
+      { id: 'enroll-admissions', label: 'Enroll & Admit Students', description: 'Perform 1-click atomic conversion of approved applicants into enrolled students and parent user accounts' },
+    ],
+  },
 ];
 
 export const DEFAULT_ROLE_PERMISSIONS = {
@@ -284,6 +295,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-events', 'manage-events',
     'view-hrms', 'manage-hrms',
     'view-schools', 'manage-schools',
+    'view-admissions', 'manage-admissions', 'enroll-admissions',
   ],
   'admin': [
     'view-dashboard',
@@ -304,6 +316,7 @@ export const DEFAULT_ROLE_PERMISSIONS = {
     'view-events', 'manage-events',
     'view-hrms', 'manage-hrms',
     'view-schools',
+    'view-admissions', 'manage-admissions', 'enroll-admissions',
   ],
   'teacher': [
     'view-dashboard',

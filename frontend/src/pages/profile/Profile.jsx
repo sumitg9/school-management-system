@@ -188,7 +188,7 @@ const Profile = () => {
         <div className="h-44 bg-gradient-to-r from-blue-700 via-indigo-800 to-purple-900 relative p-6 flex items-start justify-between">
           <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md px-3 py-1 rounded-full text-white text-xs font-semibold">
             <span>🏫</span>
-            <span>{settings?.school_name || 'Delhi Public School'}</span>
+            <span>{settings?.school_name || 'Delhi Public Academy'}</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -716,7 +716,7 @@ const Profile = () => {
                 <span className="text-2xl">🎓</span>
                 <div>
                   <h4 className="text-sm font-bold text-indigo-950">
-                    {settings?.school_name || 'Delhi Public School'}
+                    {settings?.school_name || 'Delhi Public Academy'}
                   </h4>
                   <p className="text-[11px] text-indigo-700">Official Institutional Profile</p>
                 </div>

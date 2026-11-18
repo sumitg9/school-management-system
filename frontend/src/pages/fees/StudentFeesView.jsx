@@ -920,7 +920,7 @@ const StudentFeesView = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-gray-200 gap-4">
                   <div>
                     <h1 className="text-xl font-bold text-gray-900 tracking-tight">
-                      {settings?.school_name || 'Delhi Public School'}
+                      {settings?.school_name || 'Delhi Public Academy'}
                     </h1>
                     <p className="text-xs text-gray-500 mt-0.5">
                       {settings?.school_address || 'Knowledge Park, Institutional Area'}
