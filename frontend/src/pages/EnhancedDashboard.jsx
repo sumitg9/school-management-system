@@ -57,11 +57,11 @@ const EnhancedDashboard = () => {
   });
 
   const [recentActivities, setRecentActivities] = useState([
-    { id: 1, type: 'student', action: 'Student management active', time: 'Active', icon: '👨‍🎓' },
-    { id: 2, type: 'attendance', action: 'Daily attendance tracker active', time: 'Today', icon: '📊' },
-    { id: 3, type: 'exam', action: 'Examinations scheduled', time: 'This Term', icon: '📝' },
-    { id: 4, type: 'fee', action: 'Fee management portal updated', time: 'Active', icon: '💰' },
-    { id: 5, type: 'assignment', action: 'Assignment system ready', time: 'Active', icon: '📚' },
+    { id: 1, type: 'student', path: '/students', action: 'Student management active', time: 'Active', icon: '👨‍🎓' },
+    { id: 2, type: 'attendance', path: '/attendance', action: 'Daily attendance tracker active', time: 'Today', icon: '📊' },
+    { id: 3, type: 'exam', path: '/exams', action: 'Examinations scheduled', time: 'This Term', icon: '📝' },
+    { id: 4, type: 'fee', path: '/fees', action: 'Fee management portal updated', time: 'Active', icon: '💰' },
+    { id: 5, type: 'assignment', path: '/assignments', action: 'Assignment system ready', time: 'Active', icon: '📚' },
   ]);
 
   useEffect(() => {
@@ -104,9 +104,9 @@ const EnhancedDashboard = () => {
           assignments: { total: 0, active: 0, overdue: 0 },
         });
         setRecentActivities([
-          { id: 1, type: 'student', action: `Parent Portal: ${parentChildren.length} linked child${parentChildren.length !== 1 ? 'ren' : ''}`, time: 'Active', icon: '👨‍👩‍👧' },
-          { id: 2, type: 'attendance', action: activeChild ? `Viewing ${activeChild.first_name}'s academic records` : 'Select active child', time: 'Today', icon: '👦' },
-          { id: 3, type: 'fee', action: 'Fee schedules and payment receipts available', time: 'Active', icon: '💰' },
+          { id: 1, type: 'student', path: '/students', action: `Parent Portal: ${parentChildren.length} linked child${parentChildren.length !== 1 ? 'ren' : ''}`, time: 'Active', icon: '👨‍👩‍👧' },
+          { id: 2, type: 'attendance', path: '/attendance', action: activeChild ? `Viewing ${activeChild.first_name}'s academic records` : 'Select active child', time: 'Today', icon: '👦' },
+          { id: 3, type: 'fee', path: '/fees', action: 'Fee schedules and payment receipts available', time: 'Active', icon: '💰' },
         ]);
         setInitialLoading(false);
         setRefreshing(false);
@@ -242,11 +242,28 @@ const EnhancedDashboard = () => {
 
       // Update dynamic recent activities if real data is available
       const dynamicActivities = [];
+
+      try {
+        const admApps = JSON.parse(localStorage.getItem('sms_admission_applications_v1') || '[]');
+        if (admApps.length > 0) {
+          const latestAdm = admApps[0];
+          dynamicActivities.push({
+            id: 'admission-latest',
+            type: 'admission',
+            path: `/admissions/manage/${latestAdm.id}`,
+            action: `Admission application: ${latestAdm.first_name} ${latestAdm.last_name || ''} (${latestAdm.application_number})`,
+            time: 'Recently',
+            icon: '📝',
+          });
+        }
+      } catch (_) {}
+
       if (studentsRes?.data?.[0]) {
         const s = studentsRes.data[0];
         dynamicActivities.push({
           id: 'student-latest',
           type: 'student',
+          path: `/students/${s.id}`,
           action: `Student enrolled: ${s.first_name || ''} ${s.last_name || ''}`.trim(),
           time: 'Recently',
           icon: '👨‍🎓',
@@ -257,15 +274,16 @@ const EnhancedDashboard = () => {
         dynamicActivities.push({
           id: 'teacher-latest',
           type: 'teacher',
+          path: `/teachers/${t.id}`,
           action: `Teacher active: ${t.first_name || ''} ${t.last_name || ''}`.trim(),
           time: 'Recently',
           icon: '👨‍🏫',
         });
       }
       dynamicActivities.push(
-        { id: 2, type: 'attendance', action: 'Daily attendance tracker active', time: 'Today', icon: '📊' },
-        { id: 3, type: 'exam', action: 'Examinations scheduled', time: 'This Term', icon: '📝' },
-        { id: 4, type: 'fee', action: 'Fee management portal updated', time: 'Active', icon: '💰' }
+        { id: 2, type: 'attendance', path: '/attendance', action: 'Daily attendance tracker active', time: 'Today', icon: '📊' },
+        { id: 3, type: 'exam', path: '/exams', action: 'Examinations scheduled', time: 'This Term', icon: '📝' },
+        { id: 4, type: 'fee', path: '/fees', action: 'Fee management portal updated', time: 'Active', icon: '💰' }
       );
       setRecentActivities(dynamicActivities);
 
@@ -620,22 +638,40 @@ const EnhancedDashboard = () => {
 
         {/* Recent Activity */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
-          <div className="space-y-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
+            <span className="text-2xl">⚡</span>
+          </div>
+          <div className="space-y-3">
             {recentActivities.map((activity) => (
-              <div key={activity.id} className="flex items-start space-x-3">
+              <div
+                key={activity.id}
+                onClick={() => activity.path && navigate(activity.path)}
+                className={`flex items-start space-x-3 p-2 rounded-xl transition ${
+                  activity.path ? 'hover:bg-slate-50 cursor-pointer' : ''
+                }`}
+                title={activity.path ? 'Click to view details' : undefined}
+              >
                 <div className="h-10 w-10 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <span className="text-xl">{activity.icon}</span>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">{activity.action}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{activity.action}</p>
                   <p className="text-xs text-gray-500">{activity.time}</p>
                 </div>
+                {activity.path && (
+                  <span className="text-xs text-blue-500 font-bold self-center">→</span>
+                )}
               </div>
             ))}
           </div>
-          <button className="mt-4 w-full text-center text-sm text-blue-600 hover:text-blue-800">
-            View All Activity →
+          <button
+            type="button"
+            onClick={() => navigate('/notifications')}
+            className="mt-4 w-full text-center text-sm font-semibold text-blue-600 hover:text-blue-800 cursor-pointer hover:underline py-2 rounded-lg hover:bg-blue-50/50 transition flex items-center justify-center gap-1.5"
+          >
+            <span>View All Activity</span>
+            <span>→</span>
           </button>
         </div>
       </div>

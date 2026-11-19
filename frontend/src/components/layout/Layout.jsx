@@ -61,14 +61,6 @@ const Layout = ({ children }) => {
       permission: 'view-dashboard',
     },
     {
-      id: 'admissions_direct',
-      type: 'item',
-      path: '/admissions/manage',
-      icon: '📝',
-      label: 'Online Admissions',
-      permission: 'view-admissions',
-    },
-    {
       id: 'academics',
       type: 'group',
       label: isParent() ? "Child's Academics" : 'Academics & Faculty',

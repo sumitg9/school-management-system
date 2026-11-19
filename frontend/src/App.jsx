@@ -168,6 +168,8 @@ function AppRoutes() {
                     <Route path="/admission/manage/:id" element={<Navigate to="/admissions/manage/:id" replace />} />
                     <Route path="/admission/settings" element={<Navigate to="/admissions/settings" replace />} />
                     <Route path="/notifications" element={<NotificationCenter />} />
+                    <Route path="/activity" element={<Navigate to="/notifications" replace />} />
+                    <Route path="/activities" element={<Navigate to="/notifications" replace />} />
                     <Route path="/users" element={<PermissionRoute permission="manage-users"><UserList /></PermissionRoute>} />
                     <Route path="/settings" element={<PermissionRoute permission="manage-settings"><Settings /></PermissionRoute>} />
                     <Route path="/profile" element={<Profile />} />
